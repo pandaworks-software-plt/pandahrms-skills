@@ -28,9 +28,9 @@ for skill_dir in "${PLUGIN_ROOT}/skills"/*/; do
         # Extract description from YAML frontmatter (BSD sed compatible)
         description=$(awk '/^---$/{n++; next} n==1 && /^description:/{sub(/^description: */, ""); print; exit}' "${skill_dir}SKILL.md")
         if [ -n "$skills_list" ]; then
-            skills_list="${skills_list}\n- pandahrms-skills:${skill_name}: ${description}"
+            skills_list="${skills_list}\n- pandahrms:${skill_name}: ${description}"
         else
-            skills_list="- pandahrms-skills:${skill_name}: ${description}"
+            skills_list="- pandahrms:${skill_name}: ${description}"
         fi
     fi
 done
