@@ -17,7 +17,7 @@ for dir in "${HOME}/.claude/plugins/cache"/*/superpowers/*/; do
     fi
 done
 if [ "$superpowers_found" = false ]; then
-    warning_message="\n\n**WARNING:** The superpowers plugin is required but not installed. Run: claude plugins add obra/superpowers"
+    warning_message="\n\n**WARNING:** The superpowers plugin is required but not installed. Launch Claude Code and run: /plugins marketplace add obra/superpowers"
 fi
 
 # Build skill list from skills directory

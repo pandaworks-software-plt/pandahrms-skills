@@ -120,11 +120,11 @@ Run each project to confirm it works:
 
 ### Step 7: Claude Code Setup
 
-Install Claude Code plugins:
+Install Claude Code plugins (run these inside Claude Code):
 
-```bash
-claude plugins add obra/superpowers
-claude plugins add pandaworks-software-plt/pandahrms-skills
+```
+/plugins marketplace add obra/superpowers
+/plugins marketplace add pandaworks-software-plt/pandahrms-skills
 ```
 
 Point the developer to each project's `CLAUDE.md` for project-specific conventions.
