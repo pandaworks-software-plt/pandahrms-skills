@@ -7,6 +7,19 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
+# Check if superpowers plugin is installed
+warning_message=""
+superpowers_found=false
+for dir in "${HOME}/.claude/plugins/cache"/*/superpowers/*/; do
+    if [ -d "$dir" ]; then
+        superpowers_found=true
+        break
+    fi
+done
+if [ "$superpowers_found" = false ]; then
+    warning_message="\n\n**WARNING:** The superpowers plugin is required but not installed. Run: claude plugins add obra/superpowers"
+fi
+
 # Build skill list from skills directory
 skills_list=""
 for skill_dir in "${PLUGIN_ROOT}/skills"/*/; do
@@ -42,13 +55,14 @@ escape_for_json() {
 }
 
 skills_escaped=$(escape_for_json "$skills_list")
+warning_escaped=$(escape_for_json "$warning_message")
 
 # Output context injection as JSON
 cat <<EOF
 {
   "hookSpecificOutput": {
     "hookEventName": "SessionStart",
-    "additionalContext": "PandaHRMS skills available (use Skill tool to invoke):\n${skills_escaped}"
+    "additionalContext": "PandaHRMS skills available (use Skill tool to invoke):\n${skills_escaped}${warning_escaped}"
   }
 }
 EOF

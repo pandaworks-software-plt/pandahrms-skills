@@ -12,7 +12,10 @@ Pandahrms-specific skills plugin for Claude Code. Provides domain skills that in
 
 ## Installation
 
+Requires [superpowers](https://github.com/obra/superpowers) plugin. Install both:
+
 ```bash
+claude plugins add obra/superpowers
 claude plugins add pandaworks-software-plt/pandahrms-skills
 ```
 
