@@ -1,8 +1,8 @@
 {
   "name": "pandahrms",
-  "description": "Pandahrms-specific skills for Claude Code: spec writing, cross-project bridge, system setup, and EF Core migrations",
-  "version": "1.2.0",
+  "description": "Pandahrms-specific skills for Claude Code: spec writing, cross-project bridge, system setup, EF Core migrations, and React web frontend conventions",
+  "version": "1.3.0",
   "author": { "name": "Pandaworks" },
   "license": "UNLICENSED",
-  "keywords": ["pandahrms", "skills", "gherkin", "specs", "setup", "bridge"]
+  "keywords": ["pandahrms", "skills", "gherkin", "specs", "setup", "bridge", "react", "nextjs", "frontend"]
 }
