@@ -4,19 +4,38 @@ Pandahrms-specific skills plugin for Claude Code. Provides domain skills that in
 
 ## Skills
 
-| Skill | Description |
-|-------|-------------|
-| **spec-writing** | Convert design documents into Gherkin feature specs in pandahrms-spec |
-| **cross-project-bridge** | Structured protocol for debugging cross-project FE/BE issues |
-| **system-setup** | Guide new developers through environment setup (macOS + Windows) |
+| Skill | Slash Command | Description |
+|-------|---------------|-------------|
+| **spec-writing** | `/pandahrms:spec-writing` | Convert design documents into Gherkin feature specs in pandahrms-spec |
+| **cross-project-bridge** | `/pandahrms:cross-project-bridge` | Structured protocol for debugging cross-project FE/BE issues |
+| **system-setup** | `/pandahrms:system-setup` | Guide new developers through environment setup (macOS + Windows, Docker or IIS) |
+| **ef-migrations** | `/pandahrms:ef-migrations` | EF Core migration commands for Performance and Recruitment APIs |
 
 ## Installation
 
-Requires [superpowers](https://github.com/obra/superpowers) plugin. Launch Claude Code, then install both:
+### Prerequisites
 
+Requires [superpowers](https://github.com/obra/superpowers) plugin.
+
+### Steps
+
+1. Launch Claude Code
+2. Add the marketplaces:
+   ```
+   /plugins marketplace add obra/superpowers-marketplace
+   /plugins marketplace add pandaworks-software-plt/pandahrms-skills
+   ```
+3. Install the plugins:
+   ```
+   /plugins install superpowers@superpowers-marketplace
+   /plugins install pandahrms@pandahrms-skills
+   ```
+
+### Updating
+
+To update the plugin to the latest version:
 ```
-/plugins marketplace add obra/superpowers
-/plugins marketplace add pandaworks-software-plt/pandahrms-skills
+/plugins update pandahrms@pandahrms-skills
 ```
 
 ## How it fits
@@ -24,11 +43,11 @@ Requires [superpowers](https://github.com/obra/superpowers) plugin. Launch Claud
 This plugin adds domain-specific skills to the superpowers development pipeline:
 
 ```
-superpowers:brainstorming --> superpowers:writing-plans --> pandahrms-skills:spec-writing
+superpowers:brainstorming --> superpowers:writing-plans --> pandahrms:spec-writing
     --> superpowers:executing-plans (TDD) --> superpowers:code-review --> superpowers:finish-branch
 ```
 
-Additional standalone skills: `cross-project-bridge` and `system-setup`.
+Additional standalone skills: `pandahrms:cross-project-bridge`, `pandahrms:system-setup`, and `pandahrms:ef-migrations`.
 
 ## License
 
