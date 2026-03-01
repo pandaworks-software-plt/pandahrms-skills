@@ -1,0 +1,8 @@
+{
+  "name": "pandahrms-skills",
+  "description": "Pandahrms-specific skills for Claude Code: spec writing, cross-project bridge, and system setup",
+  "version": "1.0.0",
+  "author": { "name": "Pandaworks" },
+  "license": "UNLICENSED",
+  "keywords": ["pandahrms", "skills", "gherkin", "specs", "setup", "bridge"]
+}

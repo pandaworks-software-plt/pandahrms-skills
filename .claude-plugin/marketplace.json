@@ -1,0 +1,18 @@
+{
+  "name": "pandahrms-skills",
+  "description": "Pandahrms-specific skills for Claude Code",
+  "owner": {
+    "name": "Pandaworks"
+  },
+  "plugins": [
+    {
+      "name": "pandahrms-skills",
+      "description": "Pandahrms-specific skills for Claude Code: spec writing, cross-project bridge, and system setup",
+      "version": "1.0.0",
+      "source": "./",
+      "author": {
+        "name": "Pandaworks"
+      }
+    }
+  ]
+}
