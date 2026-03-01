@@ -7,68 +7,140 @@ description: Use when setting up a new developer workstation for Pandahrms devel
 
 ## Overview
 
-Guide new developers through setting up the complete Pandahrms development environment. Covers the full monorepo workspace across all projects with platform-specific instructions.
+Guide new developers through setting up the complete Pandahrms development environment. This skill operates as a phased pipeline - shared prerequisites first, then deployment based on the developer's chosen method (Docker or IIS).
 
 **Announce at start:** "I'm using the system-setup skill to configure the development environment."
 
-## Platform Detection
+## Interaction Model
 
-Detect the platform automatically and load the appropriate guide:
+For EVERY step in this skill:
+
+1. **Explain** what the tool/component is and why it's needed (1-2 sentences)
+2. **Check** if it's already installed or done (run a check command)
+3. **Show** the exact command that will be run
+4. **Ask permission** before executing
+
+Never run installation commands without the developer's explicit approval.
+
+## The Pipeline
+
+```
+Phase 1: Gather Info
+    |
+Phase 2: Prerequisites (shared - platform-specific)
+    |
+Phase 3: Clone & Configure (shared)
+    |
+Phase 4: Deployment (Docker OR IIS)
+    |
+Phase 5: Verification & Tooling
+```
+
+---
+
+## Phase 1: Gather Info
+
+Collect three pieces of information before starting:
+
+### 1. Platform Detection
+
+Detect automatically via the OS. Confirm with the developer.
+
+- **macOS** - will use `mac-setup.md` for prerequisites
+- **Windows** - will use `windows-setup.md` for prerequisites
+
+### 2. Developer Role
+
+Ask which areas they will work on. This determines which repos to clone and which dependencies to install.
+
+| Role | Repos | Dependencies |
+|------|-------|--------------|
+| **Frontend** | FE projects + specs | Node.js, pnpm |
+| **Backend** | BE projects + shared lib | .NET SDK |
+| **Mobile** | Mobile app + specs | Node.js, Yarn, Expo, Xcode/Android Studio |
+| **All** | Everything | All of the above |
+
+### 3. Deployment Method
+
+Ask how they want to run the stack locally:
+
+| Method | Best for | Platform |
+|--------|----------|----------|
+| **Docker** | Full stack with one command, containers handle everything | macOS or Windows |
+| **IIS (non-Docker)** | Running .NET in IIS, Next.js as Windows services | Windows only |
+
+If they choose IIS on macOS, inform them IIS is Windows-only and suggest Docker.
+
+---
+
+## Phase 2: Prerequisites
+
+Load the platform-specific reference file:
 
 - **macOS:** Read `mac-setup.md` in this skill directory
 - **Windows:** Read `windows-setup.md` in this skill directory
 
-## The Process
+Walk through each prerequisite from the reference file using the interaction model (explain, check, show, ask).
 
-### Step 1: Prerequisites
-
-Verify or install required tools. Ask the user which roles they will work on (frontend, backend, mobile, all) to skip irrelevant steps.
-
-**All roles:**
+**Common prerequisites (all platforms):**
 - Git
 - Node.js (LTS)
-- pnpm (`npm install -g pnpm`)
-- .NET SDK
-- IDE (VS Code recommended, Rider for .NET)
+- pnpm
+- .NET SDK (if backend or all role)
+- IDE (VS Code recommended)
 
-**Mobile development (additional):**
+**If Docker deployment chosen:**
+- Docker Desktop
+
+**If IIS deployment chosen (Windows only):**
+- .NET 8 ASP.NET Core Hosting Bundle
+- IIS URL Rewrite Module
+- Application Request Routing (ARR)
+- SQL Server (Express or Developer edition)
+
+**If mobile role:**
 - Yarn
-- Expo CLI (`npm install -g expo-cli`)
+- Expo CLI
 - macOS: Xcode CLI tools + CocoaPods
 - Android: Android Studio + SDK
 
-### Step 2: Clone Repositories
+---
 
-Create the workspace directory and clone all required repos:
+## Phase 3: Clone & Configure
+
+### 3.1 Create Workspace
 
 ```bash
 mkdir -p ~/Developer/pandaworks/_pandahrms-workspace
 cd ~/Developer/pandaworks/_pandahrms-workspace
 ```
 
-**Repositories to clone:**
+### 3.2 Clone Repositories
 
-| Project | Repo |
-|---------|------|
-| PandaHRMS_Api | Main backend API |
-| Pandahrms_PerformanceApi | Performance backend |
-| Pandahrms_RecruitmentApi | Recruitment backend |
-| Pandahrms_ApiGateway | API Gateway |
-| Pandahrms_Web | Web backend |
-| pandahrms-shared | Shared .NET library |
-| Pandahrms-Performance | Performance frontend |
-| Pandahrms-Recruitment | Recruitment frontend |
-| pandahrms-sso | SSO frontend |
-| pandaworks-app | Mobile app |
-| pandahrms-spec | Specifications |
+Clone only the repos relevant to the developer's role. All repos are under the `pandaworks-software-plt` GitHub organization.
 
-Also create shared bridge directories:
+| Project | Type | Roles |
+|---------|------|-------|
+| PandaHRMS_Api | Backend | backend, all |
+| Pandahrms_PerformanceApi | Backend | backend, all |
+| Pandahrms_RecruitmentApi | Backend | backend, all |
+| Pandahrms_ApiGateway | Backend | backend, all |
+| Pandahrms_Web | Backend | backend, all |
+| pandahrms-shared | Shared lib | backend, all |
+| Pandahrms-Performance | Frontend | frontend, all |
+| Pandahrms-Recruitment | Frontend | frontend, all |
+| pandahrms-sso | Frontend | frontend, all |
+| pandaworks-app | Mobile | mobile, all |
+| pandahrms-spec | Specs | all roles |
+
+### 3.3 Create Bridge Directories
+
 ```bash
 mkdir -p performance-shared/bridge
 mkdir -p pandahrms-app-shared/bridge
 ```
 
-### Step 3: Install Dependencies
+### 3.4 Install Dependencies
 
 **Frontend projects (Next.js):**
 ```bash
@@ -89,19 +161,38 @@ cd Pandahrms_PerformanceApi && dotnet restore && cd ..
 cd Pandahrms_RecruitmentApi && dotnet restore && cd ..
 ```
 
-### Step 4: Environment Configuration
+Only run the commands relevant to the developer's role.
 
-Each project needs its own environment file. Walk through each one and prompt for required values (API URLs, database connections, secrets).
+---
 
-**Frontend projects:** `.env.local` files
-**Backend projects:** `appsettings.Development.json` or user secrets
-**Mobile app:** `.env` file
+## Phase 4: Deployment
 
-Never commit environment files. Add them to `.gitignore` if not already present.
+Load the deployment-specific guide:
 
-### Step 5: Generate API Types
+- **Docker:** Read `docker-deployment.md` in this skill directory
+- **IIS:** Read `iis-deployment.md` in this skill directory
 
-For frontend and mobile projects that consume APIs:
+Follow the loaded guide step by step using the interaction model.
+
+---
+
+## Phase 5: Verification & Tooling
+
+### 5.1 Verify Services
+
+After deployment, verify that all services are running and accessible:
+
+| Service | Docker URL | IIS URL |
+|---------|-----------|---------|
+| API Gateway | http://localhost:8080 | Configured in IIS |
+| Main API | http://localhost:8010 | IIS web app `/apps` |
+| Performance API | http://localhost:8011 | IIS web app |
+| SSO | http://localhost:8000 | IIS web app `/sso` |
+| Performance FE | http://localhost:8001 | IIS web app |
+
+### 5.2 Generate API Types
+
+For frontend and mobile projects that consume APIs (only after backends are running):
 
 ```bash
 cd Pandahrms-Performance && pnpm generate-api && cd ..
@@ -110,15 +201,7 @@ cd pandahrms-sso && pnpm generate-api && cd ..
 cd pandaworks-app && yarn generate-api && cd ..
 ```
 
-### Step 6: Verify Setup
-
-Run each project to confirm it works:
-
-**Frontend:** `pnpm dev` (should start on port 3000 or 8000)
-**Backend:** `dotnet run --project <Project>/<Project>.csproj`
-**Mobile:** `npx expo start`
-
-### Step 7: Claude Code Setup
+### 5.3 Claude Code Setup
 
 Install Claude Code plugins (run these inside Claude Code):
 
@@ -129,16 +212,29 @@ Install Claude Code plugins (run these inside Claude Code):
 
 Point the developer to each project's `CLAUDE.md` for project-specific conventions.
 
+---
+
 ## Checklist
 
-- [ ] Platform detected (macOS or Windows)
-- [ ] Developer role identified (frontend/backend/mobile/all)
-- [ ] Prerequisites installed and verified
+### Phase 1
+- [ ] Platform detected and confirmed
+- [ ] Developer role identified
+- [ ] Deployment method chosen
+
+### Phase 2
+- [ ] All prerequisites installed and verified
+
+### Phase 3
 - [ ] Workspace directory created
-- [ ] All required repositories cloned
+- [ ] Required repositories cloned
 - [ ] Bridge directories created
 - [ ] Dependencies installed per project
-- [ ] Environment files configured (no secrets committed)
-- [ ] API types generated
-- [ ] Each project runs successfully
+
+### Phase 4
+- [ ] Deployment completed (Docker or IIS)
+- [ ] All services running
+
+### Phase 5
+- [ ] All services accessible and responding
+- [ ] API types generated (if frontend/mobile role)
 - [ ] Claude Code plugins installed
