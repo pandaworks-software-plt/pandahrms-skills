@@ -16,6 +16,25 @@ superpowers:brainstorming --> superpowers:writing-plans --> pandahrms-skills:spe
     --> superpowers:executing-plans (TDD) --> superpowers:code-review
 ```
 
+## Prerequisite: Verify pandahrms-spec Project
+
+**All specs MUST be written into the `pandahrms-spec` repository.** Before doing anything else, verify the project exists on the user's machine.
+
+Check for the directory at: `<workspace>/pandahrms-spec/` (where `<workspace>` is the pandahrms monorepo workspace, typically `_pandahrms-workspace/`).
+
+**If not found, STOP and tell the user:**
+
+> The `pandahrms-spec` project was not found in your workspace. Please clone it first:
+>
+> ```bash
+> cd <workspace-directory>
+> git clone https://github.com/pandaworks-software-plt/pandahrms-spec.git
+> ```
+>
+> Then re-run this skill.
+
+Do NOT proceed with spec writing until the project directory is confirmed to exist.
+
 ## The Process
 
 ### Step 1: Read the Source
