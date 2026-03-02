@@ -25,12 +25,12 @@ Only act when the user says something like:
 
 | Project Pair | Bridge Path |
 |--------------|-------------|
-| Performance FE + Performance API | `_pandahrms-workspace/performance-shared/bridge/` |
-| Mobile App + Main API | `_pandahrms-workspace/pandahrms-app-shared/bridge/` |
+| Performance FE + Performance API | `~/.claude/bridge/performance/` |
+| Mobile App + Main API | `~/.claude/bridge/mobile-app/` |
 
 Absolute paths:
-- `/Users/kyson/Developer/pandaworks/_pandahrms-workspace/performance-shared/bridge/`
-- `/Users/kyson/Developer/pandaworks/_pandahrms-workspace/pandahrms-app-shared/bridge/`
+- `/Users/kyson/.claude/bridge/performance/`
+- `/Users/kyson/.claude/bridge/mobile-app/`
 
 ## Detecting the Project Pair
 
@@ -38,10 +38,10 @@ Determine which bridge to use based on the current working directory:
 
 | Current Project | Bridge | Other Side |
 |-----------------|--------|------------|
-| `Pandahrms-Performance` | `performance-shared/bridge/` | `Pandahrms_PerformanceApi` |
-| `Pandahrms_PerformanceApi` | `performance-shared/bridge/` | `Pandahrms-Performance` |
-| `pandaworks-app` | `pandahrms-app-shared/bridge/` | `PandaHRMS_Api` |
-| `PandaHRMS_Api` | `pandahrms-app-shared/bridge/` | `pandaworks-app` |
+| `Pandahrms-Performance` | `~/.claude/bridge/performance/` | `Pandahrms_PerformanceApi` |
+| `Pandahrms_PerformanceApi` | `~/.claude/bridge/performance/` | `Pandahrms-Performance` |
+| `pandaworks-app` | `~/.claude/bridge/mobile-app/` | `PandaHRMS_Api` |
+| `PandaHRMS_Api` | `~/.claude/bridge/mobile-app/` | `pandaworks-app` |
 
 If unclear, ask the user which project pair is involved.
 
@@ -49,9 +49,10 @@ If unclear, ask the user which project pair is involved.
 
 When the user instructs you to document an issue in the bridge:
 
-1. Create a file in the appropriate bridge directory
-2. Name it descriptively: `<issue-name>.md`
-3. Use this format:
+1. Ensure the bridge directory exists (`mkdir -p <bridge-path>`)
+2. Create a file in the appropriate bridge directory
+3. Name it descriptively: `<issue-name>.md`
+4. Use this format:
 
 ```markdown
 # Issue: [Short Description]
@@ -82,7 +83,7 @@ For mobile issues, add:
 iOS / Android / Both
 ```
 
-4. Tell the user: "Issue documented in bridge. Switch to the [other project] session and ask Claude to check the bridge."
+5. Tell the user: "Issue documented in bridge. Switch to the [other project] session and ask Claude to check the bridge."
 
 ## Checking the Bridge (Backend Side)
 
