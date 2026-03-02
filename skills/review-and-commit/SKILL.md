@@ -46,15 +46,17 @@ digraph review_and_commit {
     "Any changes?" -> "Read all changed files" [label="yes"];
     "Read all changed files" -> "Review against standards";
     "Review against standards" -> "Issues found?";
-    "Issues found?" -> "Plan atomic commits" [label="no"];
+    "Issues found?" -> "Run /simplify" [label="no"];
     "Issues found?" -> "Minor issues?" [label="yes"];
     "Minor issues?" -> "Auto-fix minor issues" [label="yes"];
     "Minor issues?" -> "Report major issues to user" [label="no, major"];
     "Auto-fix minor issues" -> "Report major issues to user";
     "Report major issues to user" -> "User approves fixes?";
     "User approves fixes?" -> "Apply major fixes" [label="yes"];
-    "User approves fixes?" -> "Plan atomic commits" [label="skip"];
-    "Apply major fixes" -> "Plan atomic commits";
+    "User approves fixes?" -> "Run /simplify" [label="skip"];
+    "Apply major fixes" -> "Run /simplify";
+    "Run /simplify" [shape=box, style=filled, fillcolor=lightyellow];
+    "Run /simplify" -> "Plan atomic commits";
     "Plan atomic commits" -> "Present commit plan";
     "Present commit plan" -> "User approves plan?";
     "User approves plan?" -> "Execute commits" [label="yes"];
@@ -142,6 +144,10 @@ Apply these checks to every changed file. Include any lint/format violations fro
 2. **Report major issues** clearly - for each, explain: what the issue is, why it matters, proposed fix
 3. **Ask user** whether to fix major issues or skip them
 4. Apply approved fixes
+
+## Phase 3.5: Simplify
+
+After fixes are applied (or skipped), invoke the `/simplify` skill. This launches three parallel review agents (Code Reuse, Code Quality, Efficiency) against the current changes. Apply any valid findings before moving to commit planning.
 
 ## Phase 4: Plan Atomic Commits
 
