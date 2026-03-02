@@ -1,5 +1,5 @@
 ---
-description: Convert design documents into Gherkin feature specs for pandahrms-spec
+description: Write or update Gherkin specs before implementing any change in a Pandahrms project
 disable-model-invocation: true
 ---
 

@@ -1,19 +1,31 @@
 ---
 name: spec-writing
-description: Use when a design or plan document is ready and needs to be converted into Gherkin feature specifications for the pandahrms-spec repository, or when writing new feature specs, updating existing specs, or reviewing spec coverage
+description: Use when starting any work in a Pandahrms project - writing or updating Gherkin specs is a required first step before implementation for all changes including features, bug fixes, and refactors
 ---
 
 # Spec Writing
 
 ## Overview
 
-Convert design documents and plans into structured Gherkin feature specifications in the `pandahrms-spec` repository. This skill sits between planning and implementation in the development pipeline.
+Specs come first. Before implementing any change in any Pandahrms project -- feature, bug fix, or refactor -- Gherkin specifications must be written or updated in the `pandahrms-spec` repository. This is a hard gate: no implementation begins until specs are in place.
 
-**Announce at start:** "I'm using the spec-writing skill to create Gherkin specifications."
+**Announce at start:** "I'm using the spec-writing skill to write/update specs before implementation."
+
+<HARD-GATE>
+Do NOT write any implementation code, create any migration, or modify any project files until the relevant specs have been written or updated and approved by the user. This applies to ALL changes: features, bug fixes, and refactors.
+</HARD-GATE>
+
+### Where This Fits
 
 ```
-superpowers:brainstorming --> superpowers:writing-plans --> pandahrms-skills:spec-writing
-    --> superpowers:executing-plans (TDD) --> superpowers:code-review
+Any work request in any Pandahrms project
+    |
+    v
+pandahrms:spec-writing (THIS SKILL - hard gate)
+    |
+    v
+superpowers:writing-plans --> superpowers:executing-plans (TDD)
+    --> superpowers:code-review --> superpowers:finish-branch
 ```
 
 ## Prerequisite: Verify pandahrms-spec Project
@@ -37,13 +49,29 @@ Do NOT proceed with spec writing until the project directory is confirmed to exi
 
 ## The Process
 
-### Step 1: Read the Source
+### Step 1: Understand the Change
 
-1. Read the design/plan document that was produced by brainstorming or planning
-2. Identify the module it belongs to: `performance`, `hr`, `leave`, `campaign`, or other
-3. Identify all features, actors, and behaviors described
+Identify what the user is about to work on. This could come from:
 
-### Step 2: Study Existing Conventions
+- **A design/plan document** — read it and extract features, actors, and behaviors
+- **A bug report or issue** — understand the expected vs. actual behavior
+- **A verbal request** — ask clarifying questions to understand the scope
+- **A refactor** — understand what behavior must be preserved
+
+Determine:
+1. **What module** it belongs to: `performance`, `hr`, `leave`, `campaign`, or other
+2. **What feature area** is affected
+3. **What behaviors** are being added, changed, or must be preserved
+
+### Step 2: Check for Existing Specs
+
+Search `pandahrms-spec/specs/` for existing specs related to the affected feature area.
+
+- **Specs exist and cover the change** — review them, update if the change modifies expected behavior. Move to Step 4.
+- **Specs exist but don't cover this area** — write additional scenarios for the new/changed behavior
+- **No specs exist** — write them from scratch
+
+### Step 3: Study Existing Conventions
 
 Before writing any spec, read at least one existing feature file from `pandahrms-spec/` to match the style. Key conventions:
 
@@ -53,7 +81,7 @@ Before writing any spec, read at least one existing feature file from `pandahrms
 - **Split by concern:** Separate files for template management vs. lifecycle vs. responses
 - **Target:** Keep files under 200 lines where possible
 
-### Step 3: Write the Gherkin
+### Step 4: Write the Gherkin
 
 #### Feature Header
 
@@ -97,6 +125,8 @@ Apply tags at both feature and scenario level:
 | `@submit`, `@status` | Workflow and status transitions |
 | `@authorization` | Permission checks |
 | `@bulk`, `@batch` | Bulk operations |
+| `@bugfix` | Scenarios added to cover a bug fix |
+| `@refactor` | Scenarios documenting preserved behavior during refactor |
 
 #### Scenario Structure
 
@@ -127,22 +157,52 @@ Scenario: Cannot create with duplicate code
   Then I should receive an error "Code already exists"
 ```
 
-### Step 4: Review
+#### Bug Fix Scenarios
 
-1. Present the complete spec to the user for review
-2. Highlight any assumptions made or gaps in the source document
+When fixing a bug, write a scenario that captures the correct behavior:
+
+```gherkin
+@bugfix
+Scenario: Salary calculation includes overtime for part-time employees
+  Given a part-time employee with 10 hours of overtime this month
+  When I calculate their monthly salary
+  Then the overtime hours should be included in the calculation
+```
+
+#### Refactor Scenarios
+
+When refactoring, write scenarios that document the behavior being preserved:
+
+```gherkin
+@refactor
+Scenario: Employee list still returns paginated results after repository refactor
+  Given there are 50 employees in the system
+  When I request page 1 with page size 10
+  Then I should receive 10 employees
+  And the total count should be 50
+```
+
+### Step 5: Review
+
+1. Present the complete spec (new or updated) to the user for review
+2. Highlight any assumptions made or gaps in understanding
 3. Wait for approval before committing
+4. **Only after approval:** proceed to implementation planning/coding
 
-### Step 5: Commit
+### Step 6: Commit
 
 After approval:
 1. Write files to the correct location in `pandahrms-spec/`
 2. Commit to the `pandahrms-spec` repository
-3. Use commit message format: `feat(module): add spec for feature-name`
+3. Use commit message format:
+   - New specs: `feat(module): add spec for feature-name`
+   - Updated specs: `feat(module): update spec for feature-name`
+   - Bug fix specs: `fix(module): add spec covering bug-name`
 
 ## Checklist
 
-- [ ] Read source design/plan document
+- [ ] Understood the change (feature, bug fix, or refactor)
+- [ ] Checked pandahrms-spec for existing specs in the affected area
 - [ ] Identified correct module and feature name
 - [ ] Studied at least one existing .feature file for style
 - [ ] Feature header has tags, description (As a/I want/So that), and Background
@@ -151,5 +211,5 @@ After approval:
 - [ ] Validation scenarios included with `@validation` tag
 - [ ] Data tables used for structured input
 - [ ] Files split by concern (under 200 lines each)
-- [ ] Presented to user for review
+- [ ] Presented to user for review and approved
 - [ ] Committed to pandahrms-spec after approval
