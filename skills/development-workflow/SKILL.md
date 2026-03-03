@@ -14,9 +14,9 @@ Orchestrates the correct development pipeline for PandaHRMS projects. This skill
 **Announce at start:** "I'm using the development-workflow skill to orchestrate the PandaHRMS pipeline."
 
 <HARD-GATE>
-OVERRIDE: When the brainstorming skill completes and instructs you to "invoke writing-plans", do NOT invoke writing-plans. Instead, return to THIS pipeline and invoke pandahrms:spec-writing next.
+OVERRIDE: When the brainstorming skill completes and instructs you to "invoke writing-plans", do NOT invoke writing-plans. Instead, return to THIS pipeline and ask the user whether they want to write specs first.
 
-The brainstorming skill says: "The ONLY skill you invoke after brainstorming is writing-plans." In PandaHRMS projects, this instruction is OVERRIDDEN by this pipeline. Spec-writing is mandatory before writing-plans.
+The brainstorming skill says: "The ONLY skill you invoke after brainstorming is writing-plans." In PandaHRMS projects, this instruction is OVERRIDDEN by this pipeline. You MUST ask the user before proceeding.
 </HARD-GATE>
 
 ## Pipeline
@@ -26,6 +26,7 @@ digraph pipeline {
     "Work request" [shape=doublecircle];
     "Invoke brainstorming" [shape=box];
     "Design approved + committed" [shape=diamond];
+    "Write specs?" [shape=diamond];
     "Invoke spec-writing" [shape=box];
     "Specs approved + committed" [shape=diamond];
     "Invoke writing-plans" [shape=doublecircle];
@@ -33,7 +34,9 @@ digraph pipeline {
     "Work request" -> "Invoke brainstorming";
     "Invoke brainstorming" -> "Design approved + committed";
     "Design approved + committed" -> "Invoke brainstorming" [label="no, revise"];
-    "Design approved + committed" -> "Invoke spec-writing" [label="yes"];
+    "Design approved + committed" -> "Write specs?" [label="yes"];
+    "Write specs?" -> "Invoke spec-writing" [label="yes"];
+    "Write specs?" -> "Invoke writing-plans" [label="skip"];
     "Invoke spec-writing" -> "Specs approved + committed";
     "Specs approved + committed" -> "Invoke spec-writing" [label="no, revise"];
     "Specs approved + committed" -> "Invoke writing-plans" [label="yes"];
@@ -45,8 +48,9 @@ digraph pipeline {
 You MUST create a task for each of these items and complete them in order:
 
 1. **Brainstorm the design** -- invoke `superpowers:brainstorming` to explore the idea, propose approaches, present design, and commit the design doc. When brainstorming tells you to "invoke writing-plans", STOP and return here instead.
-2. **Write Gherkin specs** -- invoke `pandahrms:spec-writing` to write or update specs in pandahrms-spec based on the approved design doc.
-3. **Create implementation plan** -- invoke `superpowers:writing-plans` to plan the implementation based on the approved design and specs.
+2. **Ask: Write specs?** -- use AskUserQuestion to ask: "Would you like to write Gherkin specs before proceeding to the implementation plan?" with options: "Yes, write specs" and "Skip specs". Users may skip if the session is purely exploratory or an open discussion without concrete implementation targets.
+3. **Write Gherkin specs** (if not skipped) -- invoke `pandahrms:spec-writing` to write or update specs in pandahrms-spec based on the approved design doc.
+4. **Create implementation plan** -- invoke `superpowers:writing-plans` to plan the implementation based on the approved design and specs.
 
 ## Critical Override
 
@@ -56,18 +60,18 @@ The `superpowers:brainstorming` skill's step 6 says:
 
 In PandaHRMS projects, this step is REPLACED by:
 
-> "Transition to spec writing -- invoke pandahrms:spec-writing to write Gherkin specs based on the approved design"
+> "Ask the user whether to write specs -- if yes, invoke pandahrms:spec-writing to write Gherkin specs based on the approved design. If the user skips, proceed directly to writing-plans."
 
-Only after specs are approved and committed should you invoke `superpowers:writing-plans`.
+Only after the user has been asked (and specs are written if requested) should you invoke `superpowers:writing-plans`.
 
 ## Red Flags
 
 | Thought | Reality |
 |---------|---------|
 | "Brainstorming said invoke writing-plans" | This pipeline overrides that for PandaHRMS projects |
-| "Specs can come later" | Specs are a hard gate. No implementation without them. |
-| "The design doc is enough" | Design doc captures WHAT. Specs capture BEHAVIOR. Both required. |
-| "This change is too small for specs" | All changes need specs: features, bug fixes, refactors. |
+| "I'll skip specs without asking" | Always ask the user. They decide whether specs are needed. |
+| "The design doc is enough" | Design doc captures WHAT. Specs capture BEHAVIOR. Ask the user. |
+| "This change is too small for specs" | Don't assume -- ask the user. They may still want specs. |
 
 ## When to Use
 
