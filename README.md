@@ -6,10 +6,13 @@ Pandahrms-specific skills plugin for Claude Code. Provides domain skills that in
 
 | Skill | Slash Command | Description |
 |-------|---------------|-------------|
+| **development-workflow** | `/pandahrms:development-workflow` | Orchestrates brainstorming -> spec-writing -> writing-plans for PandaHRMS projects |
 | **spec-writing** | `/pandahrms:spec-writing` | Write/update Gherkin specs before implementing any change (hard gate) |
+| **review-and-commit** | `/pandahrms:review-and-commit` | Review git changes against code standards, fix issues, plan atomic commits |
+| **react-web-frontend** | `/pandahrms:react-web-frontend` | Frontend conventions and patterns for Next.js projects |
 | **cross-project-bridge** | `/pandahrms:cross-project-bridge` | Structured protocol for debugging cross-project FE/BE issues |
-| **system-setup** | `/pandahrms:system-setup` | Guide new developers through environment setup (macOS + Windows, Docker or IIS) |
 | **ef-migrations** | `/pandahrms:ef-migrations` | EF Core migration commands for Performance and Recruitment APIs |
+| **system-setup** | `/pandahrms:system-setup` | Guide new developers through environment setup (macOS + Windows, Docker or IIS) |
 
 ## Installation
 
@@ -43,10 +46,14 @@ To update the plugin to the latest version:
 This plugin adds domain-specific skills to the superpowers development pipeline:
 
 ```
-Any work request --> pandahrms:spec-writing (hard gate)
+Any work request --> pandahrms:development-workflow
+    --> superpowers:brainstorming (design)
+    --> pandahrms:spec-writing (Gherkin specs - hard gate)
     --> superpowers:writing-plans --> superpowers:executing-plans (TDD)
     --> superpowers:code-review --> superpowers:finish-branch
 ```
+
+The `development-workflow` skill ensures `spec-writing` is never skipped after brainstorming.
 
 Additional standalone skills: `pandahrms:cross-project-bridge`, `pandahrms:system-setup`, and `pandahrms:ef-migrations`.
 

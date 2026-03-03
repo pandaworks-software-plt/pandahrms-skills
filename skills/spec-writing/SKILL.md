@@ -21,12 +21,20 @@ Do NOT write any implementation code, create any migration, or modify any projec
 Any work request in any Pandahrms project
     |
     v
+pandahrms:development-workflow (orchestrator)
+    |
+    v
+superpowers:brainstorming (design doc)
+    |
+    v
 pandahrms:spec-writing (THIS SKILL - hard gate)
     |
     v
 superpowers:writing-plans --> superpowers:executing-plans (TDD)
     --> superpowers:code-review --> superpowers:finish-branch
 ```
+
+**Note:** When invoked via `pandahrms:development-workflow`, brainstorming runs first and this skill runs after the design doc is approved. When invoked directly, this skill runs standalone.
 
 ## Prerequisite: Verify pandahrms-spec Project
 
