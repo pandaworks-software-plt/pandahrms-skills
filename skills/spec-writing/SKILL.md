@@ -83,13 +83,59 @@ Search `pandahrms-spec/specs/` for existing specs related to the affected featur
 
 Before writing any spec, read at least one existing feature file from `pandahrms-spec/` to match the style. Key conventions:
 
-- **Spec root:** `/Users/kyson/Developer/pandaworks/_pandahrms-workspace/pandahrms-spec/specs/`
+- **Spec root:** `<workspace>/pandahrms-spec/specs/`
 - **Directory structure:** `specs/<module>/<feature-name>/<feature-file>.feature`
 - **File naming:** `<entity>-<functional-area>.feature` (singular entity names)
 - **Split by concern:** Separate files for template management vs. lifecycle vs. responses
 - **Target:** Keep files under 200 lines where possible
 
 ### Step 4: Write the Gherkin
+
+#### BDD Principles (Mandatory)
+
+Every scenario MUST describe **user behavior and business outcomes**, NOT UI implementation details. Scenarios must be **implementation-agnostic** -- the same spec should be valid whether the feature is built for web, mobile, or API.
+
+**Prohibited (UI-focused language) -- NEVER use these:**
+- UI controls: "click button", "tap", "select from dropdown", "fill in textbox", "pick from date picker", "toggle switch"
+- UI feedback: "see a toast notification", "modal appears", "spinner shows", "page redirects to"
+- UI layout: "in the sidebar", "on the top right", "in the header", "below the table"
+- CSS/styling: "highlighted in red", "greyed out", "bold text"
+
+**Required (Behavior-focused language) -- use these instead:**
+
+| Instead of (UI) | Write (Behavior) |
+|---|---|
+| "I click the Apply Leave button" | "I apply for leave" |
+| "I select Annual Leave from the dropdown" | "I choose leave type Annual Leave" |
+| "I pick 2026-03-10 in the date picker" | "from 2026-03-10 to 2026-03-12" |
+| "I click Submit" | (omit -- implied by the action) |
+| "I see a green toast Success" | "the application should be submitted successfully" |
+| "a modal appears asking for confirmation" | "I am asked to confirm the action" |
+| "the row is highlighted in red" | "the leave request should be flagged as conflicting" |
+| "I see a spinner" | (omit -- implementation detail) |
+| "the page redirects to dashboard" | "I should see my leave summary" |
+
+**`Then` steps must assert business outcomes**, not visual feedback:
+- Balance changes, status transitions, notifications sent, records created
+- Permission checks, rule enforcement, data consistency
+- NOT: toasts, modals, colors, redirects, spinners
+
+**Bad -- UI-focused:**
+```gherkin
+Scenario: Apply for leave
+  When I click the "Apply Leave" button
+  And I select "Annual Leave" from the dropdown
+  And I click "Submit"
+  Then I should see a green toast notification "Leave applied successfully"
+```
+
+**Good -- Behavior-focused:**
+```gherkin
+Scenario: Employee applies for annual leave
+  When I apply for annual leave from "2026-03-10" to "2026-03-12"
+  Then my leave application should be submitted successfully
+  And my remaining annual leave balance should be reduced by 3 days
+```
 
 #### Feature Header
 
@@ -120,7 +166,13 @@ Order sections logically: creation -> listing -> editing -> deletion -> special 
 
 #### Tags
 
-Apply tags at both feature and scenario level:
+Always apply tags at **both** feature and scenario level.
+
+**Feature-level tags** (on the Feature line):
+- Module/feature identifier: `@performance`, `@recruitment`, `@hr`, `@leave`, `@campaign`
+- Sub-feature identifier: `@template`, `@response`, `@review-lifecycle`, `@pip`
+
+**Scenario-level tags:**
 
 | Tag | Usage |
 |-----|-------|
@@ -133,6 +185,8 @@ Apply tags at both feature and scenario level:
 | `@submit`, `@status` | Workflow and status transitions |
 | `@authorization` | Permission checks |
 | `@bulk`, `@batch` | Bulk operations |
+| `@hierarchy` | Hierarchical relationships |
+| `@employee`, `@reviewer`, `@manager` | Role-specific scenarios |
 | `@bugfix` | Scenarios added to cover a bug fix |
 | `@refactor` | Scenarios documenting preserved behavior during refactor |
 
@@ -190,6 +244,66 @@ Scenario: Employee list still returns paginated results after repository refacto
   And the total count should be 50
 ```
 
+#### Common Patterns
+
+**Status Transitions:**
+```gherkin
+@status
+Scenario: Status transition description
+  Given [entity] with status "[current_status]"
+  When [action]
+  Then the status should change to "[new_status]"
+  And [side effects]
+```
+
+**Permissions:**
+```gherkin
+@validation @authorization
+Scenario: Cannot perform action without permission
+  Given [context]
+  When I try to [restricted action]
+  Then I should receive an error "[permission error]"
+```
+
+**CRUD Operations** -- group in this order:
+1. Creation (`@create`)
+2. Listing/Retrieval (`@list`)
+3. Editing (`@edit`)
+4. Deletion/Archival (`@delete`)
+
+#### File Splitting Strategy
+
+Split features by **functional concerns/bounded contexts**, not by CRUD operations.
+
+**When to split into separate files:**
+- Different actors/user journeys (admin setup vs. end-user interaction)
+- Different lifecycle phases (configuration vs. execution)
+- Different concerns (template management vs. instance management vs. data entry)
+- File approaching 200 lines
+
+**When to keep in same file:**
+- CRUD operations on the same entity (unless file gets too large)
+- Variations of the same user flow
+- Related validation scenarios
+
+**Guidelines:**
+- Keep files under 200 lines
+- Prefer 3-4 files per feature over 1 large file or 10+ small files
+- Each file should be independently understandable
+- Group by: functional area, actor/role, or lifecycle phase
+
+**Naming convention:**
+- Format: `[entity]-[functional-area].feature`
+- Singular entity names: `adhoc-review` not `adhoc-reviews`
+- Functional area describes the concern: `template`, `response`, `lifecycle`
+- Examples: `adhoc-review-template.feature`, `pip-tracking.feature`
+
+#### Naming Conventions
+
+- Feature names: clear capability description (e.g., "Ad-hoc Review Template Management")
+- Scenario names: describe expected behavior (e.g., "HR creates a base ad-hoc review template")
+- Consistent role names: "HR administrator", "Head of Department", "employee", "reviewer", "manager"
+
 ### Step 5: Review
 
 1. Present the complete spec (new or updated) to the user for review
@@ -217,7 +331,9 @@ After approval:
 - [ ] Scenarios grouped with comment headers
 - [ ] Tags applied at feature and scenario level
 - [ ] Validation scenarios included with `@validation` tag
+- [ ] BDD compliant: no UI language, behavior-focused, business outcomes in Then steps
 - [ ] Data tables used for structured input
 - [ ] Files split by concern (under 200 lines each)
+- [ ] Consistent role names used (HR administrator, employee, reviewer, manager)
 - [ ] Presented to user for review and approved
 - [ ] Committed to pandahrms-spec after approval
