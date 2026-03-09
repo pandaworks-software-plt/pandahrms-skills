@@ -161,7 +161,17 @@ When the user instructs you to write to the bridge:
 [Why this option was chosen]
 ```
 
-6. Tell the user: "Message documented in bridge at `{bridge_path}/{filename}`. Switch to the [target project] session and ask Claude to check the bridge."
+6. Tell the user the message was documented, then output a copy-paste-able prompt in a code block:
+
+```
+Bridge message documented at `{bridge_path}/{filename}`.
+
+Paste this in your [{target project}] session:
+```
+
+```
+Check the bridge for a {type} about {short description}
+```
 
 ## Checking the Bridge
 
@@ -213,7 +223,17 @@ Bridge messages for [{pair_name}]:
 [Any changes the original side needs to make, or "Nothing"]
 ```
 
-9. Tell the user: "Work complete. Switch to the [other project] session to review the response, or delete the file if resolved."
+9. Tell the user work is complete, then output a copy-paste-able prompt in a code block:
+
+```
+Work complete and response appended to bridge.
+
+Paste this in your [{other project}] session:
+```
+
+```
+Check the bridge for a response about {short description}
+```
 
 ## Cleanup
 
