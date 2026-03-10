@@ -145,9 +145,13 @@ Apply these checks to every changed file. Include any lint/format violations fro
 3. **Ask user** whether to fix major issues or skip them
 4. Apply approved fixes
 
-## Phase 3.5: Simplify
+## Phase 3.5: Simplify (MANDATORY - never skip)
 
-After fixes are applied (or skipped), invoke the `/simplify` skill. This launches three parallel review agents (Code Reuse, Code Quality, Efficiency) against the current changes. Apply any valid findings before moving to commit planning.
+**Announce:** "Running /simplify to check for reuse opportunities, code quality, and efficiency improvements."
+
+Then invoke the `/simplify` skill. This launches three parallel review agents (Code Reuse, Code Quality, Efficiency) against the current changes. Apply any valid findings before moving to commit planning.
+
+This phase is **non-negotiable** - always run it regardless of change size, perceived simplicity, or whether issues were found in earlier phases.
 
 ## Phase 4: Plan Atomic Commits
 
@@ -208,6 +212,7 @@ For each commit in the plan:
 
 ## Red Flags - STOP
 
+- Skipping `/simplify` for any reason - it is mandatory before commit planning
 - About to `git add -A` or `git add .` - stage specific files only
 - Committing `.env`, credentials, or secrets - warn the user
 - Commit message doesn't match the actual changes - rewrite it
