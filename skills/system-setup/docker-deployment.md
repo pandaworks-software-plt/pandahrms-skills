@@ -66,7 +66,7 @@ The default connection string points to the dockerized SQL Server. Change it onl
 |----------|-------------|---------|
 | `CORE_API_BASE_URL` | Internal API URL (container-to-container) | `http://pandahrms-api:8080` |
 | `NEXT_PUBLIC_CORE_API_BASE_URL` | Public API URL (browser access) | `http://localhost:8080` |
-| `PRODUCT_NAME` | SSO branding name | `PandaHRMS SSO` |
+| `PRODUCT_NAME` | SSO branding name | `Pandahrms SSO` |
 | `PRODUCT_SLOGAN` | SSO branding slogan | `Single Sign-On Platform` |
 | `VENDOR` | Vendor name | `pandaworks` |
 

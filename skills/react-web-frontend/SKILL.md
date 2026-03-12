@@ -1,13 +1,13 @@
 ---
 name: react-web-frontend
-description: Use when building features, components, or pages in any PandaHRMS Next.js web project (Pandahrms-Performance, Pandahrms-Recruitment, pandahrms-sso), or when unsure about frontend naming, page patterns, state management, or component architecture
+description: Use when building features, components, or pages in any Pandahrms Next.js web project (Pandahrms-Performance, Pandahrms-Recruitment, pandahrms-sso), or when unsure about frontend naming, page patterns, state management, or component architecture
 ---
 
 # React Web Frontend
 
 ## Overview
 
-Shared conventions for all PandaHRMS Next.js 15 web projects. Performance project is the reference standard.
+Shared conventions for all Pandahrms Next.js 15 web projects. Performance project is the reference standard.
 
 **Announce at start:** "I'm using the react-web-frontend skill for frontend conventions."
 

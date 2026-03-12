@@ -62,7 +62,7 @@ cat <<EOF
 {
   "hookSpecificOutput": {
     "hookEventName": "SessionStart",
-    "additionalContext": "PandaHRMS skills available (use Skill tool to invoke):\n${skills_escaped}${warning_escaped}"
+    "additionalContext": "Pandahrms skills available (use Skill tool to invoke):\n${skills_escaped}${warning_escaped}"
   }
 }
 EOF

@@ -6,7 +6,7 @@ Pandahrms-specific skills plugin for Claude Code. Provides domain skills that in
 
 | Skill | Slash Command | Description |
 |-------|---------------|-------------|
-| **development-workflow** | `/pandahrms:development-workflow` | Orchestrates brainstorming -> spec-writing -> writing-plans for PandaHRMS projects |
+| **development-workflow** | `/pandahrms:development-workflow` | Orchestrates brainstorming -> spec-writing -> writing-plans for Pandahrms projects |
 | **spec-writing** | `/pandahrms:spec-writing` | Write/update Gherkin specs before implementing any change (hard gate) |
 | **review-and-commit** | `/pandahrms:review-and-commit` | Review git changes against code standards, fix issues, plan atomic commits |
 | **react-web-frontend** | `/pandahrms:react-web-frontend` | Frontend conventions and patterns for Next.js projects |

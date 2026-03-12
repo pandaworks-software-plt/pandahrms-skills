@@ -183,7 +183,7 @@ Create a `.env` file in each deployment directory.
 ```env
 BASE_URL=http://localhost/sso
 API_URL=http://localhost/api
-PRODUCT_NAME=PandaHRMS SSO
+PRODUCT_NAME=Pandahrms SSO
 PRODUCT_SLOGAN=Single Sign-On Platform
 VENDOR=pandaworks
 ```
