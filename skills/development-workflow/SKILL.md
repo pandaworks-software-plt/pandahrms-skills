@@ -52,7 +52,7 @@ You MUST create a task for each of these items and complete them in order:
 3. **Write Gherkin specs** (if not skipped) -- invoke `pandahrms:spec-writing` to write or update specs in pandahrms-spec based on the approved design doc.
 4. **Create implementation plan** -- invoke `superpowers:writing-plans` to plan the implementation based on the approved design and specs.
 
-## Critical Override
+## Critical Override: Brainstorming Terminal State
 
 The `superpowers:brainstorming` skill's step 6 says:
 
@@ -64,6 +64,19 @@ In PandaHRMS projects, this step is REPLACED by:
 
 Only after the user has been asked (and specs are written if requested) should you invoke `superpowers:writing-plans`.
 
+## Critical Override: Always Use Parallel Session
+
+When `superpowers:writing-plans` completes and offers the execution choice between "Subagent-Driven (this session)" and "Parallel Session (separate)", you MUST always select **Parallel Session (separate)**.
+
+Do NOT offer or use "Subagent-Driven (this session)" in PandaHRMS projects. After the plan is saved, guide the user to open a new session with `superpowers:executing-plans`.
+
+## Critical Override: Executing Plans Behavior
+
+When executing a plan via `superpowers:executing-plans` in PandaHRMS projects:
+
+1. **Never commit during execution** -- Do NOT run `git commit` after individual tasks or batches. All changes remain uncommitted until the entire plan is complete. Committing is a separate step handled by `pandahrms:review-and-commit` after all work is done.
+2. **Finish all tasks without stopping** -- Do NOT stop after batches of 3 for review. Execute ALL tasks in the plan continuously from start to finish. Only stop if you hit an actual blocker (missing dependency, test fails repeatedly, unclear instruction).
+
 ## Red Flags
 
 | Thought | Reality |
@@ -72,6 +85,9 @@ Only after the user has been asked (and specs are written if requested) should y
 | "I'll skip specs without asking" | Always ask the user. They decide whether specs are needed. |
 | "The design doc is enough" | Design doc captures WHAT. Specs capture BEHAVIOR. Ask the user. |
 | "This change is too small for specs" | Don't assume -- ask the user. They may still want specs. |
+| "Let me use subagent-driven execution" | PandaHRMS always uses Parallel Session (separate). No exceptions. |
+| "Let me commit after this task" | Never commit during plan execution. All commits happen after via review-and-commit. |
+| "Let me stop for a batch review" | Finish all tasks without stopping. Only stop on actual blockers. |
 
 ## When to Use
 
