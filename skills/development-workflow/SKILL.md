@@ -68,7 +68,14 @@ Only after the user has been asked (and specs are written if requested) should y
 
 When `superpowers:writing-plans` completes and offers the execution choice between "Subagent-Driven (this session)" and "Parallel Session (separate)", you MUST always select **Parallel Session (separate)**.
 
-Do NOT offer or use "Subagent-Driven (this session)" in Pandahrms projects. After the plan is saved, guide the user to open a new session with `superpowers:executing-plans`.
+Do NOT offer or use "Subagent-Driven (this session)" in Pandahrms projects. After the plan is saved, display a copy-paste ready message that includes the plan file path:
+
+```
+To execute: Open a new session and run:
+/executing-plans {absolute_path_to_plan_file}
+```
+
+Replace `{absolute_path_to_plan_file}` with the actual path where the plan was saved (e.g., `/Users/kyson/Developer/.../docs/plans/2026-03-13-feature-name.md`).
 
 ## Critical Override: Executing Plans Behavior
 
