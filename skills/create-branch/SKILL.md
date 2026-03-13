@@ -22,7 +22,9 @@ digraph create_branch {
     "Source is non-main?" [shape=diamond];
     "Warn + confirm intent" [shape=box];
     "Determine branch type" [shape=box];
-    "Compose + confirm name" [shape=box];
+    "Compose branch name" [shape=box];
+    "AskUser to confirm" [shape=box];
+    "User confirms?" [shape=diamond];
     "Fetch + create branch" [shape=box];
     "Verify upstream" [shape=diamond];
     "Unset + fix upstream" [shape=box];
@@ -33,8 +35,11 @@ digraph create_branch {
     "Source is non-main?" -> "Warn + confirm intent" [label="yes"];
     "Source is non-main?" -> "Determine branch type" [label="no"];
     "Warn + confirm intent" -> "Determine branch type";
-    "Determine branch type" -> "Compose + confirm name";
-    "Compose + confirm name" -> "Fetch + create branch";
+    "Determine branch type" -> "Compose branch name";
+    "Compose branch name" -> "AskUser to confirm";
+    "AskUser to confirm" -> "User confirms?";
+    "User confirms?" -> "Fetch + create branch" [label="yes"];
+    "User confirms?" -> "Compose branch name" [label="no"];
     "Fetch + create branch" -> "Verify upstream";
     "Verify upstream" -> "Unset + fix upstream" [label="wrong"];
     "Verify upstream" -> "Show proof to user" [label="correct"];
@@ -93,9 +98,19 @@ Examples:
 - `fix/login-redirect-loop`
 - `chore/update-dependencies`
 
-Present the proposed name to the user for confirmation before proceeding.
+### 5. Confirm Before Creating (MANDATORY)
 
-### 5. Fetch and Create
+Before creating the branch, you MUST use AskUserQuestion to confirm. Present:
+
+- **Branch name:** `{type}/{short-kebab-description}`
+- **Purpose:** {what the user described}
+- **Source branch:** `{source-branch}`
+
+Ask: "Should I create this branch?" with options like "Yes, create it" and "No, let me change something".
+
+Do NOT proceed to create the branch until the user explicitly confirms.
+
+### 6. Fetch and Create
 
 ```bash
 # Fetch latest from remote
@@ -108,7 +123,7 @@ git branch -r | grep {source-branch}
 git checkout -b {branch-name} origin/{source-branch}
 ```
 
-### 6. Verify and Fix Upstream (CRITICAL -- NEVER SKIP)
+### 7. Verify and Fix Upstream (CRITICAL -- NEVER SKIP)
 
 After creation, ALWAYS check the upstream tracking:
 
