@@ -11,6 +11,26 @@ Specs come first. Before implementing any change in any Pandahrms project -- fea
 
 **Announce at start:** "I'm using the spec-writing skill to write/update specs before implementation."
 
+## Skip Condition: UI-Only Changes
+
+**If the work is purely about UI/presentation** -- styling, layout, component design, theming, responsiveness, animations, dark mode, or visual polish -- **skip this skill entirely.** These changes don't alter business behavior and don't need Gherkin specs.
+
+Announce: "Skipping spec-writing -- this is a UI-only change with no business behavior impact." Then proceed directly to the next step in the workflow.
+
+**Examples of UI-only work (skip):**
+- Redesigning a page layout or component appearance
+- Adjusting spacing, colors, typography, or responsiveness
+- Adding dark mode support
+- Building a new UI component with no new business logic
+- Fixing visual bugs (alignment, overflow, z-index)
+
+**Examples that still need specs (don't skip):**
+- Adding a new form that creates/updates data
+- Changing validation rules or error messages
+- Adding filtering, sorting, or pagination behavior
+- Changing workflow or status transitions
+- Adding role-based visibility or permissions
+
 <HARD-GATE>
 Do NOT write any implementation code, create any migration, or modify any project files until the relevant specs have been written or updated and approved by the user. This applies to ALL changes: features, bug fixes, and refactors.
 </HARD-GATE>
