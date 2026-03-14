@@ -39,7 +39,9 @@ digraph create_branch {
     "Compose branch name" -> "AskUser to confirm";
     "AskUser to confirm" -> "User confirms?";
     "User confirms?" -> "Fetch + create branch" [label="yes"];
-    "User confirms?" -> "Compose branch name" [label="no"];
+    "User confirms?" -> "Compose branch name" [label="no, change something"];
+    "User confirms?" -> "Done (user handles branching)" [label="skip"];
+    "Done (user handles branching)" [shape=doublecircle];
     "Fetch + create branch" -> "Verify upstream";
     "Verify upstream" -> "Unset + fix upstream" [label="wrong"];
     "Verify upstream" -> "Show proof to user" [label="correct"];
@@ -106,9 +108,11 @@ Before creating the branch, you MUST use AskUserQuestion to confirm. Present:
 - **Purpose:** {what the user described}
 - **Source branch:** `{source-branch}`
 
-Ask: "Should I create this branch?" with options like "Yes, create it" and "No, let me change something".
+Ask: "Should I create this branch?" with options like "Yes, create it", "No, let me change something", and "Skip".
 
 Do NOT proceed to create the branch until the user explicitly confirms.
+
+If the user chooses **Skip**, stop the branch creation process entirely and let them manage branching on their own. Continue with whatever task triggered the branch creation.
 
 ### 6. Fetch and Create
 
