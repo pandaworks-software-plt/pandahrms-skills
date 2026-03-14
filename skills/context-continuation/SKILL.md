@@ -1,6 +1,6 @@
 ---
 name: context-continuation
-description: Use when a conversation is getting long and the user wants to summarize decisions, code changes, and remaining work to continue in a fresh session
+description: Use when the user explicitly requests it (e.g., "/context-continuation", "save context", "pick up where we left off"). If the conversation is getting long, use AskUserQuestion to ask the user whether they want to save context and continue in a new session -- never auto-activate without permission.
 ---
 
 # Context Continuation
