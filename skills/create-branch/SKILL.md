@@ -1,6 +1,6 @@
 ---
 name: create-branch
-description: ALWAYS use when the user needs to create, start, or checkout a new git branch. Prevents dangerous upstream tracking inheritance and enforces folder-based naming conventions. Triggers on any mention of new branch, new feature branch, branching off, checkout -b, or starting work on a new task
+description: ALWAYS use when the user needs to create, start, or checkout a new git branch. Prevents dangerous upstream tracking inheritance and enforces folder-based naming conventions. Triggers on any mention of new branch, new feature branch, branching off, or checkout -b
 ---
 
 # Create Branch
@@ -11,7 +11,9 @@ Safely creates git branches with folder-based naming and correct upstream tracki
 
 ## The Danger This Skill Prevents
 
-When you `git checkout -b feature/my-work` while on `origin/feature/other-work`, git automatically sets `origin/feature/other-work` as the upstream. Every `git push` then goes to `origin/feature/other-work` instead of creating `origin/feature/my-work`. This corrupts a shared branch with no PR review.
+When you branch from a remote ref like `origin/feature/other-work`, git automatically sets that as the upstream. Every `git push` then goes to `origin/feature/other-work` instead of creating your own remote branch. This corrupts a shared branch with no PR review.
+
+**The fix is simple: always branch from local refs, never from `origin/` refs.** Local-to-local branching does not inherit any upstream, so the problem never occurs.
 
 ## Process
 
@@ -25,9 +27,9 @@ digraph create_branch {
     "Compose branch name" [shape=box];
     "AskUser to confirm" [shape=box];
     "User confirms?" [shape=diamond];
-    "Fetch + create branch" [shape=box];
-    "Verify upstream" [shape=diamond];
-    "Unset + fix upstream" [shape=box];
+    "Fetch + checkout local source" [shape=box];
+    "Create branch from local ref" [shape=box];
+    "Verify no upstream" [shape=diamond];
     "Show proof to user" [shape=doublecircle];
 
     "User requests branch" -> "Gather purpose + source";
@@ -38,14 +40,13 @@ digraph create_branch {
     "Determine branch type" -> "Compose branch name";
     "Compose branch name" -> "AskUser to confirm";
     "AskUser to confirm" -> "User confirms?";
-    "User confirms?" -> "Fetch + create branch" [label="yes"];
+    "User confirms?" -> "Fetch + checkout local source" [label="yes"];
     "User confirms?" -> "Compose branch name" [label="no, change something"];
     "User confirms?" -> "Done (user handles branching)" [label="skip"];
     "Done (user handles branching)" [shape=doublecircle];
-    "Fetch + create branch" -> "Verify upstream";
-    "Verify upstream" -> "Unset + fix upstream" [label="wrong"];
-    "Verify upstream" -> "Show proof to user" [label="correct"];
-    "Unset + fix upstream" -> "Show proof to user";
+    "Fetch + checkout local source" -> "Create branch from local ref";
+    "Create branch from local ref" -> "Verify no upstream";
+    "Verify no upstream" -> "Show proof to user" [label="no upstream (correct)"];
 }
 ```
 
@@ -114,35 +115,35 @@ Do NOT proceed to create the branch until the user explicitly confirms.
 
 If the user chooses **Skip**, stop the branch creation process entirely and let them manage branching on their own. Continue with whatever task triggered the branch creation.
 
-### 6. Fetch and Create
+### 6. Fetch and Create from Local Ref
+
+**CRITICAL: Never branch from `origin/` refs. Always branch from a local branch.**
+
+Branching from a local ref does not inherit any upstream, so there is nothing to fix afterward.
 
 ```bash
 # Fetch latest from remote
 git fetch origin
 
-# Verify source branch exists
-git branch -r | grep {source-branch}
+# Ensure the source branch exists locally and is up to date
+git checkout {source-branch}
+git pull
 
-# Create branch from the chosen source
-git checkout -b {branch-name} origin/{source-branch}
+# Create the new branch from the local ref
+git checkout -b {branch-name}
 ```
 
-### 7. Verify and Fix Upstream (CRITICAL -- NEVER SKIP)
+### 7. Verify No Upstream (CRITICAL -- NEVER SKIP)
 
-After creation, ALWAYS check the upstream tracking:
+After creation, ALWAYS verify that no upstream was inherited:
 
 ```bash
 git branch -vv
 ```
 
-The upstream will almost always be wrong after branching. **Always unset it:**
+The new branch should show **no upstream** (no `[origin/...]` tracking ref). If it does have one, something went wrong — unset it immediately with `git branch --unset-upstream`.
 
-```bash
-# Unset the inherited upstream
-git branch --unset-upstream
-```
-
-Show the user the `git branch -vv` output as proof that no wrong upstream is set. Inform them that on first push, they must use:
+Show the user the `git branch -vv` output as proof. Inform them that on first push, they must use:
 
 ```bash
 git push -u origin {branch-name}
@@ -155,14 +156,16 @@ After branch creation, verify ALL of these:
 - [ ] Branch name follows `{type}/{description}` format
 - [ ] Branch was created from the correct source
 - [ ] User was warned if source was a non-main branch
-- [ ] `git branch -vv` shows no upstream (it was unset)
+- [ ] Branch was created from a **local** ref (never `origin/`)
+- [ ] `git branch -vv` shows no upstream (none inherited)
 - [ ] User knows to use `git push -u origin {branch-name}` on first push
 
 ## Red Flags
 
 | Situation | Action |
 |-----------|--------|
-| `git branch -vv` shows `[origin/other-branch]` | STOP. Unset upstream immediately. |
+| `git branch -vv` shows `[origin/other-branch]` | STOP. Unset upstream immediately. Likely branched from `origin/` ref by mistake. |
+| Branching from `origin/branch-name` | NEVER do this. Always checkout the local branch first, then branch from it. |
 | User wants `f-something` or flat naming | Redirect to folder-based naming convention. |
 | User wants to push without setting upstream | Ensure `git push -u origin {branch-name}` is used for first push. |
 | Creating from a non-main branch | Warn user, confirm intent (Step 2). |
@@ -172,13 +175,14 @@ After branch creation, verify ALL of these:
 ```bash
 # Safe branch creation (full sequence)
 git fetch origin
-git checkout -b feature/my-feature origin/main
-git branch --unset-upstream
+git checkout main && git pull        # Ensure local source is up to date
+git checkout -b feature/my-feature   # Branch from local ref — no upstream inherited
+
+# Verify no upstream was inherited
+git branch -vv
+
 # On first push, set correct upstream:
 git push -u origin feature/my-feature
-
-# Verify upstream is correct
-git branch -vv
 
 # Fix wrong upstream on existing branch
 git branch --unset-upstream
