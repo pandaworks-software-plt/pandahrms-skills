@@ -46,17 +46,26 @@ digraph review_and_commit {
     "Any changes?" -> "Read all changed files" [label="yes"];
     "Read all changed files" -> "Review against standards";
     "Review against standards" -> "Issues found?";
-    "Issues found?" -> "Run /simplify" [label="no"];
+    "Issues found?" -> "Ask: run /simplify?" [label="no"];
     "Issues found?" -> "Minor issues?" [label="yes"];
     "Minor issues?" -> "Auto-fix minor issues" [label="yes"];
     "Minor issues?" -> "Report major issues to user" [label="no, major"];
     "Auto-fix minor issues" -> "Report major issues to user";
     "Report major issues to user" -> "User approves fixes?";
     "User approves fixes?" -> "Apply major fixes" [label="yes"];
-    "User approves fixes?" -> "Run /simplify" [label="skip"];
-    "Apply major fixes" -> "Run /simplify";
+    "User approves fixes?" -> "Ask: run /simplify?" [label="skip"];
+    "Apply major fixes" -> "Ask: run /simplify?";
+    "Ask: run /simplify?" [shape=diamond, style=filled, fillcolor=lightyellow];
     "Run /simplify" [shape=box, style=filled, fillcolor=lightyellow];
-    "Run /simplify" -> "Plan atomic commits";
+    "Show simplify changes" [shape=box];
+    "Ask: test again or commit?" [shape=diamond, style=filled, fillcolor=lightyellow];
+
+    "Run /simplify" -> "Show simplify changes";
+    "Show simplify changes" -> "Ask: test again or commit?";
+    "Ask: test again or commit?" -> "Ask: run /simplify?" [label="test again"];
+    "Ask: test again or commit?" -> "Plan atomic commits" [label="ok to commit"];
+    "Ask: run /simplify?" -> "Run /simplify" [label="yes"];
+    "Ask: run /simplify?" -> "Plan atomic commits" [label="skip"];
     "Plan atomic commits" -> "Present commit plan";
     "Present commit plan" -> "User approves plan?";
     "User approves plan?" -> "Execute commits" [label="yes"];
@@ -145,13 +154,29 @@ Apply these checks to every changed file. Include any lint/format violations fro
 3. **Ask user** whether to fix major issues or skip them
 4. Apply approved fixes
 
-## Phase 3.5: Simplify (MANDATORY - never skip)
+## Phase 3.5: Simplify (interactive)
 
-**Announce:** "Running /simplify to check for reuse opportunities, code quality, and efficiency improvements."
+### Step 1: Ask before running
 
-Then invoke the `/simplify` skill. This launches three parallel review agents (Code Reuse, Code Quality, Efficiency) against the current changes. Apply any valid findings before moving to commit planning.
+Use `AskUserQuestion` to ask the user whether they want to run `/simplify`:
 
-This phase is **non-negotiable** - always run it regardless of change size, perceived simplicity, or whether issues were found in earlier phases.
+> "Ready to run /simplify to check for reuse opportunities, code quality, and efficiency improvements. Run it?"
+
+- If user says **yes** -> proceed to Step 2
+- If user says **skip** -> go directly to Phase 4
+
+### Step 2: Run /simplify
+
+Invoke the `/simplify` skill. This launches three parallel review agents (Code Reuse, Code Quality, Efficiency) against the current changes. Apply any valid findings.
+
+### Step 3: Show changes and ask to proceed
+
+After `/simplify` completes and fixes are applied, show the user a summary of what changed. Then use `AskUserQuestion`:
+
+> "These changes were made by /simplify. Want to test/review again, or proceed to commit?"
+
+- If user says **test again** or wants another round -> loop back to Step 1
+- If user says **ok to commit** -> proceed to Phase 4
 
 ## Phase 4: Plan Atomic Commits
 
@@ -212,7 +237,8 @@ For each commit in the plan:
 
 ## Red Flags - STOP
 
-- Skipping `/simplify` for any reason - it is mandatory before commit planning
+- Running `/simplify` without asking the user first - always use AskUserQuestion
+- Proceeding to commit after `/simplify` without showing changes and asking - always confirm
 - About to `git add -A` or `git add .` - stage specific files only
 - Committing `.env`, credentials, or secrets - warn the user
 - Commit message doesn't match the actual changes - rewrite it
