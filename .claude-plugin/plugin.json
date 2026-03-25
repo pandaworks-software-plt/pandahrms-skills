@@ -1,7 +1,7 @@
 {
   "name": "pandahrms",
   "description": "Pandahrms-specific skills for Claude Code: development workflow orchestration, spec writing, cross-project bridge, system setup, EF Core migrations, React web frontend conventions, review-and-commit workflow, and safe branch creation",
-  "version": "1.12.1",
+  "version": "1.12.2",
   "author": { "name": "Pandaworks" },
   "license": "UNLICENSED",
   "keywords": ["pandahrms", "skills", "gherkin", "specs", "setup", "bridge", "react", "nextjs", "frontend"]
