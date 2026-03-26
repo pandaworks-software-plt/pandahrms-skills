@@ -111,10 +111,13 @@ Apply these checks to every changed file. Include any lint/format violations fro
 
 **Auditing and Observability:**
 
+*Applies to backend projects (API, MVC5, monorepo with backend). If the project is frontend-only, skip this section.*
+
 | Check | What to Look For |
 |-------|-----------------|
 | **Audit fields** | Entities that need tracking have `CreatedBy`, `CreatedAt`, `ModifiedBy`, `ModifiedAt` fields populated. |
-| **Audit trail** | State-changing operations (create, update, delete) log who did what and when. Check if base entity audit pattern is followed. |
+| **Audit trail on all API endpoints** | Every state-changing API endpoint (POST, PUT, PATCH, DELETE) must have audit trail logging -- who did what, when, and on which resource. Check that new or modified endpoints follow the project's existing audit pattern (e.g., base entity audit, middleware audit, or explicit audit log calls). Endpoints without audit trail are a **major** issue. |
+| **Audit trail consistency** | Verify the audit mechanism matches the project's existing pattern. Check for: base entity auto-population, audit middleware, or explicit audit service calls. New endpoints must use the same approach as existing ones. |
 | **Logging** | Important operations have appropriate log levels. Errors are logged with context. No sensitive data in logs. |
 
 **Code Quality:**
@@ -131,7 +134,7 @@ Apply these checks to every changed file. Include any lint/format violations fro
 ### Categorize Issues
 
 - **Minor** (auto-fix): lint/format violations, naming inconsistencies, missing access modifiers, trivial formatting, simple null checks, obvious missing `readonly`, dead code removal, missing `async` keyword
-- **Major** (ask first): SOLID violations, god classes, duplicated logic that should reuse existing code, missing DI registration, missing audit fields, security vulnerabilities, missing test coverage, architectural concerns, missing authorization attributes
+- **Major** (ask first): SOLID violations, god classes, duplicated logic that should reuse existing code, missing DI registration, missing audit fields, missing audit trail on API endpoints, security vulnerabilities, missing test coverage, architectural concerns, missing authorization attributes
 
 ## Phase 3: Fix
 
