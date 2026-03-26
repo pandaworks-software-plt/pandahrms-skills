@@ -15,8 +15,9 @@ pandahrms-skills/
 │   ├── cross-project-bridge/    # Communication between FE/BE Claude sessions
 │   ├── development-workflow/    # Orchestrator for all development work
 │   ├── ef-migrations/           # Entity Framework Core migrations
+│   ├── code-review/             # Code review, fix issues, /simplify (no commits)
+│   ├── commit/                  # Verify clean, plan and execute atomic commits
 │   ├── react-web-frontend/      # Next.js frontend conventions
-│   ├── review-and-commit/       # Code review and atomic commit workflow
 │   ├── spec-writing/            # Gherkin spec writing (hard gate before implementation)
 │   └── system-setup/            # Developer workstation setup
 ├── hooks/                       # Claude Code hooks (session-start, etc.)

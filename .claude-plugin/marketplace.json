@@ -14,7 +14,7 @@
         "source": "url",
         "url": "https://github.com/pandaworks-software-plt/pandahrms-skills.git"
       },
-      "description": "Pandahrms-specific skills: development workflow orchestration, spec writing, cross-project bridge, system setup, EF Core migrations, React web frontend conventions, and review-and-commit workflow",
+      "description": "Pandahrms-specific skills: development workflow orchestration, spec writing, cross-project bridge, system setup, EF Core migrations, React web frontend conventions, code review, and commit workflow",
       "version": "1.5.0"
     }
   ]

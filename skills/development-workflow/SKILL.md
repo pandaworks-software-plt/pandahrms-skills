@@ -86,7 +86,7 @@ Replace `{absolute_path_to_plan_file}` with the actual path where the plan was s
 
 When executing a plan via `superpowers:executing-plans` in Pandahrms projects:
 
-1. **Never commit during execution** -- Do NOT run `git commit` after individual tasks or batches. All changes remain uncommitted until the entire plan is complete. Committing is a separate step handled by `pandahrms:review-and-commit` after all work is done.
+1. **Never commit during execution** -- Do NOT run `git commit` after individual tasks or batches. All changes remain uncommitted until the entire plan is complete. Committing is a separate step handled by `pandahrms:commit` after all work is done.
 2. **Finish all tasks without stopping** -- Do NOT stop after batches of 3 for review. Execute ALL tasks in the plan continuously from start to finish. Only stop if you hit an actual blocker (missing dependency, test fails repeatedly, unclear instruction).
 
 ## Red Flags
@@ -98,7 +98,7 @@ When executing a plan via `superpowers:executing-plans` in Pandahrms projects:
 | "The design doc is enough" | Design doc captures WHAT. Specs capture BEHAVIOR. Ask the user. |
 | "This change is too small for specs" | Don't assume -- ask the user. They may still want specs (unless it's UI-only, then auto-skip). |
 | "Let me use subagent-driven execution" | Pandahrms always uses Parallel Session (separate). No exceptions. |
-| "Let me commit after this task" | Never commit during plan execution. All commits happen after via review-and-commit. |
+| "Let me commit after this task" | Never commit during plan execution. All commits happen after via code-review and commit. |
 | "Let me stop for a batch review" | Finish all tasks without stopping. Only stop on actual blockers. |
 
 ## When to Use

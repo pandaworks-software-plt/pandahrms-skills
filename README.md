@@ -8,7 +8,8 @@ Pandahrms-specific skills plugin for Claude Code. Provides domain skills that in
 |-------|---------------|-------------|
 | **development-workflow** | `/pandahrms:development-workflow` | Orchestrates brainstorming -> spec-writing -> writing-plans for Pandahrms projects |
 | **spec-writing** | `/pandahrms:spec-writing` | Write/update Gherkin specs before implementing any change (hard gate) |
-| **review-and-commit** | `/pandahrms:review-and-commit` | Review git changes against code standards, fix issues, plan atomic commits |
+| **code-review** | `/pandahrms:code-review` | Review git changes against code standards, fix issues, run /simplify (no commits) |
+| **commit** | `/pandahrms:commit` | Verify code is reviewed and clean, plan and execute atomic commits |
 | **react-web-frontend** | `/pandahrms:react-web-frontend` | Frontend conventions and patterns for Next.js projects |
 | **cross-project-bridge** | `/pandahrms:cross-project-bridge` | Structured protocol for debugging cross-project FE/BE issues |
 | **ef-migrations** | `/pandahrms:ef-migrations` | EF Core migration commands for Performance and Recruitment APIs |
@@ -50,7 +51,7 @@ Any work request --> pandahrms:development-workflow
     --> superpowers:brainstorming (design)
     --> pandahrms:spec-writing (Gherkin specs - hard gate)
     --> superpowers:writing-plans --> superpowers:executing-plans (TDD)
-    --> superpowers:code-review --> superpowers:finish-branch
+    --> pandahrms:code-review --> test --> pandahrms:commit --> superpowers:finish-branch
 ```
 
 The `development-workflow` skill ensures `spec-writing` is never skipped after brainstorming.

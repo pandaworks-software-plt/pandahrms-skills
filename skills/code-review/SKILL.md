@@ -1,30 +1,31 @@
 ---
-name: review-and-commit
-description: Use when done coding and ready to commit, or when explicitly reviewing working tree changes before commit - reviews git changes against code standards, fixes issues, and plans atomic commits
+name: code-review
+description: Use when reviewing working tree changes against code standards - reads all changed files, reviews against checklist, fixes issues, and optionally runs /simplify. Does NOT commit. Run this before /commit.
 ---
 
-# Review and Commit
+# Code Review
 
 ## Overview
 
-Review all git working tree changes against code quality standards, fix issues found, then plan and execute atomic commits grouped by logical unit.
+Review all git working tree changes against code quality standards, fix issues found, and optionally run /simplify. This skill changes code but never commits. Run /commit separately after testing.
 
 ## When to Use
 
-- After finishing a chunk of implementation work, before committing
+- After finishing a chunk of implementation work, before testing and committing
 - On explicit invocation to review current changes
-- When you have multiple changed files that should be split into logical commits
+- As the first step in the "review -> test -> commit" cycle
 
 ## Workflow
 
 ```dot
-digraph review_and_commit {
+digraph code_review {
     "Changes ready to review" [shape=doublecircle];
     "Gather changes" [shape=box];
     "git diff and git status" [shape=plaintext];
     "Any changes?" [shape=diamond];
     "No changes to review" [shape=doublecircle];
     "Read all changed files" [shape=box];
+    "Run linter" [shape=box];
     "Review against standards" [shape=box];
     "Issues found?" [shape=diamond];
     "Minor issues?" [shape=diamond];
@@ -32,19 +33,18 @@ digraph review_and_commit {
     "Report major issues to user" [shape=box];
     "User approves fixes?" [shape=diamond];
     "Apply major fixes" [shape=box];
-    "Plan atomic commits" [shape=box];
-    "Present commit plan" [shape=box];
-    "User approves plan?" [shape=diamond];
-    "Execute commits" [shape=box];
-    "STOP: Never use git add -A" [shape=octagon, style=filled, fillcolor=red, fontcolor=white];
-    "Done" [shape=doublecircle];
+    "Ask: run /simplify?" [shape=diamond, style=filled, fillcolor=lightyellow];
+    "Run /simplify" [shape=box, style=filled, fillcolor=lightyellow];
+    "Show simplify changes" [shape=box];
+    "Done - remind user to test" [shape=doublecircle];
 
     "Changes ready to review" -> "Gather changes";
     "Gather changes" -> "git diff and git status";
     "git diff and git status" -> "Any changes?";
     "Any changes?" -> "No changes to review" [label="no"];
     "Any changes?" -> "Read all changed files" [label="yes"];
-    "Read all changed files" -> "Review against standards";
+    "Read all changed files" -> "Run linter";
+    "Run linter" -> "Review against standards";
     "Review against standards" -> "Issues found?";
     "Issues found?" -> "Ask: run /simplify?" [label="no"];
     "Issues found?" -> "Minor issues?" [label="yes"];
@@ -55,23 +55,10 @@ digraph review_and_commit {
     "User approves fixes?" -> "Apply major fixes" [label="yes"];
     "User approves fixes?" -> "Ask: run /simplify?" [label="skip"];
     "Apply major fixes" -> "Ask: run /simplify?";
-    "Ask: run /simplify?" [shape=diamond, style=filled, fillcolor=lightyellow];
-    "Run /simplify" [shape=box, style=filled, fillcolor=lightyellow];
-    "Show simplify changes" [shape=box];
-    "Ask: test again or commit?" [shape=diamond, style=filled, fillcolor=lightyellow];
-
-    "Run /simplify" -> "Show simplify changes";
-    "Show simplify changes" -> "Ask: test again or commit?";
-    "Ask: test again or commit?" -> "Ask: run /simplify?" [label="test again"];
-    "Ask: test again or commit?" -> "Plan atomic commits" [label="ok to commit"];
     "Ask: run /simplify?" -> "Run /simplify" [label="yes"];
-    "Ask: run /simplify?" -> "Plan atomic commits" [label="skip"];
-    "Plan atomic commits" -> "Present commit plan";
-    "Present commit plan" -> "User approves plan?";
-    "User approves plan?" -> "Execute commits" [label="yes"];
-    "User approves plan?" -> "Plan atomic commits" [label="adjust"];
-    "Execute commits" -> "STOP: Never use git add -A";
-    "Execute commits" -> "Done";
+    "Ask: run /simplify?" -> "Done - remind user to test" [label="skip"];
+    "Run /simplify" -> "Show simplify changes";
+    "Show simplify changes" -> "Done - remind user to test";
 }
 ```
 
@@ -81,7 +68,6 @@ Run in parallel:
 - `git status` - see all modified, added, untracked files
 - `git diff` - see unstaged changes
 - `git diff --cached` - see staged changes
-- `git log --oneline -5` - recent commits for message style reference
 
 Read the full content of every changed file. You need full context to review properly.
 
@@ -154,7 +140,7 @@ Apply these checks to every changed file. Include any lint/format violations fro
 3. **Ask user** whether to fix major issues or skip them
 4. Apply approved fixes
 
-## Phase 3.5: Simplify (interactive)
+## Phase 4: Simplify (interactive)
 
 ### Step 1: Ask before running
 
@@ -163,94 +149,38 @@ Use `AskUserQuestion` to ask the user whether they want to run `/simplify`:
 > "Ready to run /simplify to check for reuse opportunities, code quality, and efficiency improvements. Run it?"
 
 - If user says **yes** -> proceed to Step 2
-- If user says **skip** -> go directly to Phase 4
+- If user says **skip** -> go to Phase 5
 
 ### Step 2: Run /simplify
 
 Invoke the `/simplify` skill. This launches three parallel review agents (Code Reuse, Code Quality, Efficiency) against the current changes. Apply any valid findings.
 
-### Step 3: Show changes and ask to proceed
+### Step 3: Show changes
 
-After `/simplify` completes and fixes are applied, show the user a summary of what changed. Then use `AskUserQuestion`:
+After `/simplify` completes and fixes are applied, show the user a summary of what changed.
 
-> "These changes were made by /simplify. Want to test/review again, or proceed to commit?"
+## Phase 5: Done
 
-- If user says **test again** or wants another round -> loop back to Step 1
-- If user says **ok to commit** -> proceed to Phase 4
+Summarize all changes made during the review:
+- Minor issues auto-fixed
+- Major issues fixed (if any)
+- /simplify changes (if run)
 
-## Phase 4: Plan Atomic Commits
+End with this message:
 
-Group changes into logical commits. Each commit should be:
-- **Self-contained** - builds independently
-- **Single purpose** - one logical change
-- **Properly ordered** - dependencies committed first
-
-### Grouping Strategy
-
-1. Identify logical units of change (a feature, a bugfix, a refactor, a test addition)
-2. Within each unit, order by dependency layer:
-   - Domain/Core entities and interfaces first
-   - Business logic / use cases second
-   - Infrastructure / persistence third
-   - API / presentation fourth
-   - Tests last (or alongside their layer)
-3. If a unit is small and tightly coupled across layers, keep as single commit
-
-### Commit Message Format
-
-Use conventional commits: `type(scope): description`
-
-| Type | When |
-|------|------|
-| `feat` | New feature / wholly new functionality |
-| `fix` | Bug fix |
-| `refactor` | Code restructuring, no behavior change |
-| `test` | Adding or updating tests only |
-| `docs` | Documentation only |
-| `chore` | Maintenance, dependency updates |
-
-**Read `git log --oneline -5`** to match the repository's existing commit message style.
-
-### Present the Plan
-
-Show a numbered table:
-
-```
-| # | Type | Files | Message |
-|---|------|-------|---------|
-| 1 | feat(core) | Entity.cs, IRepo.cs | add Widget entity and repository interface |
-| 2 | feat(usecase) | Handler.cs, Dto.cs | implement CreateWidget command handler |
-| 3 | feat(api) | Endpoint.cs | expose CreateWidget endpoint |
-| 4 | test(widget) | HandlerTests.cs | add CreateWidget handler unit tests |
-```
-
-Ask user to approve, adjust ordering, or merge/split commits.
-
-## Phase 5: Execute Commits
-
-For each commit in the plan:
-1. Stage only the specific files for that commit: `git add file1 file2 ...`
-2. Create the commit with the agreed message (use HEREDOC for formatting)
-3. Verify with `git status` after each commit
-
-**NEVER** use `git add -A` or `git add .` - always stage specific files.
+> "Code review complete. Please test your changes, then run /commit when ready."
 
 ## Red Flags - STOP
 
 - Running `/simplify` without asking the user first - always use AskUserQuestion
-- Proceeding to commit after `/simplify` without showing changes and asking - always confirm
-- About to `git add -A` or `git add .` - stage specific files only
-- Committing `.env`, credentials, or secrets - warn the user
-- Commit message doesn't match the actual changes - rewrite it
+- About to commit - this skill NEVER commits. That's /commit's job.
 - Skipping review because "changes are small" - review everything
-- Committing without reading the changed files first - read them all
+- Reviewing only the diff, not the full file - always read full files
 
 ## Common Mistakes
 
 | Mistake | Fix |
 |---------|-----|
 | Reviewing only the diff, not the full file | Always read full file for context |
-| Grouping unrelated changes in one commit | Split by logical unit, not by file proximity |
-| Writing commit messages about "what" not "why" | Focus on purpose: "support widget filtering" not "add if statement" |
 | Fixing issues without telling the user | Always summarize what was auto-fixed |
-| Staging files that weren't reviewed | Only commit files that passed review |
+| Committing after review | Never commit. Remind user to test then /commit |
