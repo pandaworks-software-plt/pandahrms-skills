@@ -170,7 +170,7 @@ Paste this in your [{target project}] session:
 ```
 
 ```
-Check the bridge for a {type} about {short description}
+Check the bridge for a {type} about {short description} at {bridge_path}/{filename}
 ```
 
 ## Checking the Bridge
@@ -232,7 +232,7 @@ Paste this in your [{other project}] session:
 ```
 
 ```
-Check the bridge for a response about {short description}
+Check the bridge for a response about {short description} at {bridge_path}/{filename}
 ```
 
 ## Cleanup
