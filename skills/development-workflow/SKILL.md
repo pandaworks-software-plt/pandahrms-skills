@@ -25,7 +25,7 @@ The brainstorming skill says: "The ONLY skill you invoke after brainstorming is 
 digraph pipeline {
     "Work request" [shape=doublecircle];
     "Invoke brainstorming" [shape=box];
-    "Design approved + committed" [shape=diamond];
+    "Design approved" [shape=diamond];
     "UI-only work?" [shape=diamond];
     "Auto-skip specs" [shape=box, style=filled, fillcolor=lightyellow];
     "Write specs?" [shape=diamond];
@@ -34,9 +34,9 @@ digraph pipeline {
     "Invoke writing-plans" [shape=doublecircle];
 
     "Work request" -> "Invoke brainstorming";
-    "Invoke brainstorming" -> "Design approved + committed";
-    "Design approved + committed" -> "Invoke brainstorming" [label="no, revise"];
-    "Design approved + committed" -> "UI-only work?" [label="yes"];
+    "Invoke brainstorming" -> "Design approved";
+    "Design approved" -> "Invoke brainstorming" [label="no, revise"];
+    "Design approved" -> "UI-only work?" [label="yes"];
     "UI-only work?" -> "Auto-skip specs" [label="yes"];
     "Auto-skip specs" -> "Invoke writing-plans";
     "UI-only work?" -> "Write specs?" [label="no"];
@@ -52,7 +52,7 @@ digraph pipeline {
 
 You MUST create a task for each of these items and complete them in order:
 
-1. **Brainstorm the design** -- invoke `superpowers:brainstorming` to explore the idea, propose approaches, present design, and commit the design doc. When brainstorming tells you to "invoke writing-plans", STOP and return here instead.
+1. **Brainstorm the design** -- invoke `superpowers:brainstorming` to explore the idea, propose approaches, and present design. Do NOT auto-commit the design doc -- leave it uncommitted for the user to review. When brainstorming tells you to "invoke writing-plans", STOP and return here instead.
 2. **Check: UI-only work?** -- If the work is purely UI/presentation (styling, layout, component design, theming, responsiveness, animations, dark mode, visual polish), auto-skip specs and go directly to step 4. Announce: "Skipping spec-writing -- this is a UI-only change with no business behavior impact."
 3. **Ask: Write specs?** (non-UI work only) -- use AskUserQuestion to ask: "Would you like to write Gherkin specs before proceeding to the implementation plan?" with options: "Yes, write specs" and "Skip specs". Users may skip if the session is purely exploratory or an open discussion without concrete implementation targets. If yes, invoke `pandahrms:spec-writing` to write or update specs in pandahrms-spec based on the approved design doc.
 4. **Create implementation plan** -- invoke `superpowers:writing-plans` to plan the implementation based on the approved design and specs.
@@ -68,6 +68,24 @@ In Pandahrms projects, this step is REPLACED by:
 > "Ask the user whether to write specs -- if yes, invoke pandahrms:spec-writing to write Gherkin specs based on the approved design. If the user skips, proceed directly to writing-plans."
 
 Only after the user has been asked (and specs are written if requested) should you invoke `superpowers:writing-plans`.
+
+## Critical Override: Store Plans Inside the Project
+
+Design docs and implementation plans MUST be stored inside the **current project's** `docs/plans/` directory -- NOT in the skills repo or any other location.
+
+The superpowers skills (brainstorming, writing-plans) save to `docs/plans/` relative to the working directory. Ensure the working directory is the project itself so files land in the right place:
+
+```
+<workspace>/
+├── pandahrms-web/                # current project
+│   └── docs/plans/               # <-- design docs and plans go here
+│       ├── 2026-03-13-feature-name-design.md
+│       └── 2026-03-13-feature-name.md
+├── pandahrms-spec/
+└── ...
+```
+
+If you are running from a different directory (e.g., the workspace root), explicitly set the output path to `<project>/docs/plans/` when saving.
 
 ## Critical Override: Always Use Parallel Session
 
