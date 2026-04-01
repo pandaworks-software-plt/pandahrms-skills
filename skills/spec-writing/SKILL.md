@@ -60,7 +60,16 @@ superpowers:writing-plans --> superpowers:executing-plans (TDD)
 
 **All specs MUST be written into the `pandahrms-spec` repository.** Before doing anything else, verify the project exists on the user's machine.
 
-Check for the directory at: `<workspace>/pandahrms-spec/` (where `<workspace>` is the pandahrms monorepo workspace, typically `_pandahrms-workspace/`).
+The spec repo is always a **sibling directory** to the current project. Go up one level from the current working directory to find the workspace, then look for `pandahrms-spec/` there:
+
+```
+<workspace>/              # parent of current project
+├── pandahrms-web/        # current project (example)
+├── pandahrms-app/
+└── pandahrms-spec/       # <-- always here, same level
+```
+
+Resolve the path as: `$(dirname $PWD)/pandahrms-spec/`
 
 **If not found, STOP and tell the user:**
 
