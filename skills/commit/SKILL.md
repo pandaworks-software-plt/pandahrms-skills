@@ -33,9 +33,9 @@ digraph commit {
     "Done" [shape=doublecircle];
 
     "User triggers /commit" -> "Ask: reviewed?";
-    "Ask: reviewed?" -> "Run /code-review" [label="no"];
+    "Ask: reviewed?" -> "Run /code-review" [label="perform code review"];
     "Run /code-review" -> "STOP" [label="review done, remind to test then /commit again"];
-    "Ask: reviewed?" -> "Run lint check" [label="yes"];
+    "Ask: reviewed?" -> "Run lint check" [label="skip code review"];
     "Run lint check" -> "Lint errors?" ;
     "Lint errors?" -> "Warn and STOP" [label="yes, tell user to fix"];
     "Lint errors?" -> "Gather changes" [label="clean"];
@@ -52,12 +52,10 @@ digraph commit {
 
 Use `AskUserQuestion`:
 
-> "Have you run /code-review on these changes?"
+> "It is recommended to perform code review before commit. Proceed?"
 
-- **Yes** -> proceed to Phase 2
-- **No** -> invoke `/code-review`, then STOP with message: "Review complete. Please test your changes, then run /commit again."
-
-The gate ensures all code changes happen during review (where they can be tested), not during commit.
+- **Perform code review** -> invoke `/code-review`, then STOP with message: "Review complete. Please test your changes, then run /commit again."
+- **Skip code review** -> proceed to Phase 2
 
 ## Phase 2: Lint Verification
 
