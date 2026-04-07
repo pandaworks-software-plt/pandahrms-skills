@@ -50,6 +50,9 @@ superpowers:brainstorming (design doc)
 pandahrms:spec-writing (THIS SKILL - hard gate)
     |
     v
+pandahrms:spec-review (cross-check design vs specs)
+    |
+    v
 superpowers:writing-plans --> superpowers:executing-plans (TDD)
     --> superpowers:code-review --> superpowers:finish-branch
 ```

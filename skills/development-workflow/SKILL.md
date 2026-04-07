@@ -31,6 +31,8 @@ digraph pipeline {
     "Write specs?" [shape=diamond];
     "Invoke spec-writing" [shape=box];
     "Specs approved + committed" [shape=diamond];
+    "Invoke spec-review" [shape=box];
+    "Design/specs aligned?" [shape=diamond];
     "Invoke writing-plans" [shape=doublecircle];
 
     "Work request" -> "Invoke brainstorming";
@@ -44,7 +46,13 @@ digraph pipeline {
     "Write specs?" -> "Invoke writing-plans" [label="skip"];
     "Invoke spec-writing" -> "Specs approved + committed";
     "Specs approved + committed" -> "Invoke spec-writing" [label="no, revise"];
-    "Specs approved + committed" -> "Invoke writing-plans" [label="yes"];
+    "Specs approved + committed" -> "Invoke spec-review" [label="yes"];
+    "Invoke spec-review" -> "Design/specs aligned?";
+    "Design/specs aligned?" -> "Fix gaps?" [label="no, gaps found"];
+    "Fix gaps?" [shape=diamond];
+    "Fix gaps?" -> "Invoke spec-writing" [label="yes, fix"];
+    "Fix gaps?" -> "Invoke writing-plans" [label="no, proceed anyway"];
+    "Design/specs aligned?" -> "Invoke writing-plans" [label="yes"];
 }
 ```
 
@@ -55,7 +63,8 @@ You MUST create a task for each of these items and complete them in order:
 1. **Brainstorm the design** -- invoke `superpowers:brainstorming` to explore the idea, propose approaches, and present design. Do NOT auto-commit the design doc -- leave it uncommitted for the user to review. When brainstorming tells you to "invoke writing-plans", STOP and return here instead.
 2. **Check: UI-only work?** -- If the work is purely UI/presentation (styling, layout, component design, theming, responsiveness, animations, dark mode, visual polish), auto-skip specs and go directly to step 4. Announce: "Skipping spec-writing -- this is a UI-only change with no business behavior impact."
 3. **Ask: Write specs?** (non-UI work only) -- use AskUserQuestion to ask: "Would you like to write Gherkin specs before proceeding to the implementation plan?" with options: "Yes, write specs" and "Skip specs". Users may skip if the session is purely exploratory or an open discussion without concrete implementation targets. If yes, invoke `pandahrms:spec-writing` to write or update specs in pandahrms-spec based on the approved design doc.
-4. **Create implementation plan** -- invoke `superpowers:writing-plans` to plan the implementation based on the approved design and specs.
+4. **Review specs against design** -- invoke `pandahrms:spec-review` to cross-check the design doc against the written specs. This ensures every design requirement has spec coverage and nothing was missed. If no specs were written (user skipped step 3), this step is automatically skipped. If gaps are found, ask the user whether to fix them (loop back to spec-writing) or proceed anyway to implementation planning.
+5. **Create implementation plan** -- invoke `superpowers:writing-plans` to plan the implementation based on the approved design and specs.
 
 ## Critical Override: Brainstorming Terminal State
 
@@ -114,6 +123,7 @@ When executing a plan via `superpowers:executing-plans` in Pandahrms projects:
 | "Brainstorming said invoke writing-plans" | This pipeline overrides that for Pandahrms projects |
 | "I'll skip specs without asking" | Always ask the user. They decide whether specs are needed. |
 | "The design doc is enough" | Design doc captures WHAT. Specs capture BEHAVIOR. Ask the user. |
+| "Specs look fine, skip the review" | Always run spec-review after writing specs. It catches gaps you won't notice manually. |
 | "This change is too small for specs" | Don't assume -- ask the user. They may still want specs (unless it's UI-only, then auto-skip). |
 | "Let me use subagent-driven execution" | Pandahrms always uses Parallel Session (separate). No exceptions. |
 | "Let me commit after this task" | Never commit during plan execution. All commits happen after via code-review and commit. |
