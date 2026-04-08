@@ -22,8 +22,8 @@ digraph commit {
     "Ask: reviewed?" [shape=diamond];
     "Run /code-review" [shape=box, style=filled, fillcolor=lightyellow];
     "STOP" [shape=octagon, style=filled, fillcolor=red, fontcolor=white];
-    "Run lint check" [shape=box];
-    "Lint errors?" [shape=diamond];
+    "Run format/lint check" [shape=box];
+    "Errors?" [shape=diamond];
     "Warn and STOP" [shape=octagon, style=filled, fillcolor=orange];
     "Gather changes" [shape=box];
     "Plan atomic commits" [shape=box];
@@ -35,10 +35,10 @@ digraph commit {
     "User triggers /commit" -> "Ask: reviewed?";
     "Ask: reviewed?" -> "Run /code-review" [label="perform code review"];
     "Run /code-review" -> "STOP" [label="review done, remind to test then /commit again"];
-    "Ask: reviewed?" -> "Run lint check" [label="skip code review"];
-    "Run lint check" -> "Lint errors?" ;
-    "Lint errors?" -> "Warn and STOP" [label="yes, tell user to fix"];
-    "Lint errors?" -> "Gather changes" [label="clean"];
+    "Ask: reviewed?" -> "Run format/lint check" [label="skip code review"];
+    "Run format/lint check" -> "Errors?" ;
+    "Errors?" -> "Warn and STOP" [label="yes, tell user to fix"];
+    "Errors?" -> "Gather changes" [label="clean"];
     "Gather changes" -> "Plan atomic commits";
     "Plan atomic commits" -> "Present commit plan";
     "Present commit plan" -> "User approves?";
@@ -57,16 +57,22 @@ Use `AskUserQuestion`:
 - **Perform code review** -> invoke `/code-review`, then STOP with message: "Review complete. Please test your changes, then run /commit again."
 - **Skip code review** -> proceed to Phase 2
 
-## Phase 2: Lint Verification
+## Phase 2: Format/Lint Verification
 
-Run the project's linter in **check-only mode** (no auto-fix):
+Detect the project type and run the appropriate check in **verify-only mode** (no auto-fix):
+
+### .NET projects (`.sln` or `.csproj` in workspace)
+- Run `dotnet format --verify-no-changes` on the solution/project
+- This checks code style, formatting, and analyzer warnings
+- Do NOT run JS/TS linters -- .NET projects do not use them
+
+### JavaScript/TypeScript projects
 - `biome.json` / `biome.jsonc` -> `pnpm biome check` (without `--write`)
 - `.eslintrc.*` / `eslint.config.*` -> `pnpm lint`
-- .NET projects -> `dotnet format --verify-no-changes` (if available)
 - Any `lint` script in `package.json` -> `pnpm lint` or `yarn lint`
 
-If lint errors exist:
-> "Lint errors found. Please fix these before committing, then run /commit again."
+If errors exist:
+> "Format/lint errors found. Please fix these before committing, then run /commit again."
 
 Show the errors and STOP. Do not fix them -- that's code-review's job.
 
@@ -143,7 +149,7 @@ For each commit in the plan:
 - About to `git add -A` or `git add .` - stage specific files only
 - Committing `.env`, credentials, or secrets - warn the user
 - Commit message doesn't match the actual changes - rewrite it
-- Lint errors detected - STOP. Tell user to fix first.
+- Format/lint errors detected - STOP. Tell user to fix first.
 - Skipping the review gate - always ask
 
 ## Common Mistakes
@@ -154,4 +160,4 @@ For each commit in the plan:
 | Grouping unrelated changes in one commit | Split by logical unit, not by file proximity |
 | Writing commit messages about "what" not "why" | Focus on purpose: "support widget filtering" not "add if statement" |
 | Staging files that weren't reviewed | Only commit files that passed review |
-| Skipping lint check | Always verify lint is clean before committing |
+| Skipping format/lint check | Always verify format/lint is clean before committing |
