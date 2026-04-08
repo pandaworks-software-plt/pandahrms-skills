@@ -140,7 +140,7 @@ Before writing any spec, read at least one existing feature file from `pandahrms
 
 - **Spec root:** `<workspace>/pandahrms-spec/specs/`
 - **Directory structure:** `specs/<module>/<feature-name>/<feature-file>.feature`
-- **File naming:** `<entity>-<functional-area>.feature` (singular entity names)
+- **File naming:** `<YYYYMMDD>-<entity>-<functional-area>.feature` (datetime prefix, singular entity names)
 - **Split by concern:** Separate files for template management vs. lifecycle vs. responses
 - **Target:** Keep files under 200 lines where possible
 
@@ -348,10 +348,11 @@ Split features by **functional concerns/bounded contexts**, not by CRUD operatio
 - Group by: functional area, actor/role, or lifecycle phase
 
 **Naming convention:**
-- Format: `[entity]-[functional-area].feature`
+- Format: `[datetime]-[entity]-[functional-area].feature`
+- Datetime prefix: `YYYYMMDD` format using the date the spec is created
 - Singular entity names: `adhoc-review` not `adhoc-reviews`
 - Functional area describes the concern: `template`, `response`, `lifecycle`
-- Examples: `adhoc-review-template.feature`, `pip-tracking.feature`
+- Examples: `20260408-adhoc-review-template.feature`, `20260408-pip-tracking.feature`
 
 #### Naming Conventions
 
