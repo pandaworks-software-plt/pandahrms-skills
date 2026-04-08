@@ -11,6 +11,27 @@ Specs come first. Before implementing any change in any Pandahrms project -- fea
 
 **Announce at start:** "I'm using the spec-writing skill to write/update specs before implementation."
 
+## Skip Condition: Non-Pandahrms Project
+
+**This skill only writes specs to `pandahrms-spec` for Pandahrms-related projects.** Before proceeding, check if the current working directory is a Pandahrms project.
+
+**How to detect a Pandahrms project:**
+- The project directory name starts with `pandahrms-` or `Pandahrms_` or `PandaHRMS_` (case-insensitive prefix match)
+- OR the project is inside a workspace that contains `pandahrms-spec/` as a sibling
+- OR the project has a CLAUDE.md that references Pandahrms
+
+**If the project is NOT Pandahrms-related:**
+- Do NOT look for or write to `pandahrms-spec/`
+- Instead, write specs within the project's own repository
+- Look for an existing spec directory by checking these paths in order:
+  1. `.project/specs/` (preferred convention)
+  2. `docs/specs/`
+  3. `specs/`
+  4. `features/`
+- If none exist, create `.project/specs/` and use that
+- All Gherkin writing guidelines in this skill still apply -- only the spec location changes
+- Announce: "This is not a Pandahrms project -- specs will be written in this project's own repository instead of pandahrms-spec."
+
 ## Skip Condition: UI-Only Changes
 
 **If the work is purely about UI/presentation** -- styling, layout, component design, theming, responsiveness, animations, dark mode, or visual polish -- **skip this skill entirely.** These changes don't alter business behavior and don't need Gherkin specs.
@@ -59,9 +80,11 @@ superpowers:writing-plans --> superpowers:executing-plans (TDD)
 
 **Note:** When invoked via `pandahrms:development-workflow`, brainstorming runs first and this skill runs after the design doc is approved. When invoked directly, this skill runs standalone.
 
-## Prerequisite: Verify pandahrms-spec Project
+## Prerequisite: Verify pandahrms-spec Project (Pandahrms Projects Only)
 
-**All specs MUST be written into the `pandahrms-spec` repository.** Before doing anything else, verify the project exists on the user's machine.
+**This section only applies to Pandahrms projects** (see "Skip Condition: Non-Pandahrms Project" above). For non-Pandahrms projects, skip this section and write specs within the project's own repository.
+
+**All Pandahrms specs MUST be written into the `pandahrms-spec` repository.** Before doing anything else, verify the project exists on the user's machine.
 
 The spec repo is always a **sibling directory** to the current project. Go up one level from the current working directory to find the workspace, then look for `pandahrms-spec/` there:
 
@@ -346,12 +369,19 @@ Split features by **functional concerns/bounded contexts**, not by CRUD operatio
 ### Step 6: Commit
 
 After approval:
+
+**For Pandahrms projects:**
 1. Write files to the correct location in `pandahrms-spec/`
 2. Commit to the `pandahrms-spec` repository
 3. Use commit message format:
    - New specs: `feat(module): add spec for feature-name`
    - Updated specs: `feat(module): update spec for feature-name`
    - Bug fix specs: `fix(module): add spec covering bug-name`
+
+**For non-Pandahrms projects:**
+1. Write files to the project's own spec directory (e.g., `specs/` or `features/`)
+2. Commit within the current project repository
+3. Use the same commit message format as above
 
 ## Checklist
 
