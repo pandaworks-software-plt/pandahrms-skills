@@ -28,7 +28,9 @@ pandahrms:commit (atomic commits after user tests)
 ```dot
 digraph pipeline {
     "Plan file" [shape=doublecircle];
-    "Execute plan" [shape=box];
+    "Ask execution mode" [shape=diamond, style=filled, fillcolor=lightyellow];
+    "Full: execute all tasks" [shape=box];
+    "Partial: execute selected tasks" [shape=box];
     "Code review" [shape=box];
     "Simplify" [shape=box];
     "Dispatch agents" [shape=box, label="Dispatch parallel agents"];
@@ -37,8 +39,11 @@ digraph pipeline {
     "Report results" [shape=box];
     "Ask user to test" [shape=doublecircle];
 
-    "Plan file" -> "Execute plan";
-    "Execute plan" -> "Code review";
+    "Plan file" -> "Ask execution mode";
+    "Ask execution mode" -> "Full: execute all tasks" [label="full"];
+    "Ask execution mode" -> "Partial: execute selected tasks" [label="partial"];
+    "Full: execute all tasks" -> "Code review";
+    "Partial: execute selected tasks" -> "Code review";
     "Code review" -> "Simplify";
     "Simplify" -> "Dispatch agents";
     "Dispatch agents" -> "Cross-check vs spec" [label="agent 1"];
@@ -53,21 +58,31 @@ digraph pipeline {
 
 You MUST create a task for each of these items and complete them in order:
 
-1. **Execute the plan** -- invoke `superpowers:executing-plans` with the plan file path. Apply execution overrides (see below).
-2. **Code review** -- invoke `pandahrms:code-review`. Override: skip Phase 5 (the /simplify prompt) since simplify runs as a separate mandatory step next.
-3. **Simplify** -- invoke `/simplify` directly. This is mandatory in this pipeline, not optional.
-4. **Dispatch parallel cross-check agents** -- dispatch both agents simultaneously using a single message with multiple Agent tool calls:
+1. **Ask execution mode** -- use AskUserQuestion to ask: "How would you like to execute this plan?" with options:
+   - **Full (Recommended)** -- execute all tasks continuously, no commits, no stops. Only stops on actual blockers.
+   - **Partial** -- user selects which tasks to execute. Useful for resuming incomplete sessions or executing specific sections.
+2. **Execute the plan** -- invoke `superpowers:executing-plans` with the plan file path. Apply execution overrides based on the chosen mode (see below).
+3. **Code review** -- invoke `pandahrms:code-review`. Override: skip Phase 5 (the /simplify prompt) since simplify runs as a separate mandatory step next.
+4. **Simplify** -- invoke `/simplify` directly. This is mandatory in this pipeline, not optional.
+5. **Dispatch parallel cross-check agents** -- dispatch both agents simultaneously using a single message with multiple Agent tool calls:
    - **Agent 1: Spec cross-check** -- compare git changes against the feature's Gherkin specs. See Spec Cross-Check Agent below. Skip if spec repo or relevant specs not found.
    - **Agent 2: Test coverage cross-check** -- verify unit tests cover all new/changed implementation. See Test Coverage Agent below. Skip if no test project found.
-5. **Ask user to test** -- present both agents' results, then end with: "Please test your changes, then run /commit when ready."
+6. **Ask user to test** -- present both agents' results, then end with: "Please test your changes, then run /commit when ready."
 
 ## Execution Overrides
 
-When running `superpowers:executing-plans` in this pipeline:
+These overrides always apply regardless of mode:
 
 1. **Never commit during execution** -- Do NOT run `git commit` after individual tasks or batches. All changes remain uncommitted until the user runs /commit after testing.
-2. **Finish all tasks without stopping** -- Do NOT stop after batches of 3 for review. Execute ALL tasks continuously from start to finish. Only stop on actual blockers (missing dependency, repeated test failures, unclear instruction).
-3. **Track time per task** -- Record start/end timestamps for every plan task. Read `## Pipeline Timing` from the plan file (if present) and display the combined Development Summary on completion.
+2. **Track time per task** -- Record start/end timestamps for every plan task. Read `## Pipeline Timing` from the plan file (if present) and display the combined Development Summary on completion.
+
+### Full Mode
+
+3. **Finish all tasks without stopping** -- Do NOT stop after batches of 3 for review. Execute ALL tasks continuously from start to finish. Only stop on actual blockers (missing dependency, repeated test failures, unclear instruction).
+
+### Partial Mode
+
+3. **Let user select tasks** -- read the plan file and present all tasks as a numbered list. Use AskUserQuestion (multiSelect) to let the user pick which tasks to execute. Execute only the selected tasks in plan order. Skip unselected tasks.
 
 ### Time Tracking
 
@@ -205,7 +220,8 @@ Present both agents' results to the user before asking them to test.
 | "Cross-check seems redundant after code-review" | Code-review checks code quality. Cross-checks verify spec compliance and test coverage. Different concerns. |
 | "Tests exist so coverage is fine" | Existing tests may not cover new code. The agent checks new/changed implementations specifically. |
 | "I'll run agents one at a time" | Always dispatch both cross-check agents in parallel for efficiency. |
-| "Let me stop for batch review" | Finish all tasks without stopping. Only stop on actual blockers. |
+| "Let me stop for batch review" | In full mode, finish all tasks without stopping. In partial mode, only execute selected tasks. |
+| "I'll default to partial mode" | Always ask the user. Full mode is recommended. |
 | "Specs aren't available, skip the whole pipeline" | Only skip the cross-check step. Everything else runs normally. |
 | "Let me use subagent-driven execution" | This IS the execution skill. Run executing-plans directly here, not via subagent dispatch. |
 | "Let me commit between steps" | No commits at any point. All commits happen via /commit after the user tests. |
