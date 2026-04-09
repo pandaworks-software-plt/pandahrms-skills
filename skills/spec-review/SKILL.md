@@ -30,7 +30,7 @@ This skill runs after specs are written and approved, before proceeding to imple
 
 ## Skip Condition: No Specs Written
 
-If specs were skipped in the pipeline (user chose "Skip specs" in the development-workflow), or no `.feature` files exist for the current feature area in `pandahrms-spec/`, **skip this skill entirely**.
+If specs were skipped in the pipeline (user chose "Skip specs" in the design-pipeline), or no `.feature` files exist for the current feature area in `pandahrms-spec/`, **skip this skill entirely**.
 
 Announce: "Skipping spec-review -- no specs were written for this feature." Then proceed to the next step in the pipeline.
 

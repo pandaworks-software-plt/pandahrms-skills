@@ -6,7 +6,8 @@ Pandahrms-specific skills plugin for Claude Code. Provides domain skills that in
 
 | Skill | Slash Command | Description |
 |-------|---------------|-------------|
-| **development-workflow** | `/pandahrms:development-workflow` | Orchestrates brainstorming -> spec-writing -> writing-plans for Pandahrms projects |
+| **design-pipeline** | `/pandahrms:design-pipeline` | Design phase: brainstorm -> specs -> plan |
+| **execution-pipeline** | `/pandahrms:execution-pipeline` | Execution phase: execute plan -> code review -> simplify -> spec cross-check -> test |
 | **spec-writing** | `/pandahrms:spec-writing` | Write/update Gherkin specs before implementing any change (hard gate) |
 | **code-review** | `/pandahrms:code-review` | Review git changes against code standards, fix issues, run /simplify (no commits) |
 | **commit** | `/pandahrms:commit` | Verify code is reviewed and clean, plan and execute atomic commits |
@@ -47,14 +48,18 @@ To update the plugin to the latest version:
 This plugin adds domain-specific skills to the superpowers development pipeline:
 
 ```
-Any work request --> pandahrms:development-workflow
+Any work request --> pandahrms:design-pipeline
     --> superpowers:brainstorming (design)
     --> pandahrms:spec-writing (Gherkin specs - hard gate)
-    --> superpowers:writing-plans --> superpowers:executing-plans (TDD)
-    --> pandahrms:code-review --> test --> pandahrms:commit --> superpowers:finish-branch
+    --> superpowers:writing-plans (implementation plan)
+
+Plan ready --> pandahrms:execution-pipeline
+    --> superpowers:executing-plans (TDD)
+    --> pandahrms:code-review --> /simplify --> spec cross-check
+    --> user tests --> pandahrms:commit --> superpowers:finish-branch
 ```
 
-The `development-workflow` skill ensures `spec-writing` is never skipped after brainstorming.
+The `design-pipeline` ensures `spec-writing` is never skipped after brainstorming. The `execution-pipeline` ensures code review, simplification, and spec compliance are verified before the user tests.
 
 Additional standalone skills: `pandahrms:cross-project-bridge`, `pandahrms:system-setup`, and `pandahrms:ef-migrations`.
 
