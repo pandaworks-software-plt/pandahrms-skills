@@ -7,7 +7,7 @@ description: Use when reviewing working tree changes against code standards - re
 
 ## Overview
 
-Review all git working tree changes against code quality standards, fix issues found, and optionally run /simplify. This skill changes code but never commits. Run /commit separately after testing.
+Review all git working tree changes against code quality standards, fix issues found, and run /simplify. This skill changes code but never commits.
 
 ## When to Use
 
@@ -19,7 +19,10 @@ Review all git working tree changes against code quality standards, fix issues f
 
 ```dot
 digraph code_review {
-    "Changes ready to review" [shape=doublecircle];
+    "Assess change size" [shape=doublecircle];
+    "Small change?" [shape=diamond];
+    "Ask: review or commit?" [shape=diamond];
+    "Run /commit directly" [shape=box, style=filled, fillcolor=lightgreen];
     "Gather changes" [shape=box];
     "git diff and git status" [shape=plaintext];
     "Any changes?" [shape=diamond];
@@ -38,12 +41,18 @@ digraph code_review {
     "Spec covers changes?" [shape=diamond, style=filled, fillcolor=lightblue];
     "Ask: create/update spec?" [shape=diamond, style=filled, fillcolor=lightblue];
     "Run /spec-writing" [shape=box, style=filled, fillcolor=lightblue];
-    "Ask: run /simplify?" [shape=diamond, style=filled, fillcolor=lightyellow];
     "Run /simplify" [shape=box, style=filled, fillcolor=lightyellow];
     "Show simplify changes" [shape=box];
-    "Done - remind user to test" [shape=doublecircle];
+    "Review summary" [shape=box];
+    "Ask: /commit or test first?" [shape=diamond, style=filled, fillcolor=lightgreen];
+    "Run /commit" [shape=box, style=filled, fillcolor=lightgreen];
+    "Done - user will test" [shape=doublecircle];
 
-    "Changes ready to review" -> "Gather changes";
+    "Assess change size" -> "Small change?";
+    "Small change?" -> "Ask: review or commit?" [label="yes"];
+    "Small change?" -> "Gather changes" [label="no, full review"];
+    "Ask: review or commit?" -> "Run /commit directly" [label="commit"];
+    "Ask: review or commit?" -> "Gather changes" [label="review"];
     "Gather changes" -> "git diff and git status";
     "git diff and git status" -> "Any changes?";
     "Any changes?" -> "No changes to review" [label="no"];
@@ -60,20 +69,34 @@ digraph code_review {
     "User approves fixes?" -> "Apply major fixes" [label="yes"];
     "User approves fixes?" -> "UI-only changes?" [label="skip"];
     "Apply major fixes" -> "UI-only changes?";
-    "UI-only changes?" -> "Ask: run /simplify?" [label="yes, skip spec check"];
+    "UI-only changes?" -> "Run /simplify" [label="yes, skip spec check"];
     "UI-only changes?" -> "Check spec discrepancy" [label="no"];
     "Check spec discrepancy" -> "Spec covers changes?";
-    "Spec covers changes?" -> "Ask: run /simplify?" [label="yes"];
+    "Spec covers changes?" -> "Run /simplify" [label="yes"];
     "Spec covers changes?" -> "Ask: create/update spec?" [label="no or missing"];
     "Ask: create/update spec?" -> "Run /spec-writing" [label="yes"];
-    "Ask: create/update spec?" -> "Ask: run /simplify?" [label="skip"];
-    "Run /spec-writing" -> "Ask: run /simplify?";
-    "Ask: run /simplify?" -> "Run /simplify" [label="yes"];
-    "Ask: run /simplify?" -> "Done - remind user to test" [label="skip"];
+    "Ask: create/update spec?" -> "Run /simplify" [label="skip"];
+    "Run /spec-writing" -> "Run /simplify";
     "Run /simplify" -> "Show simplify changes";
-    "Show simplify changes" -> "Done - remind user to test";
+    "Show simplify changes" -> "Review summary";
+    "Review summary" -> "Ask: /commit or test first?";
+    "Ask: /commit or test first?" -> "Run /commit" [label="commit"];
+    "Ask: /commit or test first?" -> "Done - user will test" [label="test first"];
 }
 ```
+
+## Phase 0: Triage
+
+First, run `git diff` and `git diff --cached` to assess the size of changes.
+
+**If changes are small** (e.g., a few lines, single-file tweak, config change, typo fix): use `AskUserQuestion` to ask:
+
+> "Small change detected. Would you like to run a full code review, or commit directly?"
+
+- If user says **review** -> proceed to Phase 1
+- If user says **commit** -> invoke `/commit` and end the flow
+
+**If changes are not small**: proceed directly to Phase 1 (no question asked).
 
 ## Phase 1: Gather Changes
 
@@ -207,22 +230,9 @@ Then use `AskUserQuestion` to ask:
 - If user says **yes** -> invoke the `/spec-writing` skill, then continue to Phase 5
 - If user says **skip** -> move to Phase 5
 
-## Phase 5: Simplify (interactive)
+## Phase 5: Simplify
 
-### Step 1: Ask before running
-
-Use `AskUserQuestion` to ask the user whether they want to run `/simplify`:
-
-> "Ready to run /simplify to check for reuse opportunities, code quality, and efficiency improvements. Run it?"
-
-- If user says **yes** -> proceed to Step 2
-- If user says **skip** -> go to Phase 6
-
-### Step 2: Run /simplify
-
-Invoke the `/simplify` skill. This launches three parallel review agents (Code Reuse, Code Quality, Efficiency) against the current changes. Apply any valid findings.
-
-### Step 3: Show changes
+Run `/simplify` automatically. This launches three parallel review agents (Code Reuse, Code Quality, Efficiency) against the current changes. Apply any valid findings.
 
 After `/simplify` completes and fixes are applied, show the user a summary of what changed.
 
@@ -232,17 +242,19 @@ Summarize all changes made during the review:
 - Minor issues auto-fixed
 - Major issues fixed (if any)
 - Spec discrepancy status (in sync, updated, or skipped)
-- /simplify changes (if run)
+- /simplify changes
 
-End with this message:
+Then use `AskUserQuestion` to ask:
 
-> "Code review complete. Please test your changes, then run /commit when ready."
+> "Code review complete. Would you like to proceed to /commit, or test first?"
+
+- If user says **commit** -> invoke the `/commit` skill
+- If user says **test** -> end the flow with: "Sounds good. Run /commit when you're ready."
 
 ## Red Flags - STOP
 
-- Running `/simplify` without asking the user first - always use AskUserQuestion
 - Running `/spec-writing` without asking the user first - always use AskUserQuestion
-- About to commit - this skill NEVER commits. That's /commit's job.
+- Committing without asking the user first - always ask commit vs test in Phase 6
 - Skipping review because "changes are small" - review everything
 - Reviewing only the diff, not the full file - always read full files
 - Running spec check on UI-only changes - skip Phase 4 for styling/layout/theming work
@@ -253,6 +265,6 @@ End with this message:
 |---------|-----|
 | Reviewing only the diff, not the full file | Always read full file for context |
 | Fixing issues without telling the user | Always summarize what was auto-fixed |
-| Committing after review | Never commit. Remind user to test then /commit |
+| Committing without asking | Always ask user: /commit or test first? |
 | Blocking review when spec repo is missing | Report it and move on -- do not block the review |
 | Running spec check on UI-only changes | Skip Phase 4 for styling, layout, theming, dark mode |
