@@ -56,6 +56,48 @@ digraph pipeline {
 }
 ```
 
+## Time Tracking
+
+Track elapsed time for each checklist task:
+
+1. **On task start** -- record the current time (use `date +%s` via Bash)
+2. **On task completion** -- record the end time, calculate the duration, and display it: `"Task N completed in Xm Ys"`
+3. **On final task completion** -- display a summary table with each task's duration and the total pipeline time:
+
+```
+Pipeline Time Summary
+---------------------
+Task 1: Brainstorm the design       -- 12m 34s
+Task 2: Check: UI-only work?        --  0m  5s
+Task 3: Ask: Write specs?           --  8m 21s
+Task 4: Review specs against design --  3m 10s
+Task 5: Create implementation plan  -- 15m 02s
+---------------------
+Total                               -- 39m 12s
+```
+
+Skipped tasks show `-- skipped` instead of a duration. Time includes any user interaction wait time (that is expected -- these tasks involve user decisions).
+
+Additionally, track and display:
+- **Agents spawned** -- count each Agent tool invocation (subagents) during the pipeline
+- **Skills invoked** -- list each Skill tool invocation by name
+
+Include these in the final summary:
+
+```
+Pipeline Summary
+---------------------
+Task 1: Brainstorm the design       -- 12m 34s
+Task 2: Check: UI-only work?        --  0m  5s
+Task 3: Ask: Write specs?           --  8m 21s
+Task 4: Review specs against design --  3m 10s
+Task 5: Create implementation plan  -- 15m 02s
+---------------------
+Total time                          -- 39m 12s
+Skills invoked                      -- 4 (brainstorming, spec-writing, spec-review, writing-plans)
+Agents spawned                      -- 2
+```
+
 ## Checklist
 
 You MUST create a task for each of these items and complete them in order:
