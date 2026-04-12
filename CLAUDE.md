@@ -10,15 +10,15 @@ This is the **pandahrms-skills** repository -- a Claude Code plugin containing P
 pandahrms-skills/
 ├── .claude-plugin/plugin.json   # Plugin metadata and version
 ├── skills/                      # Claude Code skills (SKILL.md files)
+│   ├── pipeline/                # Unified pipeline: brainstorm -> specs -> plan -> execute -> test
 │   ├── create-branch/           # Safe branch creation with upstream protection
 │   ├── cross-project-bridge/    # Communication between FE/BE Claude sessions
-│   ├── design-pipeline/         # Design phase: brainstorm -> specs -> plan
-│   ├── execution-pipeline/      # Execution phase: execute -> review -> verify
 │   ├── ef-migrations/           # Entity Framework Core migrations
 │   ├── code-review/             # Code review, fix issues, /simplify (no commits)
 │   ├── commit/                  # Verify clean, plan and execute atomic commits
 │   ├── react-web-frontend/      # Next.js frontend conventions
 │   ├── spec-writing/            # Gherkin spec writing (hard gate before implementation)
+│   ├── spec-review/             # Cross-check design docs against Gherkin specs
 │   └── system-setup/            # Developer workstation setup
 ├── hooks/                       # Claude Code hooks (session-start, etc.)
 └── docs/                        # Plans and documentation
