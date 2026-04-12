@@ -81,32 +81,37 @@ digraph pipeline {
 
 You MUST create a task for each of these items and complete them in order:
 
-1. **Brainstorm the design** -- invoke `superpowers:brainstorming` to explore the idea, propose approaches, and present the design. Do NOT auto-commit the design doc -- leave it uncommitted for the user to review. When brainstorming tells you to "invoke writing-plans", STOP and return here instead.
-2. **Check: UI-only work?** -- If the work is purely UI/presentation (styling, layout, component design, theming, responsiveness, animations, dark mode, visual polish), auto-skip specs and go directly to step 6. Announce: "Skipping spec-writing -- this is a UI-only change with no business behavior impact."
-3. **Ask: Write specs?** (non-UI work only) -- use AskUserQuestion to ask: "Would you like to write Gherkin specs before proceeding to the implementation plan?" with options: "Yes, write specs" and "Skip specs". Users may skip if the session is purely exploratory or an open discussion without concrete implementation targets. If yes, invoke `pandahrms:spec-writing` to write or update specs in pandahrms-spec based on the approved design doc.
-4. **Review specs against design** -- invoke `pandahrms:spec-review` to cross-check the design doc against the written specs. This ensures every design requirement has spec coverage and nothing was missed. If no specs were written (user skipped step 3), this step is automatically skipped. If gaps are found, ask the user whether to fix them (loop back to spec-writing) or proceed anyway.
-5. **QA review: edge cases** -- dispatch a QA-review sub-agent (using the Agent tool) to independently review the feature specs for missed edge cases, unhappy paths, boundary conditions, and implicit requirements not explicitly stated in the design. If no specs were written (user skipped step 3), this step is automatically skipped. See [QA Review Agent](#qa-review-agent) below.
-6. **Create implementation plan** -- invoke `superpowers:writing-plans` to plan the implementation based on the approved design and specs.
-7. **Execute plan** -- the plan will be executed via `superpowers:subagent-driven-development` (v5 default). Apply the no-commit override: implementer subagents must NOT commit after tasks. All changes remain uncommitted.
-8. **Spec cross-check** -- after all tasks are executed, dispatch a spec cross-check agent to verify the full implementation matches the feature specs. See [Spec Cross-Check Agent](#spec-cross-check-agent) below. Skip if no specs exist.
-9. **Ask user to test** -- present the spec cross-check results, then end with: "Please test your changes, then run /commit when ready."
+1. **Brainstorm the design** -- Record start time. Invoke `superpowers:brainstorming` to explore the idea, propose approaches, and present the design. Do NOT auto-commit the design doc -- leave it uncommitted for the user to review. When brainstorming tells you to "invoke writing-plans", STOP and return here instead. Pause timer before presenting the design for user approval; resume after they respond. Record end time.
+2. **Check: UI-only work?** -- Record start time. If the work is purely UI/presentation (styling, layout, component design, theming, responsiveness, animations, dark mode, visual polish), auto-skip specs and go directly to step 6. Announce: "Skipping spec-writing -- this is a UI-only change with no business behavior impact." Record end time.
+3. **Ask: Write specs?** (non-UI work only) -- Record start time. Pause timer, then use AskUserQuestion to ask: "Would you like to write Gherkin specs before proceeding to the implementation plan?" with options: "Yes, write specs" and "Skip specs". Resume timer after user responds. Users may skip if the session is purely exploratory or an open discussion without concrete implementation targets. If yes, invoke `pandahrms:spec-writing` to write or update specs in pandahrms-spec based on the approved design doc. Record end time.
+4. **Review specs against design** -- Record start time. Invoke `pandahrms:spec-review` to cross-check the design doc against the written specs. This ensures every design requirement has spec coverage and nothing was missed. If no specs were written (user skipped step 3), this step is automatically skipped. If gaps are found, pause timer and ask the user whether to fix them (loop back to spec-writing) or proceed anyway; resume after they respond. Record end time.
+5. **QA review: edge cases** -- Record start time. Dispatch a QA-review sub-agent (using the Agent tool) to independently review the feature specs for missed edge cases, unhappy paths, boundary conditions, and implicit requirements not explicitly stated in the design. If no specs were written (user skipped step 3), this step is automatically skipped. See [QA Review Agent](#qa-review-agent) below. Pause timer before presenting findings to user; resume after they respond. Record end time.
+6. **Create implementation plan** -- Record start time. Invoke `superpowers:writing-plans` to plan the implementation based on the approved design and specs. Record end time.
+7. **Execute plan** -- Record start time. The plan will be executed via `superpowers:subagent-driven-development` (v5 default). Apply the no-commit override: implementer subagents must NOT commit after tasks. All changes remain uncommitted. Subagents must report their own duration (see [Subagent Timing](#subagent-timing)). Record end time.
+8. **Spec cross-check** -- Record start time. After all tasks are executed, dispatch a spec cross-check agent to verify the full implementation matches the feature specs. See [Spec Cross-Check Agent](#spec-cross-check-agent) below. Skip if no specs exist. Record end time.
+9. **Ask user to test** -- present the spec cross-check results and the Development Summary, then end with: "Please test your changes, then run /commit when ready."
 
 ## Time Tracking
 
-Track elapsed time across the full pipeline. Display a summary when execution completes.
+Track **active work time** across the full pipeline -- time spent by Claude doing work, excluding time waiting for user input or blocked on external factors. Display a summary when execution completes.
 
 ### How to track
 
 1. **On task start** -- record the current time (use `date +%s` via Bash)
-2. **On task completion** -- record the end time, calculate the duration, and display it: `"Task N completed in Xm Ys"`
-3. **On final task completion** -- display a summary:
+2. **Before any user prompt** -- record a pause timestamp. This includes:
+   - AskUserQuestion calls (design approval, "write specs?", "fix gaps?", "add edge cases?")
+   - Any blocker requiring user action (e.g., environment issue, missing access)
+   - Presenting results and waiting for user to respond
+3. **After user responds** -- record a resume timestamp. Add the paused duration to the task's excluded time.
+4. **On task completion** -- calculate: `duration = (end - start) - total_excluded_time`. Display: `"Task N completed in Xm Ys (active work)"`
+5. **On final task completion** -- display a summary:
 
 ```
-Development Summary
+Development Summary (active work time, excludes user-wait)
 ===========================
 Brainstorm the design       --  12m 34s
 Check: UI-only work?        --   0m 05s
-Ask: Write specs?           --   8m 21s
+Write specs                 --   8m 21s
 Review specs against design --   3m 10s
 QA review: edge cases       --   2m 45s
 Create implementation plan  --  15m 02s
@@ -121,10 +126,81 @@ Plan Task 3: ...            --  12m 08s
 Execution total             --  42m 31s
 Spec cross-check            --   1m 20s
 ===========================
-Grand total                 --  1h 25m 48s
+Grand total (active)        --  1h 25m 48s
+Total wall-clock time       --  2h 10m 15s
+User-wait time              --     44m 27s
 ```
 
+### What counts as paused time
+
+| Paused (exclude from timing) | Active (include in timing) |
+|------------------------------|---------------------------|
+| Waiting for user to answer AskUserQuestion | Claude processing after user responds |
+| User reviewing a design doc or spec | Brainstorming, writing specs, planning |
+| User fixing an environment issue | Subagent execution |
+| Blocked on external dependency | Reading files, running commands |
+
+### Implementation
+
+Persist all timestamps to `/tmp/pipeline-timing.json` so they survive context compression during long sessions. Use `date +%s` to capture epoch seconds.
+
+**On pipeline start**, initialize the file:
+
+```bash
+echo '{"tasks":[]}' > /tmp/pipeline-timing.json
+```
+
+**On each task event**, append to the file using a Bash `jq` command or by reading/rewriting the JSON. Each task entry has this structure:
+
+```json
+{
+  "name": "Brainstorm the design",
+  "start": 1718000000,
+  "end": 1718000754,
+  "pauses": [[1718000300, 1718000500]]
+}
+```
+
+Active duration = `(end - start) - sum(resume - pause for each pause)`
+
+**Duration formatting** -- compute in Bash to avoid platform issues:
+
+```bash
+elapsed=$((end - start - total_paused))
+printf '%dm %02ds' $((elapsed / 60)) $((elapsed % 60))
+```
+
+This uses POSIX-compatible arithmetic and works on both macOS and Linux.
+
 Skipped tasks show `-- skipped` instead of a duration.
+
+### Parallel Task Timing
+
+When step 7 dispatches parallel subagents via `subagent-driven-development`:
+
+- **Per-task duration** = each subagent's own active time (reported by the subagent)
+- **Execution total** = wall-clock time from first subagent dispatch to last subagent completion (not the sum of individual tasks, since parallel tasks overlap)
+- The summary table lists each task with its own duration, but the "Execution total" row reflects real elapsed time
+
+## Subagent Timing
+
+All dispatched subagents (QA review, spec cross-check, and implementer subagents) must report their own duration. Include the following timing instructions in every subagent dispatch prompt:
+
+```
+## Timing
+
+Record your start time at the beginning of your work:
+  start=$(date +%s)
+
+When you are done, record your end time and report the duration at the end of your response:
+  end=$(date +%s)
+  elapsed=$((end - start))
+  printf 'Agent duration: %dm %02ds\n' $((elapsed / 60)) $((elapsed % 60))
+
+Include the "Agent duration: Xm Ys" line as the last line of your response.
+```
+
+After each subagent returns, parse the reported duration and write it to `/tmp/pipeline-timing.json` as the task's active time.
 
 ## QA Review Agent
 
@@ -194,6 +270,19 @@ prompt: |
   Focus on quality over quantity. Only report genuine gaps, not theoretical
   scenarios that the feature's scope clearly excludes.
 
+  ## Timing
+
+  Record your start time at the beginning of your work:
+    start=$(date +%s)
+
+  When you are done, record your end time and report the duration at the end
+  of your response:
+    end=$(date +%s)
+    elapsed=$((end - start))
+    printf 'Agent duration: %dm %02ds\n' $((elapsed / 60)) $((elapsed % 60))
+
+  Include the "Agent duration: Xm Ys" line as the last line of your response.
+
 description: "QA review specs for edge cases"
 ```
 
@@ -256,6 +345,19 @@ prompt: |
   | 2 | [scenario] | [file.feature] | Divergent | [how it differs] |
 
   If all scenarios are covered, state that explicitly.
+
+  ## Timing
+
+  Record your start time at the beginning of your work:
+    start=$(date +%s)
+
+  When you are done, record your end time and report the duration at the end
+  of your response:
+    end=$(date +%s)
+    elapsed=$((end - start))
+    printf 'Agent duration: %dm %02ds\n' $((elapsed / 60)) $((elapsed % 60))
+
+  Include the "Agent duration: Xm Ys" line as the last line of your response.
 
 description: "Spec cross-check: verify implementation matches feature specs"
 ```
