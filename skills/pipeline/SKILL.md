@@ -17,6 +17,20 @@ Unified pipeline for Pandahrms projects: brainstorm, spec writing, spec review, 
 
 If invoked with a plan file path (e.g., `/pipeline path/to/plan.md`), skip steps 1-6 and start directly at step 7 (Execute plan).
 
+- Initialize time tracking as normal (the timing file and pipeline start time)
+- Announce: "Executing existing plan -- skipping design phase."
+- After execution, still run step 8 (spec cross-check) if specs exist for the feature
+- Still run step 9 (ask user to test) with the Development Summary
+
+## Resume Path
+
+If invoked with `/pipeline --resume`:
+
+1. Read `/tmp/pipeline-timing-latest.json` (symlink to the most recent run) to determine which steps completed
+2. Announce: "Resuming pipeline from step N -- [step name]."
+3. Continue from the next incomplete step with full time tracking
+4. If the timing file does not exist or is corrupt, announce: "No pipeline state found -- starting fresh." and begin from step 1
+
 <HARD-GATE>
 OVERRIDE: When the brainstorming skill completes and instructs you to "invoke writing-plans", do NOT invoke writing-plans. Instead, return to THIS pipeline and ask the user whether they want to write specs first.
 
@@ -34,23 +48,27 @@ This applies to ALL subagent dispatch prompts -- never include commit instructio
 ```dot
 digraph pipeline {
     "Work request" [shape=doublecircle];
+    "Plan file provided?" [shape=diamond];
     "Invoke brainstorming" [shape=box];
     "Design approved" [shape=diamond];
     "UI-only work?" [shape=diamond];
     "Auto-skip specs" [shape=box, style=filled, fillcolor=lightyellow];
     "Write specs?" [shape=diamond];
     "Invoke spec-writing" [shape=box];
-    "Specs approved" [shape=diamond];
     "Invoke spec-review" [shape=box];
     "Design/specs aligned?" [shape=diamond];
     "Dispatch QA-review agent" [shape=box, style=filled, fillcolor=lightblue];
     "Edge cases found?" [shape=diamond];
     "Create implementation plan" [shape=box];
     "Execute plan (subagent-driven)" [shape=box, style=filled, fillcolor=lightgreen];
+    "Subagent failed?" [shape=diamond, style=filled, fillcolor=lightyellow];
+    "Handle failure" [shape=box, style=filled, fillcolor=orange];
     "Spec cross-check agent" [shape=box, style=filled, fillcolor=lightblue];
     "Ask user to test" [shape=doublecircle];
 
-    "Work request" -> "Invoke brainstorming";
+    "Work request" -> "Plan file provided?";
+    "Plan file provided?" -> "Execute plan (subagent-driven)" [label="yes (fast path)"];
+    "Plan file provided?" -> "Invoke brainstorming" [label="no"];
     "Invoke brainstorming" -> "Design approved";
     "Design approved" -> "Invoke brainstorming" [label="no, revise"];
     "Design approved" -> "UI-only work?" [label="yes"];
@@ -59,9 +77,7 @@ digraph pipeline {
     "UI-only work?" -> "Write specs?" [label="no"];
     "Write specs?" -> "Invoke spec-writing" [label="yes"];
     "Write specs?" -> "Create implementation plan" [label="skip"];
-    "Invoke spec-writing" -> "Specs approved";
-    "Specs approved" -> "Invoke spec-writing" [label="no, revise"];
-    "Specs approved" -> "Invoke spec-review" [label="yes"];
+    "Invoke spec-writing" -> "Invoke spec-review";
     "Invoke spec-review" -> "Design/specs aligned?";
     "Design/specs aligned?" -> "Fix gaps?" [label="no, gaps found"];
     "Fix gaps?" [shape=diamond];
@@ -72,23 +88,27 @@ digraph pipeline {
     "Edge cases found?" -> "Invoke spec-writing" [label="yes, add to specs"];
     "Edge cases found?" -> "Create implementation plan" [label="no, specs complete"];
     "Create implementation plan" -> "Execute plan (subagent-driven)";
-    "Execute plan (subagent-driven)" -> "Spec cross-check agent";
+    "Execute plan (subagent-driven)" -> "Subagent failed?";
+    "Subagent failed?" -> "Handle failure" [label="yes"];
+    "Handle failure" -> "Execute plan (subagent-driven)" [label="retry/skip"];
+    "Handle failure" -> "Ask user to test" [label="abort"];
+    "Subagent failed?" -> "Spec cross-check agent" [label="no, all passed"];
     "Spec cross-check agent" -> "Ask user to test";
 }
 ```
 
 ## Checklist
 
-You MUST create a task for each of these items and complete them in order:
+You MUST create a task for each of these items and complete them in order. Apply [Time Tracking](#time-tracking) to every step -- record start/end times and pause during user prompts. The timing section has full details; do not duplicate timing logic here.
 
-1. **Brainstorm the design** -- Record start time. Invoke `superpowers:brainstorming` to explore the idea, propose approaches, and present the design. Do NOT auto-commit the design doc -- leave it uncommitted for the user to review. When brainstorming tells you to "invoke writing-plans", STOP and return here instead. Pause timer before presenting the design for user approval; resume after they respond. Record end time.
-2. **Check: UI-only work?** -- Record start time. If the work is purely UI/presentation (styling, layout, component design, theming, responsiveness, animations, dark mode, visual polish), auto-skip specs and go directly to step 6. Announce: "Skipping spec-writing -- this is a UI-only change with no business behavior impact." Record end time.
-3. **Ask: Write specs?** (non-UI work only) -- Record start time. Pause timer, then use AskUserQuestion to ask: "Would you like to write Gherkin specs before proceeding to the implementation plan?" with options: "Yes, write specs" and "Skip specs". Resume timer after user responds. Users may skip if the session is purely exploratory or an open discussion without concrete implementation targets. If yes, invoke `pandahrms:spec-writing` to write or update specs in pandahrms-spec based on the approved design doc. Record end time.
-4. **Review specs against design** -- Record start time. Invoke `pandahrms:spec-review` to cross-check the design doc against the written specs. This ensures every design requirement has spec coverage and nothing was missed. If no specs were written (user skipped step 3), this step is automatically skipped. If gaps are found, pause timer and ask the user whether to fix them (loop back to spec-writing) or proceed anyway; resume after they respond. Record end time.
-5. **QA review: edge cases** -- Record start time. Dispatch a QA-review sub-agent (using the Agent tool) to independently review the feature specs for missed edge cases, unhappy paths, boundary conditions, and implicit requirements not explicitly stated in the design. If no specs were written (user skipped step 3), this step is automatically skipped. See [QA Review Agent](#qa-review-agent) below. Pause timer before presenting findings to user; resume after they respond. Record end time.
-6. **Create implementation plan** -- Record start time. Invoke `superpowers:writing-plans` to plan the implementation based on the approved design and specs. Record end time.
-7. **Execute plan** -- Record start time. The plan will be executed via `superpowers:subagent-driven-development` (v5 default). Apply the no-commit override: implementer subagents must NOT commit after tasks. All changes remain uncommitted. Subagents must report their own duration (see [Subagent Timing](#subagent-timing)). Record end time.
-8. **Spec cross-check** -- Record start time. After all tasks are executed, dispatch a spec cross-check agent to verify the full implementation matches the feature specs. See [Spec Cross-Check Agent](#spec-cross-check-agent) below. Skip if no specs exist. Record end time.
+1. **Brainstorm the design** -- invoke `superpowers:brainstorming` to explore the idea, propose approaches, and present the design. Do NOT auto-commit the design doc -- leave it uncommitted for the user to review. When brainstorming tells you to "invoke writing-plans", STOP and return here instead.
+2. **Check: UI-only work?** -- if the work is purely UI/presentation (styling, layout, component design, theming, responsiveness, animations, dark mode, visual polish), auto-skip specs and go directly to step 6. Announce: "Skipping spec-writing -- this is a UI-only change with no business behavior impact."
+3. **Write specs?** (non-UI work only) -- use AskUserQuestion to ask: "Would you like to write Gherkin specs before proceeding to the implementation plan?" with options: "Yes, write specs" and "Skip specs". Users may skip if the session is purely exploratory or an open discussion without concrete implementation targets. If yes, invoke `pandahrms:spec-writing` to write or update specs in pandahrms-spec based on the approved design doc. Present the written specs to the user for review before proceeding.
+4. **Review specs against design** -- invoke `pandahrms:spec-review` to cross-check the design doc against the written specs. This ensures every design requirement has spec coverage and nothing was missed. If no specs were written (user skipped step 3), this step is automatically skipped. If gaps are found, ask the user whether to fix them (loop back to spec-writing) or proceed anyway.
+5. **QA review: edge cases** -- dispatch a QA-review sub-agent (using the Agent tool) to independently review the feature specs for missed edge cases, unhappy paths, boundary conditions, and implicit requirements not explicitly stated in the design. If no specs were written (user skipped step 3), this step is automatically skipped. See [QA Review Agent](#qa-review-agent) below.
+6. **Create implementation plan** -- invoke `superpowers:writing-plans` to plan the implementation based on the approved design and specs.
+7. **Execute plan** -- the plan will be executed via `superpowers:subagent-driven-development` (v5 default). Apply the no-commit override: implementer subagents must NOT commit after tasks. All changes remain uncommitted. Subagents must report their own duration (see [Subagent Timing](#subagent-timing)). If a subagent fails, follow [Subagent Failure Handling](#subagent-failure-handling).
+8. **Spec cross-check** -- after all tasks are executed, dispatch a spec cross-check agent to verify the full implementation matches the feature specs. See [Spec Cross-Check Agent](#spec-cross-check-agent) below. Skip if no specs exist.
 9. **Ask user to test** -- present the spec cross-check results and the Development Summary, then end with: "Please test your changes, then run /commit when ready."
 
 ## Time Tracking
@@ -142,12 +162,19 @@ User-wait time              --     44m 27s
 
 ### Implementation
 
-Persist all timestamps to `/tmp/pipeline-timing.json` so they survive context compression during long sessions. Use `date +%s` to capture epoch seconds.
+Persist all timestamps to a run-specific file so they survive context compression during long sessions. Use `date +%s` to capture epoch seconds.
 
-**On pipeline start**, initialize the file:
+**On pipeline start**, initialize the file with a unique name:
 
 ```bash
-echo '{"tasks":[]}' > /tmp/pipeline-timing.json
+export PIPELINE_TIMING="/tmp/pipeline-timing-$(date +%s).json"
+echo '{"tasks":[]}' > "$PIPELINE_TIMING"
+```
+
+Store the `PIPELINE_TIMING` path in conversation context. For resume support, also write the path to `/tmp/pipeline-timing-latest.json` as a symlink:
+
+```bash
+ln -sf "$PIPELINE_TIMING" /tmp/pipeline-timing-latest.json
 ```
 
 **On each task event**, append to the file using a Bash `jq` command or by reading/rewriting the JSON. Each task entry has this structure:
@@ -173,6 +200,12 @@ printf '%dm %02ds' $((elapsed / 60)) $((elapsed % 60))
 This uses POSIX-compatible arithmetic and works on both macOS and Linux.
 
 Skipped tasks show `-- skipped` instead of a duration.
+
+**On pipeline end** (step 9), clean up the timing file after displaying the summary:
+
+```bash
+rm -f "$PIPELINE_TIMING" /tmp/pipeline-timing-latest.json
+```
 
 ### Parallel Task Timing
 
@@ -200,7 +233,31 @@ When you are done, record your end time and report the duration at the end of yo
 Include the "Agent duration: Xm Ys" line as the last line of your response.
 ```
 
-After each subagent returns, parse the reported duration and write it to `/tmp/pipeline-timing.json` as the task's active time.
+After each subagent returns, parse the reported duration and write it to `$PIPELINE_TIMING` as the task's active time.
+
+## Subagent Failure Handling
+
+When a subagent reports a failure (build error, test failure, merge conflict, or any non-zero exit):
+
+1. **Pause execution** -- do not dispatch further subagents
+2. **Present the error** -- show the failing subagent's name, task description, and error output
+3. **Ask the user** via AskUserQuestion: "Subagent '[task name]' failed. How would you like to proceed?" with options:
+   - **"Retry"** -- re-dispatch the same subagent with the same prompt
+   - **"Skip and continue"** -- mark the task as failed in the timing file and proceed with remaining tasks
+   - **"Abort pipeline"** -- stop execution, display the Development Summary with completed tasks, and end with: "Pipeline aborted. Completed tasks remain uncommitted. Run /commit when ready or discard with git restore."
+
+Record the failure and user decision in `$PIPELINE_TIMING` for the task entry:
+
+```json
+{
+  "name": "Task 3: ...",
+  "status": "failed",
+  "error": "Build error: CS1002 ...",
+  "resolution": "skipped"
+}
+```
+
+Failed/skipped tasks show `-- FAILED (skipped)` or `-- FAILED (retried)` in the Development Summary.
 
 ## QA Review Agent
 
@@ -216,7 +273,10 @@ Announce: "Skipping QA review -- no specs to review."
 
 ### Agent Dispatch
 
-Use the Agent tool with the following prompt structure. Replace the placeholders with actual file paths.
+Use the Agent tool with the following prompt structure. Replace the placeholders:
+- `{design_doc_path}` -- path to the approved design document
+- `{spec_file_paths}` -- paths to all written spec files
+- `{scope_notes}` -- brief "in scope / out of scope" summary extracted from the design doc, so the agent doesn't flag edge cases for deferred features
 
 ```
 prompt: |
@@ -228,8 +288,12 @@ prompt: |
 
   Design document: {design_doc_path}
   Spec files: {spec_file_paths}
+  Scope: {scope_notes}
 
-  Read the design document and all spec files.
+  Read the design document and all spec files. The scope section defines
+  what is in-scope and out-of-scope for this iteration. Only flag edge
+  cases for in-scope functionality -- do not report findings for features
+  explicitly marked as deferred or out-of-scope.
 
   ## What to Look For
 
@@ -318,7 +382,13 @@ prompt: |
   ## Task
 
   1. Run `git diff` to get all working tree changes
-  2. Locate the spec repo at `$(dirname $PWD)/pandahrms-spec/`
+  2. Locate the spec repo: search for a `pandahrms-spec` directory as a
+     sibling of the current working directory, then check parent directories.
+     Try these in order:
+     - `$(dirname $PWD)/pandahrms-spec/`
+     - `$(dirname $(dirname $PWD))/pandahrms-spec/`
+     - Search: `find $(dirname $PWD) -maxdepth 2 -type d -name pandahrms-spec`
+     If not found, report "Spec repo not found" and skip the cross-check.
   3. Identify which module/feature area the changes belong to
   4. Find all related `.feature` files
   5. For each spec scenario, check whether the implementation satisfies it:
@@ -361,29 +431,6 @@ prompt: |
 
 description: "Spec cross-check: verify implementation matches feature specs"
 ```
-
-## Critical Override: Brainstorming Terminal State
-
-The `superpowers:brainstorming` skill's terminal step says:
-
-> "Transition to implementation -- invoke writing-plans skill to create implementation plan"
-
-In Pandahrms projects, this step is REPLACED by:
-
-> "Ask the user whether to write specs -- if yes, invoke pandahrms:spec-writing to write Gherkin specs based on the approved design. If the user skips, proceed directly to writing-plans."
-
-Only after the user has been asked (and specs are written if requested) should you invoke `superpowers:writing-plans`.
-
-## Critical Override: No Commits During Execution
-
-When `superpowers:subagent-driven-development` dispatches implementer subagents, it instructs them to commit after completing each task. In Pandahrms projects, this is OVERRIDDEN:
-
-- **Do NOT include commit instructions** in implementer subagent prompts
-- **Do NOT run `git commit`** at any point during execution
-- All changes remain uncommitted until the user tests and runs `/commit`
-- If subagent-driven-development's skill text says "commit", ignore that instruction
-
-This ensures the user can review the full feature, test it, and make atomic commits via the `/commit` skill.
 
 ## Red Flags
 
