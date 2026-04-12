@@ -33,6 +33,8 @@ digraph pipeline {
     "Specs approved + committed" [shape=diamond];
     "Invoke spec-review" [shape=box];
     "Design/specs aligned?" [shape=diamond];
+    "Dispatch QA-review agent" [shape=box, style=filled, fillcolor=lightblue];
+    "Edge cases found?" [shape=diamond];
     "Invoke writing-plans" [shape=doublecircle];
 
     "Work request" -> "Invoke brainstorming";
@@ -51,8 +53,11 @@ digraph pipeline {
     "Design/specs aligned?" -> "Fix gaps?" [label="no, gaps found"];
     "Fix gaps?" [shape=diamond];
     "Fix gaps?" -> "Invoke spec-writing" [label="yes, fix"];
-    "Fix gaps?" -> "Invoke writing-plans" [label="no, proceed anyway"];
-    "Design/specs aligned?" -> "Invoke writing-plans" [label="yes"];
+    "Fix gaps?" -> "Dispatch QA-review agent" [label="no, proceed anyway"];
+    "Design/specs aligned?" -> "Dispatch QA-review agent" [label="yes"];
+    "Dispatch QA-review agent" -> "Edge cases found?";
+    "Edge cases found?" -> "Invoke spec-writing" [label="yes, add to specs"];
+    "Edge cases found?" -> "Invoke writing-plans" [label="no, specs complete"];
 }
 ```
 
@@ -70,7 +75,7 @@ Skipped tasks show `-- skipped` instead of a duration.
 
 ### Pipeline session: persist timing into the plan file
 
-After the pipeline checklist completes (step 5), append a `## Pipeline Timing` section to the **bottom** of the generated plan file:
+After the pipeline checklist completes (step 7), append a `## Pipeline Timing` section to the **bottom** of the generated plan file:
 
 ```markdown
 ## Pipeline Timing
@@ -82,10 +87,11 @@ After the pipeline checklist completes (step 5), append a `## Pipeline Timing` s
 | Check: UI-only work? | 0m 5s |
 | Ask: Write specs? | 8m 21s |
 | Review specs against design | 3m 10s |
+| QA review: edge cases | 2m 45s |
 | Create implementation plan | 15m 02s |
-| **Pipeline total** | **39m 12s** |
+| **Pipeline total** | **41m 57s** |
 | Skills invoked | 4 (brainstorming, spec-writing, spec-review, writing-plans) |
-| Agents spawned | 2 |
+| Agents spawned | 3 |
 ```
 
 This ensures the timing data travels with the plan file into the next session.
@@ -121,16 +127,97 @@ If no `## Pipeline Timing` section exists in the plan file, show only the execut
 You MUST create a task for each of these items and complete them in order:
 
 1. **Brainstorm the design** -- invoke `superpowers:brainstorming` to explore the idea, propose approaches, and present design. Do NOT auto-commit the design doc -- leave it uncommitted for the user to review. When brainstorming tells you to "invoke writing-plans", STOP and return here instead.
-2. **Check: UI-only work?** -- If the work is purely UI/presentation (styling, layout, component design, theming, responsiveness, animations, dark mode, visual polish), auto-skip specs and go directly to step 4. Announce: "Skipping spec-writing -- this is a UI-only change with no business behavior impact."
+2. **Check: UI-only work?** -- If the work is purely UI/presentation (styling, layout, component design, theming, responsiveness, animations, dark mode, visual polish), auto-skip specs and go directly to step 6. Announce: "Skipping spec-writing -- this is a UI-only change with no business behavior impact."
 3. **Ask: Write specs?** (non-UI work only) -- use AskUserQuestion to ask: "Would you like to write Gherkin specs before proceeding to the implementation plan?" with options: "Yes, write specs" and "Skip specs". Users may skip if the session is purely exploratory or an open discussion without concrete implementation targets. If yes, invoke `pandahrms:spec-writing` to write or update specs in pandahrms-spec based on the approved design doc.
-4. **Review specs against design** -- invoke `pandahrms:spec-review` to cross-check the design doc against the written specs. This ensures every design requirement has spec coverage and nothing was missed. If no specs were written (user skipped step 3), this step is automatically skipped. If gaps are found, ask the user whether to fix them (loop back to spec-writing) or proceed anyway to implementation planning.
-5. **Create implementation plan** -- invoke `superpowers:writing-plans` to plan the implementation based on the approved design and specs.
-6. **Prompt execution** -- display a copy-paste ready message for the user to execute the plan in a new session:
+4. **Review specs against design** -- invoke `pandahrms:spec-review` to cross-check the design doc against the written specs. This ensures every design requirement has spec coverage and nothing was missed. If no specs were written (user skipped step 3), this step is automatically skipped. If gaps are found, ask the user whether to fix them (loop back to spec-writing) or proceed anyway.
+5. **QA review: edge cases** -- dispatch a QA-review sub-agent (using the Agent tool) to independently review the feature specs for missed edge cases, unhappy paths, boundary conditions, and implicit requirements not explicitly stated in the design. If no specs were written (user skipped step 3), this step is automatically skipped. See [QA Review Agent](#qa-review-agent) for the agent prompt and workflow.
+6. **Create implementation plan** -- invoke `superpowers:writing-plans` to plan the implementation based on the approved design and specs.
+7. **Prompt execution** -- display a copy-paste ready message for the user to execute the plan in a new session:
 
 ```
 Design pipeline complete. To execute the plan, open a new session and run:
 /execution-pipeline {absolute_path_to_plan_file}
 ```
+
+## QA Review Agent
+
+After spec-review confirms alignment (or the user proceeds despite gaps), dispatch a sub-agent to independently audit the specs for completeness. This agent looks for what the spec author and reviewer might have missed -- edge cases that only surface when you ask "what could go wrong?"
+
+### Skip Condition
+
+Skip this step entirely when:
+- No specs were written (user skipped step 3)
+- The work is UI-only (auto-skipped at step 2)
+
+Announce: "Skipping QA review -- no specs to review."
+
+### Agent Dispatch
+
+Use the Agent tool with the following prompt structure. Replace the placeholders with actual file paths.
+
+```
+prompt: |
+  You are a QA reviewer. Your job is to review Gherkin feature specs for a
+  Pandahrms feature and identify missed edge cases, unhappy paths, boundary
+  conditions, and implicit requirements.
+
+  ## Inputs
+
+  Design document: {design_doc_path}
+  Spec files: {spec_file_paths}
+
+  Read the design document and all spec files.
+
+  ## What to Look For
+
+  1. **Unhappy paths** -- What happens when the user provides invalid input,
+     cancels mid-flow, loses connectivity, or hits a timeout?
+  2. **Boundary conditions** -- Empty lists, maximum lengths, zero values,
+     exactly-at-limit values, off-by-one scenarios.
+  3. **Concurrent/conflicting actions** -- Two users editing the same record,
+     duplicate submissions, race conditions.
+  4. **Permission edge cases** -- User's role changes mid-session, permission
+     revoked after page load, cross-tenant access attempts.
+  5. **Data state edge cases** -- Soft-deleted records, archived entities,
+     null/missing optional fields, migrated legacy data.
+  6. **Implicit requirements** -- Behavior the design assumes but never states
+     (e.g., audit logging, notification triggers, cascade effects).
+
+  ## Output Format
+
+  Return a structured report:
+
+  ### Edge Cases Found
+
+  For each finding:
+  - **ID**: QA-1, QA-2, etc.
+  - **Category**: (unhappy path | boundary | concurrency | permission | data state | implicit requirement)
+  - **Description**: What the edge case is
+  - **Suggested scenario**: A Gherkin scenario outline (Given/When/Then) that would cover it
+  - **Severity**: (high | medium | low) -- high means likely to cause a bug in production
+
+  ### Summary
+
+  - Total findings: [count]
+  - High severity: [count]
+  - Medium severity: [count]
+  - Low severity: [count]
+
+  If you find zero edge cases, state that explicitly -- do not invent findings.
+  Focus on quality over quantity. Only report genuine gaps, not theoretical
+  scenarios that the feature's scope clearly excludes.
+
+description: "QA review specs for edge cases"
+```
+
+### Handling Results
+
+After the agent returns:
+
+- **Zero findings** -- announce "QA review complete -- no additional edge cases found." Proceed to step 6.
+- **Findings returned** -- present the agent's report to the user, then use AskUserQuestion: "QA review found [count] edge cases ([high_count] high severity). Would you like to add these to the specs?" with options:
+  - **"Yes, add to specs"** -- loop back to `pandahrms:spec-writing` to incorporate the high and medium severity findings as new scenarios. Low severity findings are included only if the user explicitly asks.
+  - **"No, proceed to planning"** -- proceed to step 6. The findings are still visible in the conversation for reference during implementation.
 
 ## Critical Override: Brainstorming Terminal State
 
@@ -183,6 +270,7 @@ Replace `{absolute_path_to_plan_file}` with the actual path where the plan was s
 | "I'll skip specs without asking" | Always ask the user. They decide whether specs are needed. |
 | "The design doc is enough" | Design doc captures WHAT. Specs capture BEHAVIOR. Ask the user. |
 | "Specs look fine, skip the review" | Always run spec-review after writing specs. It catches gaps you won't notice manually. |
+| "Specs are aligned, skip QA review" | The QA agent finds what both author and reviewer miss -- edge cases, unhappy paths, implicit requirements. Always run it after spec-review. |
 | "This change is too small for specs" | Don't assume -- ask the user. They may still want specs (unless it's UI-only, then auto-skip). |
 | "Let me use subagent-driven execution" | Pandahrms always uses Parallel Session (separate) via execution-pipeline. |
 | "Let me execute the plan in this session" | Always hand off to a new session with /execution-pipeline. |
