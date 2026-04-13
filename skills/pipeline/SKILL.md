@@ -32,9 +32,37 @@ If invoked with `/pipeline --resume`:
 4. If the timing file does not exist or is corrupt, announce: "No pipeline state found -- starting fresh." and begin from step 1
 
 <HARD-GATE>
+MODEL REQUIREMENT (design phase): Steps 1-6 (brainstorm through plan creation) MUST run on Opus 1M (`claude-opus-4-6[1m]`). Before starting step 1, verify the current model ID. If the current model is not `claude-opus-4-6[1m]`, STOP and tell the user:
+
+"This pipeline recommends Opus 1M for the design phase. Please switch to Opus 1M (`claude-opus-4-6[1m]`) and rerun, or reply 'proceed on current model' to override."
+
+The fast path (plan-file provided) may run on any model since it starts at step 7.
+
+**User override:** If the user explicitly instructs you to proceed on a different model (e.g. "use sonnet", "proceed on current model", "run the design on opus 4.5"), honor it. User instructions take precedence over this skill. Record the override in the timing file as `"design_model_override": "<model>"`.
+</HARD-GATE>
+
+<HARD-GATE>
+EXECUTION MODEL (default Sonnet): Step 7 (execute plan) dispatches every implementer subagent with `model: "sonnet"` on the Agent tool call by default. The main Opus session orchestrates; Sonnet subagents do the code work. This applies to the fast path as well.
+
+**User override:** If the user explicitly asks for a different execution model (e.g. "use opus for execution", "dispatch implementers on opus", "run tasks on opus 1m"), honor it and dispatch subagents with the requested model instead. Confirm once before dispatching:
+
+"You've asked to run implementer subagents on <model> instead of the default Sonnet. That's slower and more expensive but will proceed. Confirm?"
+
+After confirmation, use the requested model for ALL implementer subagents in this pipeline run. Record the override in the timing file as `"execution_model_override": "<model>"`. Do not re-ask on each task.
+
+Absent an explicit user override, always pass `model: "sonnet"` explicitly -- never omit the parameter.
+</HARD-GATE>
+
+<HARD-GATE>
 OVERRIDE: When the brainstorming skill completes and instructs you to "invoke writing-plans", do NOT invoke writing-plans. Instead, return to THIS pipeline and ask the user whether they want to write specs first.
 
 The brainstorming skill says: "The ONLY skill you invoke after brainstorming is writing-plans." In Pandahrms projects, this instruction is OVERRIDDEN by this pipeline. You MUST ask the user before proceeding.
+</HARD-GATE>
+
+<HARD-GATE>
+OVERRIDE: At the end of `superpowers:writing-plans`, the skill asks the user to choose between "Subagent-Driven" and "Inline Execution". DO NOT present this choice. Auto-select subagent-driven and immediately proceed to step 7. This pipeline requires Sonnet subagents for execution — inline execution is not an option.
+
+Announce: "Plan complete. Proceeding to subagent-driven execution on Sonnet."
 </HARD-GATE>
 
 <HARD-GATE>
@@ -48,6 +76,7 @@ This applies to ALL subagent dispatch prompts -- never include commit instructio
 ```dot
 digraph pipeline {
     "Work request" [shape=doublecircle];
+    "Verify Opus 1M" [shape=box, style=filled, fillcolor=lightcoral];
     "Plan file provided?" [shape=diamond];
     "Invoke brainstorming" [shape=box];
     "Design approved" [shape=diamond];
@@ -60,14 +89,15 @@ digraph pipeline {
     "Dispatch QA-review agent" [shape=box, style=filled, fillcolor=lightblue];
     "Edge cases found?" [shape=diamond];
     "Create implementation plan" [shape=box];
-    "Execute plan (subagent-driven)" [shape=box, style=filled, fillcolor=lightgreen];
+    "Execute plan (Sonnet subagents)" [shape=box, style=filled, fillcolor=lightgreen];
     "Subagent failed?" [shape=diamond, style=filled, fillcolor=lightyellow];
     "Handle failure" [shape=box, style=filled, fillcolor=orange];
     "Spec cross-check agent" [shape=box, style=filled, fillcolor=lightblue];
     "Ask user to test" [shape=doublecircle];
 
-    "Work request" -> "Plan file provided?";
-    "Plan file provided?" -> "Execute plan (subagent-driven)" [label="yes (fast path)"];
+    "Work request" -> "Verify Opus 1M";
+    "Verify Opus 1M" -> "Plan file provided?";
+    "Plan file provided?" -> "Execute plan (Sonnet subagents)" [label="yes (fast path)"];
     "Plan file provided?" -> "Invoke brainstorming" [label="no"];
     "Invoke brainstorming" -> "Design approved";
     "Design approved" -> "Invoke brainstorming" [label="no, revise"];
@@ -87,10 +117,10 @@ digraph pipeline {
     "Dispatch QA-review agent" -> "Edge cases found?";
     "Edge cases found?" -> "Invoke spec-writing" [label="yes, add to specs"];
     "Edge cases found?" -> "Create implementation plan" [label="no, specs complete"];
-    "Create implementation plan" -> "Execute plan (subagent-driven)";
-    "Execute plan (subagent-driven)" -> "Subagent failed?";
+    "Create implementation plan" -> "Execute plan (Sonnet subagents)";
+    "Execute plan (Sonnet subagents)" -> "Subagent failed?";
     "Subagent failed?" -> "Handle failure" [label="yes"];
-    "Handle failure" -> "Execute plan (subagent-driven)" [label="retry/skip"];
+    "Handle failure" -> "Execute plan (Sonnet subagents)" [label="retry/skip"];
     "Handle failure" -> "Ask user to test" [label="abort"];
     "Subagent failed?" -> "Spec cross-check agent" [label="no, all passed"];
     "Spec cross-check agent" -> "Ask user to test";
@@ -107,7 +137,7 @@ You MUST create a task for each of these items and complete them in order. Apply
 4. **Review specs against design** -- invoke `pandahrms:spec-review` to cross-check the design doc against the written specs. This ensures every design requirement has spec coverage and nothing was missed. If no specs were written (user skipped step 3), this step is automatically skipped. If gaps are found, ask the user whether to fix them (loop back to spec-writing) or proceed anyway.
 5. **QA review: edge cases** -- dispatch a QA-review sub-agent (using the Agent tool) to independently review the feature specs for missed edge cases, unhappy paths, boundary conditions, and implicit requirements not explicitly stated in the design. If no specs were written (user skipped step 3), this step is automatically skipped. See [QA Review Agent](#qa-review-agent) below.
 6. **Create implementation plan** -- invoke `superpowers:writing-plans` to plan the implementation based on the approved design and specs.
-7. **Execute plan** -- the plan will be executed via `superpowers:subagent-driven-development` (v5 default). Apply the no-commit override: implementer subagents must NOT commit after tasks. All changes remain uncommitted. Subagents must report their own duration (see [Subagent Timing](#subagent-timing)). If a subagent fails, follow [Subagent Failure Handling](#subagent-failure-handling).
+7. **Execute plan** -- the plan will be executed via `superpowers:subagent-driven-development` (v5 default). Every implementer subagent MUST be dispatched with `model: "sonnet"` on the Agent tool call -- the main Opus 1M session orchestrates; Sonnet does the task work. Apply the no-commit override: implementer subagents must NOT commit after tasks. All changes remain uncommitted. Subagents must report their own duration (see [Subagent Timing](#subagent-timing)). If a subagent fails, follow [Subagent Failure Handling](#subagent-failure-handling).
 8. **Spec cross-check** -- after all tasks are executed, dispatch a spec cross-check agent to verify the full implementation matches the feature specs. See [Spec Cross-Check Agent](#spec-cross-check-agent) below. Skip if no specs exist.
 9. **Ask user to test** -- present the spec cross-check results and the Development Summary, then end with: "Please test your changes, then run /commit when ready."
 
@@ -443,6 +473,10 @@ description: "Spec cross-check: verify implementation matches feature specs"
 | "Specs are aligned, skip QA review" | The QA agent finds what both author and reviewer miss -- edge cases, unhappy paths, implicit requirements. Always run it after spec-review. |
 | "This change is too small for specs" | Don't assume -- ask the user. They may still want specs (unless it's UI-only, then auto-skip). |
 | "Let me commit after each task" | Never commit. User tests first, then /commit. |
+| "I'll start designing on Sonnet, it's fine" | Design phase defaults to Opus 1M. Stop and ask the user to switch or explicitly override. |
+| "I'll just execute the plan in the main session" | Never. Step 7 dispatches subagents. Main session only orchestrates. |
+| "The Agent tool defaults to a reasonable model" | Always pass `model` explicitly — Sonnet by default, or the user's overridden model. |
+| "The user said use opus for execution, but the skill says Sonnet" | User instructions override the skill. Confirm once, then dispatch on Opus. |
 | "The per-task reviews covered specs" | Per-task reviews check individual tasks. The spec cross-check catches gaps across tasks and missing scenarios. Always run it. |
 | "I'll skip the spec cross-check" | It's mandatory when specs exist. Only skip if no specs were written. |
 
