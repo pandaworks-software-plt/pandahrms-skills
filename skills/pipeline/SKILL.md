@@ -17,7 +17,7 @@ Unified pipeline for Pandahrms projects: brainstorm, spec writing, QA review, im
 
 If invoked with a plan file path (e.g., `/pipeline path/to/plan.md`), skip steps 1-5 and start directly at step 6 (Plan ↔ Spec cross-review), then step 7 (Execute plan).
 
-- Initialize time tracking as normal (the timing file and pipeline start time)
+- Initialize time tracking as normal
 - Announce: "Executing existing plan -- running plan/spec cross-review, then execution."
 - Still run step 6 (Plan ↔ Spec cross-review) to catch drift between the pre-existing plan and current specs
 - After execution, still run step 8 (spec cross-check) if specs exist for the feature
@@ -40,16 +40,16 @@ If yes, use AskUserQuestion: "This looks like a narrow task -- skip brainstormin
 
 Ask only when the scope is genuinely narrow. When in doubt, run the full pipeline -- over-triage erodes quality. Users may override either direction.
 
-Record the triage decision in the timing file as `"triage": "fast-tracked" | "full"`.
+Record the triage decision in the plan file's `## Pipeline Progress` section once the plan exists.
 
 ## Resume Path
 
 If invoked with `/pipeline --resume`:
 
-1. Read `/tmp/pipeline-timing-latest.json` (symlink to the most recent run) to determine which steps completed
+1. Read the plan file's `## Pipeline Progress` section to determine which steps completed and their timing
 2. Announce: "Resuming pipeline from step N -- [step name]."
 3. Continue from the next incomplete step with full time tracking
-4. If the timing file does not exist or is corrupt, announce: "No pipeline state found -- starting fresh." and begin from step 1
+4. If no plan file exists or has no progress section, announce: "No pipeline state found -- starting fresh." and begin from step 1
 
 <HARD-GATE>
 OVERRIDE: When the brainstorming skill completes and instructs you to "invoke writing-plans", do NOT invoke writing-plans. Instead, return to THIS pipeline and ask the user whether they want to write specs first.
@@ -200,46 +200,51 @@ User-wait time              --     44m 27s
 
 ### Implementation
 
-Persist all timestamps to a run-specific file so they survive context compression during long sessions.
+Use the plan file as the single source of truth for both progress tracking and timing. Before the plan file exists (steps 1-4), hold timestamps in conversation context. Once the plan is created (step 5), persist everything into the plan file.
 
-Use the Read and Write tools for all timing file I/O. Only use Bash for `date +%s`, `ln -sf`, and `rm -f`.
+Use the Read and Write tools for all plan file I/O. Only use Bash for `date +%s`.
 
 **On pipeline start:**
 
 1. Run `date +%s` in Bash to get the epoch
-2. Use the **Write** tool to create `/tmp/pipeline-timing-{epoch}.json`:
-   ```json
-   {"steps":[]}
-   ```
-3. Store the path `/tmp/pipeline-timing-{epoch}.json` in conversation context
-4. Run `ln -sf /tmp/pipeline-timing-{epoch}.json /tmp/pipeline-timing-latest.json`
+2. Hold the pipeline start time and step timestamps in conversation context until the plan file is created
 
-**On each step start/end:**
+**On plan creation (step 5):**
+
+Append a `## Pipeline Progress` section to the plan file. Backfill steps 1-4 timing from conversation context:
+
+```markdown
+## Pipeline Progress
+
+| Step | Status | Duration |
+|------|--------|----------|
+| 1. Brainstorm the design | done | 12m 34s |
+| 2. Check: UI-only work? | done | 0m 05s |
+| 3. Write specs | done | 8m 21s |
+| 4. QA review | skipped | -- |
+| 5. Create implementation plan | done | 15m 02s |
+| 6. Plan-Spec cross-review | pending | -- |
+| 7. Execute plan | pending | -- |
+| 8. Spec cross-check | pending | -- |
+| 9. Ask user to test | pending | -- |
+
+Pipeline started: 1718000000
+```
+
+**On each step completion:**
 
 1. Run `date +%s` in Bash to get the timestamp
-2. Use the **Read** tool to load the timing JSON file
-3. Parse the JSON in your reasoning, add/update the step entry
-4. Use the **Write** tool to save the updated JSON back
+2. Use the **Read** tool to load the plan file
+3. Update the step's row in the Pipeline Progress table (status and duration)
+4. Use the **Write** tool to save the plan file back
 
-Step entry structure:
-```json
-{
-  "name": "Brainstorm the design",
-  "start": 1718000000,
-  "end": 1718000754,
-  "pauses": [[1718000300, 1718000500]]
-}
-```
+**On task completion (step 7):**
+
+When a subagent completes a plan task, update the task's checkbox in the plan file from `- [ ]` to `- [x]`, then update the Pipeline Progress table for step 7's running duration.
 
 Active duration = `(end - start) - sum(resume - pause for each pause)`
 
 Format durations by computing in your reasoning: `Xm YYs`. Skipped steps show `-- skipped`.
-
-**On pipeline end** (step 9), clean up after displaying the summary:
-
-```bash
-rm -f /tmp/pipeline-timing-*.json /tmp/pipeline-timing-latest.json
-```
 
 ### Execution step timing
 
@@ -400,7 +405,7 @@ Announce: "Skipping plan ↔ spec cross-review -- no specs for this feature."
 - **Gaps found** -- present the report. Use AskUserQuestion to ask how to resolve:
   - **"Update the plan"** -- loop back to `superpowers:writing-plans` to add missing tasks or add spec references
   - **"Update the spec"** -- loop back to `pandahrms:spec-writing` to remove or adjust scenarios that aren't planned
-  - **"Proceed anyway"** -- record the acknowledged gap in the timing file and continue. Flag gaps will surface again in step 8 spec cross-check.
+  - **"Proceed anyway"** -- record the acknowledged gap in the plan file's Pipeline Progress section and continue. Flag gaps will surface again in step 8 spec cross-check.
 
 Do not proceed to execution while gaps remain unresolved unless the user explicitly acknowledges them.
 
