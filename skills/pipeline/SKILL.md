@@ -200,23 +200,28 @@ User-wait time              --     44m 27s
 
 ### Implementation
 
-Persist all timestamps to a run-specific file so they survive context compression during long sessions. Use `date +%s` to capture epoch seconds.
+Persist all timestamps to a run-specific file so they survive context compression during long sessions.
 
-**On pipeline start**, initialize the file with a unique name:
+Use the Read and Write tools for all timing file I/O. Only use Bash for `date +%s`, `ln -sf`, and `rm -f`.
 
-```bash
-export PIPELINE_TIMING="/tmp/pipeline-timing-$(date +%s).json"
-echo '{"steps":[]}' > "$PIPELINE_TIMING"
-```
+**On pipeline start:**
 
-Store the `PIPELINE_TIMING` path in conversation context. For resume support, also write the path to `/tmp/pipeline-timing-latest.json` as a symlink:
+1. Run `date +%s` in Bash to get the epoch
+2. Use the **Write** tool to create `/tmp/pipeline-timing-{epoch}.json`:
+   ```json
+   {"steps":[]}
+   ```
+3. Store the path `/tmp/pipeline-timing-{epoch}.json` in conversation context
+4. Run `ln -sf /tmp/pipeline-timing-{epoch}.json /tmp/pipeline-timing-latest.json`
 
-```bash
-ln -sf "$PIPELINE_TIMING" /tmp/pipeline-timing-latest.json
-```
+**On each step start/end:**
 
-**On each step event**, append to the file using a Bash `jq` command or by reading/rewriting the JSON. Each step entry has this structure:
+1. Run `date +%s` in Bash to get the timestamp
+2. Use the **Read** tool to load the timing JSON file
+3. Parse the JSON in your reasoning, add/update the step entry
+4. Use the **Write** tool to save the updated JSON back
 
+Step entry structure:
 ```json
 {
   "name": "Brainstorm the design",
@@ -228,21 +233,12 @@ ln -sf "$PIPELINE_TIMING" /tmp/pipeline-timing-latest.json
 
 Active duration = `(end - start) - sum(resume - pause for each pause)`
 
-**Duration formatting** -- compute in Bash to avoid platform issues:
+Format durations by computing in your reasoning: `Xm YYs`. Skipped steps show `-- skipped`.
+
+**On pipeline end** (step 9), clean up after displaying the summary:
 
 ```bash
-elapsed=$((end - start - total_paused))
-printf '%dm %02ds' $((elapsed / 60)) $((elapsed % 60))
-```
-
-This uses POSIX-compatible arithmetic and works on both macOS and Linux.
-
-Skipped steps show `-- skipped` instead of a duration.
-
-**On pipeline end** (step 9), clean up the timing file after displaying the summary:
-
-```bash
-rm -f "$PIPELINE_TIMING" /tmp/pipeline-timing-latest.json
+rm -f /tmp/pipeline-timing-*.json /tmp/pipeline-timing-latest.json
 ```
 
 ### Execution step timing
