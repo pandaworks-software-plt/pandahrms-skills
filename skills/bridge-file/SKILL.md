@@ -1,9 +1,9 @@
 ---
-name: cross-project-bridge
+name: bridge-file
 description: Use whenever reading or writing any file under ~/.claude/bridge/ (issues, notes, specs, decisions), or when the user asks to communicate between separate Claude sessions across projects (FE/BE, mobile/BE). Auto-detects project pairs and works cross-platform (Mac/Windows). Any task derived from a bridge message must update the same file when complete.
 ---
 
-# Cross-Project Bridge
+# Bridge File
 
 ## Overview
 
@@ -11,7 +11,7 @@ Structured protocol for communicating between separate Claude sessions using sha
 
 Supports multiple message types: issues, notes, specs, and decisions.
 
-**Announce at start:** "I'm using the cross-project-bridge skill to handle cross-project communication."
+**Announce at start:** "I'm using the bridge-file skill to handle cross-project communication."
 
 ## When This Skill Triggers
 
@@ -306,7 +306,7 @@ In-flight task from cross-project bridge.
 **Why:** Bridge messages are the only shared channel between paired sessions. If this task is finished (in this session or a new one) without appending a `## Response` block to the bridge file, the other side has no visibility into the outcome.
 
 **How to apply:**
-- Before marking this task complete in any session, append a `## Response` block (see cross-project-bridge skill) to the bridge file above
+- Before marking this task complete in any session, append a `## Response` block (see bridge-file skill) to the bridge file above
 - After the bridge file is updated, delete this memory entry
 - If the user explicitly says "skip the bridge update", delete this memory entry with a note explaining why
 ```

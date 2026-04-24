@@ -30,9 +30,9 @@ This skill runs after specs are written and approved, before proceeding to imple
 
 ## Skip Condition: No Specs Written
 
-If specs were skipped in the pipeline (user chose "Skip specs" in the design-pipeline), or no `.feature` files exist for the current feature area in `pandahrms-spec/`, **skip this skill entirely**.
+If specs were skipped in forge (user chose "Skip specs"), or no `.feature` files exist for the current feature area in `pandahrms-spec/`, **skip this skill entirely**.
 
-Announce: "Skipping spec-review -- no specs were written for this feature." Then proceed to the next step in the pipeline.
+Announce: "Skipping spec-review -- no specs were written for this feature." Then proceed to the next step in forge.
 
 ## Prerequisites
 
@@ -129,7 +129,7 @@ Present findings in this format:
 Based on findings:
 
 - **No gaps, no unexpected extras** -- announce "Design and specs are aligned." and pass the gate.
-- **Gaps or extras found** -- present the report, then ask the user using AskUserQuestion: "Spec review found gaps between the design and specs. Would you like to fix them?" with options: "Yes, fix gaps" and "No, proceed anyway". If yes, loop back to spec-writing to fill the gaps. If no, proceed to the next pipeline step.
+- **Gaps or extras found** -- present the report, then ask the user using AskUserQuestion: "Spec review found gaps between the design and specs. Would you like to fix them?" with options: "Yes, fix gaps" and "No, proceed anyway". If yes, loop back to spec-writing to fill the gaps. If no, proceed to the next forge step.
 
 ## Checklist
 

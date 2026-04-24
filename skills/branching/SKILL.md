@@ -1,9 +1,9 @@
 ---
-name: create-branch
+name: branching
 description: ALWAYS use when the user needs to create, start, or checkout a new git branch. Prevents dangerous upstream tracking inheritance and enforces folder-based naming conventions. Triggers on any mention of new branch, new feature branch, branching off, or checkout -b
 ---
 
-# Create Branch
+# Branching
 
 ## Overview
 

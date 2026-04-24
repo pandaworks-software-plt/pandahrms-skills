@@ -6,13 +6,14 @@ Pandahrms-specific skills plugin for Claude Code. Provides domain skills that in
 
 | Skill | Slash Command | Description |
 |-------|---------------|-------------|
-| **design-pipeline** | `/pandahrms:design-pipeline` | Design phase: brainstorm -> specs -> plan |
-| **execution-pipeline** | `/pandahrms:execution-pipeline` | Execution phase: execute plan -> code review -> simplify -> spec cross-check -> test |
+| **forge** | `/pandahrms:forge` | Unified pipeline: brainstorm -> specs -> plan -> execute -> test |
 | **spec-writing** | `/pandahrms:spec-writing` | Write/update Gherkin specs before implementing any change (hard gate) |
-| **code-review** | `/pandahrms:code-review` | Review git changes against code standards, fix issues, run /simplify (no commits) |
-| **commit** | `/pandahrms:commit` | Verify code is reviewed and clean, plan and execute atomic commits |
-| **react-web-frontend** | `/pandahrms:react-web-frontend` | Frontend conventions and patterns for Next.js projects |
-| **cross-project-bridge** | `/pandahrms:cross-project-bridge` | Structured protocol for debugging cross-project FE/BE issues |
+| **spec-review** | `/pandahrms:spec-review` | Cross-check design docs against Gherkin specs for coverage gaps |
+| **athena-review** | `/pandahrms:athena-review` | Review git changes against code standards, fix issues, run /simplify (no commits) |
+| **aegis** | `/pandahrms:aegis` | Security review (OWASP Top 10 + Pandahrms tenant/audit/PII checks); optionally invoked from athena-review |
+| **hermes-commit** | `/pandahrms:hermes-commit` | Verify code is reviewed and clean, plan and execute atomic commits |
+| **branching** | `/pandahrms:branching` | Safe branch creation with upstream protection and folder-based naming |
+| **bridge-file** | `/pandahrms:bridge-file` | Structured protocol for debugging cross-project FE/BE issues |
 | **ef-migrations** | `/pandahrms:ef-migrations` | EF Core migration commands for Performance and Recruitment APIs |
 | **system-setup** | `/pandahrms:system-setup` | Guide new developers through environment setup (macOS + Windows, Docker or IIS) |
 
@@ -48,20 +49,21 @@ To update the plugin to the latest version:
 This plugin adds domain-specific skills to the superpowers development pipeline:
 
 ```
-Any work request --> pandahrms:design-pipeline
+Any work request --> pandahrms:forge
     --> superpowers:brainstorming (design)
     --> pandahrms:spec-writing (Gherkin specs - hard gate)
+    --> pandahrms:spec-review (cross-check design vs specs)
     --> superpowers:writing-plans (implementation plan)
-
-Plan ready --> pandahrms:execution-pipeline
     --> superpowers:executing-plans (TDD)
-    --> pandahrms:code-review --> /simplify --> spec cross-check
-    --> user tests --> pandahrms:commit --> superpowers:finish-branch
+    --> pandahrms:athena-review
+        --> pandahrms:aegis (if security-sensitive)
+        --> /simplify --> spec cross-check
+    --> user tests --> pandahrms:hermes-commit --> superpowers:finish-branch
 ```
 
-The `design-pipeline` ensures `spec-writing` is never skipped after brainstorming. The `execution-pipeline` ensures code review, simplification, and spec compliance are verified before the user tests.
+`forge` is the single orchestrator from brainstorming through execution. It ensures `spec-writing` is never skipped after brainstorming, and that code review, security review (when applicable), simplification, and spec compliance are verified before the user tests.
 
-Additional standalone skills: `pandahrms:cross-project-bridge`, `pandahrms:system-setup`, and `pandahrms:ef-migrations`.
+Additional standalone skills: `pandahrms:branching`, `pandahrms:bridge-file`, `pandahrms:system-setup`, and `pandahrms:ef-migrations`.
 
 ## License
 

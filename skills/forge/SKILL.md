@@ -1,21 +1,21 @@
 ---
-name: pipeline
+name: forge
 description: Use INSTEAD of superpowers:brainstorming when starting any development work in a Pandahrms project - features, bug fixes, refactors, or any change that needs design and specs before implementation. Also use when executing an existing plan file in a Pandahrms project.
 ---
 
-# Pandahrms Pipeline
+# Pandahrms Forge
 
 ## Overview
 
-Unified pipeline for Pandahrms projects: brainstorm, spec writing, QA review, implementation planning, plan/spec cross-review, and execution -- all in a single session. This skill replaces the separate `design-pipeline` and `execution-pipeline` skills.
+Unified pipeline for Pandahrms projects: brainstorm, spec writing, QA review, implementation planning, plan/spec cross-review, and execution -- all in a single session.
 
 **Use this skill INSTEAD of invoking `superpowers:brainstorming` directly** in any Pandahrms project.
 
-**Announce at start:** "I'm using the Pandahrms pipeline to orchestrate design through execution."
+**Announce at start:** "I'm using Pandahrms forge to orchestrate design through execution."
 
 ## Fast Path (plan provided)
 
-If invoked with a plan file path (e.g., `/pipeline path/to/plan.md`), skip steps 1-5 and start directly at step 6 (Plan ↔ Spec cross-review), then step 7 (Execute plan).
+If invoked with a plan file path (e.g., `/forge path/to/plan.md`), skip steps 1-5 and start directly at step 6 (Plan ↔ Spec cross-review), then step 7 (Execute plan).
 
 - Initialize time tracking as normal
 - Announce: "Executing existing plan -- running plan/spec cross-review, then execution."
@@ -36,35 +36,35 @@ Skip this section entirely if Fast Path applies (a plan file was provided). Othe
 If yes, use AskUserQuestion: "This looks like a narrow task -- skip brainstorming and specs, go directly to writing a short plan?" with options:
 
 - **"Yes, fast-track"** -- skip steps 1-4. Jump to step 5 (Create plan). No brainstorm, no spec changes, QA auto-skipped. Standards in step 7 still apply (TDD, SOLID, DDD, spec cross-check if specs exist).
-- **"No, full pipeline"** -- proceed to step 1 normally.
+- **"No, full forge"** -- proceed to step 1 normally.
 
-Ask only when the scope is genuinely narrow. When in doubt, run the full pipeline -- over-triage erodes quality. Users may override either direction.
+Ask only when the scope is genuinely narrow. When in doubt, run the full forge -- over-triage erodes quality. Users may override either direction.
 
-Record the triage decision in the plan file's `## Pipeline Progress` section once the plan exists.
+Record the triage decision in the plan file's `## Forge Progress` section once the plan exists.
 
 ## Resume Path
 
-If invoked with `/pipeline --resume`:
+If invoked with `/forge --resume`:
 
-1. Read the plan file's `## Pipeline Progress` section to determine which steps completed and their timing
-2. Announce: "Resuming pipeline from step N -- [step name]."
+1. Read the plan file's `## Forge Progress` section to determine which steps completed and their timing
+2. Announce: "Resuming forge from step N -- [step name]."
 3. Continue from the next incomplete step with full time tracking
-4. If no plan file exists or has no progress section, announce: "No pipeline state found -- starting fresh." and begin from step 1
+4. If no plan file exists or has no progress section, announce: "No forge state found -- starting fresh." and begin from step 1
 
 <HARD-GATE>
-OVERRIDE: When the brainstorming skill completes and instructs you to "invoke writing-plans", do NOT invoke writing-plans. Instead, return to THIS pipeline and ask the user whether they want to write specs first.
+OVERRIDE: When the brainstorming skill completes and instructs you to "invoke writing-plans", do NOT invoke writing-plans. Instead, return to THIS skill and ask the user whether they want to write specs first.
 
-The brainstorming skill says: "The ONLY skill you invoke after brainstorming is writing-plans." In Pandahrms projects, this instruction is OVERRIDDEN by this pipeline. You MUST ask the user before proceeding.
+The brainstorming skill says: "The ONLY skill you invoke after brainstorming is writing-plans." In Pandahrms projects, this instruction is OVERRIDDEN by forge. You MUST ask the user before proceeding.
 </HARD-GATE>
 
 <HARD-GATE>
-OVERRIDE: At the end of `superpowers:writing-plans`, the skill asks the user to choose between "Subagent-Driven" and "Inline Execution". DO NOT present this choice. Auto-select subagent-driven and proceed first to step 6 (Plan ↔ Spec cross-review), then to step 7 (Execute). This pipeline requires subagent-driven execution — inline execution is not an option.
+OVERRIDE: At the end of `superpowers:writing-plans`, the skill asks the user to choose between "Subagent-Driven" and "Inline Execution". DO NOT present this choice. Auto-select subagent-driven and proceed first to step 6 (Plan ↔ Spec cross-review), then to step 7 (Execute). Forge requires subagent-driven execution — inline execution is not an option.
 
 Announce: "Plan complete. Running plan/spec cross-review, then subagent-driven execution."
 </HARD-GATE>
 
 <HARD-GATE>
-OVERRIDE: When subagent-driven-development instructs implementer subagents to commit after completing a task, DO NOT commit. Leave all changes uncommitted. The user will test first and then run /commit to commit clean, reviewed code.
+OVERRIDE: When subagent-driven-development instructs implementer subagents to commit after completing a task, DO NOT commit. Leave all changes uncommitted. The user will test first and then run /hermes-commit to commit clean, reviewed code.
 
 This applies to ALL subagent dispatch prompts -- never include commit instructions when dispatching implementer subagents.
 </HARD-GATE>
@@ -155,11 +155,11 @@ You MUST create a task for each of these items and complete them in order. Apply
 6. **Plan ↔ Spec cross-review** -- after the plan is written, verify bi-directional coverage: (a) every plan task references a spec scenario, and (b) every in-scope spec scenario has at least one plan task. If gaps exist, fix them (update the plan, the spec, or both) before execution. Skip if no specs exist. See [Plan-Spec Cross-Review](#plan-spec-cross-review) below.
 7. **Execute plan** -- the plan will be executed via `superpowers:subagent-driven-development` (v5 default). **Dispatch independent tasks in parallel** -- tasks the plan marks as having no dependencies on each other should be dispatched in a single Agent tool call batch to cut wall-clock time. Every implementer subagent dispatch prompt MUST include the standards prefix from [Execution Standards Prefix](#execution-standards-prefix) -- spec cross-check + TDD + SOLID + DDD. Apply the no-commit override: implementer subagents must NOT commit after tasks. All changes remain uncommitted. Time tracking records the step as a whole (wall-clock from first dispatch to last return); per-subagent timing is NOT tracked. If a subagent fails, follow [Subagent Failure Handling](#subagent-failure-handling).
 8. **Spec cross-check** -- after all tasks are executed, dispatch a spec cross-check agent to verify the full implementation matches the feature specs. See [Spec Cross-Check Agent](#spec-cross-check-agent) below. Skip if no specs exist.
-9. **Ask user to test** -- present the spec cross-check results and the Development Summary, then end with: "Please test your changes, then run /commit when ready."
+9. **Ask user to test** -- present the spec cross-check results and the Development Summary, then end with: "Please test your changes, then run /hermes-commit when ready."
 
 ## Time Tracking
 
-Track **active work time** across the full pipeline -- time spent by Claude doing work, excluding time waiting for user input or blocked on external factors. Display a summary when execution completes.
+Track **active work time** across the full forge run -- time spent by Claude doing work, excluding time waiting for user input or blocked on external factors. Display a summary when execution completes.
 
 ### How to track
 
@@ -204,17 +204,17 @@ Use the plan file as the single source of truth for both progress tracking and t
 
 Use the Read and Write tools for all plan file I/O. Only use Bash for `date +%s`.
 
-**On pipeline start:**
+**On forge start:**
 
 1. Run `date +%s` in Bash to get the epoch
-2. Hold the pipeline start time and step timestamps in conversation context until the plan file is created
+2. Hold the forge start time and step timestamps in conversation context until the plan file is created
 
 **On plan creation (step 5):**
 
-Append a `## Pipeline Progress` section to the plan file. Backfill steps 1-4 timing from conversation context:
+Append a `## Forge Progress` section to the plan file. Backfill steps 1-4 timing from conversation context:
 
 ```markdown
-## Pipeline Progress
+## Forge Progress
 
 | Step | Status | Duration |
 |------|--------|----------|
@@ -228,19 +228,19 @@ Append a `## Pipeline Progress` section to the plan file. Backfill steps 1-4 tim
 | 8. Spec cross-check | pending | -- |
 | 9. Ask user to test | pending | -- |
 
-Pipeline started: 1718000000
+Forge started: 1718000000
 ```
 
 **On each step completion:**
 
 1. Run `date +%s` in Bash to get the timestamp
 2. Use the **Read** tool to load the plan file
-3. Update the step's row in the Pipeline Progress table (status and duration)
+3. Update the step's row in the Forge Progress table (status and duration)
 4. Use the **Write** tool to save the plan file back
 
 **On task completion (step 7):**
 
-When a subagent completes a plan task, update the task's checkbox in the plan file from `- [ ]` to `- [x]`, then update the Pipeline Progress table for step 7's running duration.
+When a subagent completes a plan task, update the task's checkbox in the plan file from `- [ ]` to `- [x]`, then update the Forge Progress table for step 7's running duration.
 
 Active duration = `(end - start) - sum(resume - pause for each pause)`
 
@@ -262,7 +262,7 @@ When a subagent reports a failure (build error, test failure, merge conflict, or
 3. **Ask the user** via AskUserQuestion: "Subagent '[task name]' failed. How would you like to proceed?" with options:
    - **"Retry"** -- re-dispatch the same subagent with the same prompt
    - **"Skip and continue"** -- note the failed task in the conversation and proceed with remaining tasks
-   - **"Abort pipeline"** -- stop execution, display the Development Summary with the Execute step marked failed, and end with: "Pipeline aborted. Completed tasks remain uncommitted. Run /commit when ready or discard with git restore."
+   - **"Abort forge"** -- stop execution, display the Development Summary with the Execute step marked failed, and end with: "Forge aborted. Completed tasks remain uncommitted. Run /hermes-commit when ready or discard with git restore."
 
 Failures do not alter the step-level Development Summary other than annotating the Execute step's outcome (e.g. `Execute plan -- 42m 31s (1 task failed, skipped)`).
 
@@ -510,12 +510,12 @@ description: "Spec cross-check: verify implementation matches feature specs"
 
 | Thought | Reality |
 |---------|---------|
-| "Brainstorming said invoke writing-plans" | This pipeline overrides that for Pandahrms projects |
+| "Brainstorming said invoke writing-plans" | Forge overrides that for Pandahrms projects |
 | "I'll skip specs without asking" | Always ask the user. They decide whether specs are needed. |
 | "The design doc is enough" | Design doc captures WHAT. Specs capture BEHAVIOR. Ask the user. |
 | "Specs look fine, skip the review" | Always run QA review after writing specs. It catches design↔spec gaps and missed edge cases. |
 | "This change is too small for specs" | Don't assume -- ask the user. They may still want specs (unless it's UI-only, then auto-skip). |
-| "Let me commit after each task" | Never commit. User tests first, then /commit. |
+| "Let me commit after each task" | Never commit. User tests first, then /hermes-commit. |
 | "I'll just execute the plan in the main session" | Never. Step 7 dispatches subagents. Main session only orchestrates. |
 | "Subagent self-reports covered specs" | Self-reports check individual tasks. The spec cross-check catches gaps across tasks and missing scenarios. Always run it. |
 | "I'll skip the spec cross-check" | It's mandatory when specs exist. Only skip when no specs exist for this feature (see skip conditions). |

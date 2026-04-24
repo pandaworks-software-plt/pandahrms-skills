@@ -1,9 +1,9 @@
 ---
-name: code-review
-description: Use when reviewing working tree changes against code standards - reads all changed files, reviews against checklist, fixes issues, and optionally runs /simplify. Does NOT commit. Run this before /commit.
+name: athena-review
+description: Use when reviewing working tree changes against code standards - reads all changed files, reviews against checklist, fixes issues, and optionally runs /simplify. Does NOT commit. Run this before /hermes-commit.
 ---
 
-# Code Review
+# Athena Review (Code Review)
 
 ## Overview
 
@@ -22,20 +22,25 @@ digraph code_review {
     "Assess change size" [shape=doublecircle];
     "Small change?" [shape=diamond];
     "Ask: review or commit?" [shape=diamond];
-    "Run /commit directly" [shape=box, style=filled, fillcolor=lightgreen];
+    "Run /hermes-commit directly" [shape=box, style=filled, fillcolor=lightgreen];
     "Gather changes" [shape=box];
     "git diff and git status" [shape=plaintext];
     "Any changes?" [shape=diamond];
     "No changes to review" [shape=doublecircle];
     "Read all changed files" [shape=box];
     "Run linter" [shape=box];
+    "Codex installed?" [shape=diamond, style=filled, fillcolor=lavender];
+    "Dispatch Codex reviewer" [shape=box, style=filled, fillcolor=lavender];
     "Review against standards" [shape=box];
+    "Merge Codex findings" [shape=box, style=filled, fillcolor=lavender];
     "Issues found?" [shape=diamond];
     "Minor issues?" [shape=diamond];
     "Auto-fix minor issues" [shape=box];
     "Report major issues to user" [shape=box];
     "User approves fixes?" [shape=diamond];
     "Apply major fixes" [shape=box];
+    "Security-sensitive changes?" [shape=diamond, style=filled, fillcolor=lightpink];
+    "Run /aegis" [shape=box, style=filled, fillcolor=lightpink];
     "UI-only changes?" [shape=diamond, style=filled, fillcolor=lightblue];
     "Check spec discrepancy" [shape=box, style=filled, fillcolor=lightblue];
     "Spec covers changes?" [shape=diamond, style=filled, fillcolor=lightblue];
@@ -44,31 +49,39 @@ digraph code_review {
     "Run /simplify" [shape=box, style=filled, fillcolor=lightyellow];
     "Show simplify changes" [shape=box];
     "Review summary" [shape=box];
-    "Ask: /commit or test first?" [shape=diamond, style=filled, fillcolor=lightgreen];
-    "Run /commit" [shape=box, style=filled, fillcolor=lightgreen];
+    "Ask: /hermes-commit or test first?" [shape=diamond, style=filled, fillcolor=lightgreen];
+    "Run /hermes-commit" [shape=box, style=filled, fillcolor=lightgreen];
     "Done - user will test" [shape=doublecircle];
 
     "Assess change size" -> "Small change?";
     "Small change?" -> "Ask: review or commit?" [label="yes"];
     "Small change?" -> "Gather changes" [label="no, full review"];
-    "Ask: review or commit?" -> "Run /commit directly" [label="commit"];
+    "Ask: review or commit?" -> "Run /hermes-commit directly" [label="commit"];
     "Ask: review or commit?" -> "Gather changes" [label="review"];
     "Gather changes" -> "git diff and git status";
     "git diff and git status" -> "Any changes?";
     "Any changes?" -> "No changes to review" [label="no"];
     "Any changes?" -> "Read all changed files" [label="yes"];
     "Read all changed files" -> "Run linter";
-    "Run linter" -> "Review against standards";
-    "Review against standards" -> "Issues found?";
-    "Issues found?" -> "UI-only changes?" [label="no"];
+    "Run linter" -> "Codex installed?";
+    "Codex installed?" -> "Dispatch Codex reviewer" [label="yes, parallel"];
+    "Codex installed?" -> "Review against standards" [label="no"];
+    "Dispatch Codex reviewer" -> "Review against standards";
+    "Review against standards" -> "Merge Codex findings" [label="if dispatched"];
+    "Review against standards" -> "Issues found?" [label="no Codex"];
+    "Merge Codex findings" -> "Issues found?";
+    "Issues found?" -> "Security-sensitive changes?" [label="no"];
     "Issues found?" -> "Minor issues?" [label="yes"];
     "Minor issues?" -> "Auto-fix minor issues" [label="yes"];
     "Minor issues?" -> "Report major issues to user" [label="no, major"];
     "Auto-fix minor issues" -> "Report major issues to user";
     "Report major issues to user" -> "User approves fixes?";
     "User approves fixes?" -> "Apply major fixes" [label="yes"];
-    "User approves fixes?" -> "UI-only changes?" [label="skip"];
-    "Apply major fixes" -> "UI-only changes?";
+    "User approves fixes?" -> "Security-sensitive changes?" [label="skip"];
+    "Apply major fixes" -> "Security-sensitive changes?";
+    "Security-sensitive changes?" -> "Run /aegis" [label="yes"];
+    "Security-sensitive changes?" -> "UI-only changes?" [label="no"];
+    "Run /aegis" -> "UI-only changes?";
     "UI-only changes?" -> "Run /simplify" [label="yes, skip spec check"];
     "UI-only changes?" -> "Check spec discrepancy" [label="no"];
     "Check spec discrepancy" -> "Spec covers changes?";
@@ -79,9 +92,9 @@ digraph code_review {
     "Run /spec-writing" -> "Run /simplify";
     "Run /simplify" -> "Show simplify changes";
     "Show simplify changes" -> "Review summary";
-    "Review summary" -> "Ask: /commit or test first?";
-    "Ask: /commit or test first?" -> "Run /commit" [label="commit"];
-    "Ask: /commit or test first?" -> "Done - user will test" [label="test first"];
+    "Review summary" -> "Ask: /hermes-commit or test first?";
+    "Ask: /hermes-commit or test first?" -> "Run /hermes-commit" [label="commit"];
+    "Ask: /hermes-commit or test first?" -> "Done - user will test" [label="test first"];
 }
 ```
 
@@ -94,7 +107,7 @@ First, run `git diff` and `git diff --cached` to assess the size of changes.
 > "Small change detected. Would you like to run a full code review, or commit directly?"
 
 - If user says **review** -> proceed to Phase 1
-- If user says **commit** -> invoke `/commit` and end the flow
+- If user says **commit** -> invoke `/hermes-commit` and end the flow
 
 **If changes are not small**: proceed directly to Phase 1 (no question asked).
 
@@ -117,9 +130,69 @@ Detect the project's linter by checking for config files or `package.json` scrip
 
 Run the linter on changed files only if possible. Include lint errors in the Phase 2 review findings.
 
+### Second Opinion: Dispatch Codex Reviewer (if installed)
+
+If the Codex plugin is installed in this session, dispatch a parallel review by Codex. This gives a genuine cross-model second opinion on the same diff before Claude runs its own checklist in Phase 2.
+
+**Detection.** Check the session's available skills list for any skill name starting with `codex:` (e.g. `codex:rescue`, `codex:setup`). If none are present, skip this step silently and proceed to Phase 2 checklist -- do not announce the skip.
+
+**Dispatch pattern.** Use the Agent tool with `subagent_type: "codex:codex-rescue"`. Send it in the **same message** as the first file-read/grep tool call for Phase 2 so the two reviews run concurrently. Do not wait for Codex before starting the checklist.
+
+**Codex prompt template** (self-contained -- Codex has no conversation context):
+
+```
+Perform an independent code review of the working-tree changes in the
+current repository. Do not execute the plan, do not commit, do not
+modify files -- review only.
+
+Scope: all files reported by `git status` and all hunks in
+`git diff` and `git diff --cached`. Read each changed file in full for
+context (not just the hunks).
+
+Review against:
+1. SOLID principles (single responsibility, DI, interface size)
+2. Security (injection, authz, secrets, input validation, data exposure)
+3. Audit trail on state-changing endpoints (backend projects only)
+4. Code quality (reuse before creating, test coverage, error handling,
+   dead code, async correctness)
+5. Any project-specific CLAUDE.md rules you can find at the repo root.
+
+Return findings as a JSON block with this shape, nothing else in the
+response except the block:
+
+{
+  "findings": [
+    {
+      "severity": "minor" | "major",
+      "category": "solid" | "security" | "audit" | "quality" | "other",
+      "file": "relative/path.ext",
+      "line": 42,
+      "issue": "one-line description",
+      "suggested_fix": "one-line suggested fix"
+    }
+  ],
+  "summary": "2-3 sentences -- overall assessment"
+}
+
+If you find nothing, return {"findings": [], "summary": "..."}.
+```
+
+Use the Agent tool's `description` field: `"Codex second-opinion review"`.
+
+### Handling Codex output
+
+When Codex returns:
+- **Parse the JSON findings.** If parsing fails, treat the whole output as a free-text finding and surface it to the user verbatim.
+- **Dedupe against Claude's findings.** If Claude's checklist and Codex both flag the same file+line+category, merge into one finding and credit both reviewers in the Phase 3 report (`[Claude + Codex]`).
+- **Keep Codex-only findings** as separate entries tagged `[Codex]`.
+- **Keep Claude-only findings** tagged `[Claude]`.
+- **Treat Codex severity as advisory.** If Claude classifies a finding as major and Codex as minor (or vice versa), use the higher severity.
+
+If Codex fails or times out, do not block the review -- note "Codex unavailable, proceeding with Claude-only review" and continue.
+
 ## Phase 2: Review
 
-Apply these checks to every changed file. Include any lint/format violations from Phase 1 in the findings.
+Apply these checks to every changed file. Include any lint/format violations from Phase 1 in the findings. If a Codex reviewer was dispatched in Phase 1, its findings will be merged in at the end of this phase (see "Handling Codex output" above).
 
 ### Review Checklist
 
@@ -174,12 +247,66 @@ Apply these checks to every changed file. Include any lint/format violations fro
 
 ## Phase 3: Fix
 
-1. **Auto-fix minor issues** silently - apply fixes, then list what was changed in a summary
-2. **Report major issues** clearly - for each, explain: what the issue is, why it matters, proposed fix
+Work from the merged finding set (Claude checklist + Codex second opinion, if dispatched). Preserve the `[Claude]` / `[Codex]` / `[Claude + Codex]` attribution in the user-facing report so the user can see where each finding originated.
+
+1. **Auto-fix minor issues** silently - apply fixes, then list what was changed in a summary (with attribution)
+2. **Report major issues** clearly - for each, explain: what the issue is, why it matters, proposed fix, and attribution
 3. **Ask user** whether to fix major issues or skip them
 4. Apply approved fixes
 
-## Phase 4: Spec Discrepancy Check
+## Phase 4: Security Review (/aegis)
+
+Athena's Phase 2 catches the obvious security issues (injection, missing `[Authorize]`, hardcoded secrets, unvalidated input, leaked fields). Aegis is the deeper pass: OWASP Top 10, tenant isolation, PII handling, audit-trail completeness, and dependency scanning.
+
+### Skip Conditions
+
+Skip this phase entirely if **any** of the following apply:
+
+- **UI-only changes** - styling, layout, theming, responsiveness, dark mode, visual polish, no business logic
+- **Docs/spec/config-only changes** - README, markdown, `.feature` files, lint config, CI config with no production impact
+- **No security-relevant surface** - no new or modified auth, authorization, endpoints, request handlers, persistence writes, file I/O, secrets, PII fields, or cross-tenant operations
+
+When skipped, announce: "Skipping security review -- no security-relevant surface in these changes." and proceed to Phase 5.
+
+### Step 1: Detect Security-Relevant Changes
+
+From the diff already gathered in Phase 1, check for any of:
+
+- New or modified routes/endpoints/controllers/handlers
+- Changes to `[Authorize]`, authorization policies, role/policy checks, middleware order
+- Request DTOs, form handlers, or any code accepting user input
+- Token/session/cookie/password handling
+- File upload, download, or path construction from user input
+- Persistence writes that cross tenant boundaries, or queries missing tenant filters
+- PII fields added to responses, logs, or exceptions
+- Secrets, API keys, connection strings, environment variable additions
+- Dependency additions in `package.json`, `.csproj`, `requirements.txt`, etc.
+
+If none apply, apply the skip condition above. Otherwise continue.
+
+### Step 2: Invoke /aegis
+
+Use `AskUserQuestion` to confirm:
+
+> "Changes include security-sensitive surface ([summary of what was detected]). Run /aegis for a deeper OWASP + Pandahrms security audit?"
+
+Options:
+- **Run /aegis** -> invoke the `aegis` skill against the working tree. Aegis will report findings, optionally apply approved fixes, and return control here.
+- **Skip** -> note the skip in the review summary and proceed to Phase 5.
+
+When aegis returns, treat any approved fixes as already applied (aegis does not commit). Do not re-ask about committing -- control returns here, not to aegis's own commit prompt.
+
+### Step 3: Record Outcome
+
+Capture the aegis outcome for the Phase 7 summary:
+- **Skipped** -- no security surface, or user declined
+- **Clean** -- aegis ran, zero findings
+- **Fixes applied** -- aegis ran, N findings, M fixed
+- **Findings acknowledged** -- aegis ran, findings reported, user chose not to fix
+
+Then proceed to Phase 5.
+
+## Phase 5: Spec Discrepancy Check
 
 **Skip this phase entirely if the changes are UI-only** (styling, layout, theming, responsiveness, dark mode, visual polish with no business logic changes).
 
@@ -187,7 +314,7 @@ Apply these checks to every changed file. Include any lint/format violations fro
 
 The spec repo is a **sibling directory** to the current project. Resolve the path as: `$(dirname $PWD)/pandahrms-spec/`
 
-If the spec repo is not found, report it to the user and move on to Phase 5. Do not block the review.
+If the spec repo is not found, report it to the user and move on to Phase 6. Do not block the review.
 
 ### Step 2: Identify affected specs
 
@@ -215,7 +342,7 @@ Categorize the findings:
 
 ### Step 4: Report and ask
 
-If all changes are covered, report: "Specs are in sync with changes." and move to Phase 5.
+If all changes are covered, report: "Specs are in sync with changes." and move to Phase 6.
 
 If there are **outdated or missing specs**, report the discrepancies clearly:
 
@@ -227,37 +354,44 @@ Then use `AskUserQuestion` to ask:
 
 > "Specs are out of sync with your changes. Would you like to create/update specs now? (This will invoke /spec-writing)"
 
-- If user says **yes** -> invoke the `/spec-writing` skill, then continue to Phase 5
-- If user says **skip** -> move to Phase 5
+- If user says **yes** -> invoke the `/spec-writing` skill, then continue to Phase 6
+- If user says **skip** -> move to Phase 6
 
-## Phase 5: Simplify
+## Phase 6: Simplify
 
 Run `/simplify` automatically. This launches three parallel review agents (Code Reuse, Code Quality, Efficiency) against the current changes. Apply any valid findings.
 
 After `/simplify` completes and fixes are applied, show the user a summary of what changed.
 
-## Phase 6: Done
+## Phase 7: Done
 
 Summarize all changes made during the review:
-- Minor issues auto-fixed
-- Major issues fixed (if any)
+- Minor issues auto-fixed (with `[Claude]` / `[Codex]` / `[Claude + Codex]` attribution)
+- Major issues fixed (if any, with attribution)
+- Codex review status (dispatched and merged, unavailable, or not installed)
+- Security review outcome (skipped, clean, fixes applied, or findings acknowledged)
 - Spec discrepancy status (in sync, updated, or skipped)
 - /simplify changes
 
 Then use `AskUserQuestion` to ask:
 
-> "Code review complete. Would you like to proceed to /commit, or test first?"
+> "Code review complete. Would you like to proceed to /hermes-commit, or test first?"
 
-- If user says **commit** -> invoke the `/commit` skill
-- If user says **test** -> end the flow with: "Sounds good. Run /commit when you're ready."
+- If user says **commit** -> invoke the `/hermes-commit` skill
+- If user says **test** -> end the flow with: "Sounds good. Run /hermes-commit when you're ready."
 
 ## Red Flags - STOP
 
 - Running `/spec-writing` without asking the user first - always use AskUserQuestion
-- Committing without asking the user first - always ask commit vs test in Phase 6
+- Running `/aegis` without asking the user first - always use AskUserQuestion in Phase 4
+- Committing without asking the user first - always ask commit vs test in Phase 7
 - Skipping review because "changes are small" - review everything
 - Reviewing only the diff, not the full file - always read full files
-- Running spec check on UI-only changes - skip Phase 4 for styling/layout/theming work
+- Running spec check on UI-only changes - skip Phase 5 for styling/layout/theming work
+- Running security review on UI-only or docs-only changes - skip Phase 4 when the skip conditions apply
+- Waiting for Codex before starting Claude's own checklist - dispatch Codex in the same tool-call batch as the first Phase 2 read, so both reviews run in parallel
+- Blocking the review when Codex fails or times out - note the failure and proceed with Claude-only findings
+- Announcing "Codex not installed" when it isn't - silent skip only
 
 ## Common Mistakes
 
@@ -265,6 +399,11 @@ Then use `AskUserQuestion` to ask:
 |---------|-----|
 | Reviewing only the diff, not the full file | Always read full file for context |
 | Fixing issues without telling the user | Always summarize what was auto-fixed |
-| Committing without asking | Always ask user: /commit or test first? |
+| Committing without asking | Always ask user: /hermes-commit or test first? |
 | Blocking review when spec repo is missing | Report it and move on -- do not block the review |
-| Running spec check on UI-only changes | Skip Phase 4 for styling, layout, theming, dark mode |
+| Running spec check on UI-only changes | Skip Phase 5 for styling, layout, theming, dark mode |
+| Running /aegis on UI-only or docs-only changes | Skip Phase 4 when no security-relevant surface exists |
+| Invoking /aegis without user confirmation | Always ask in Phase 4 before invoking |
+| Running Claude's checklist first then Codex | Dispatch in parallel -- same tool-call batch as first Phase 2 read |
+| Announcing "Codex not installed" | Silent skip -- no user-facing message when absent |
+| Treating Codex output as authoritative | Advisory only -- dedupe, merge attribution, use higher severity when classifications differ |

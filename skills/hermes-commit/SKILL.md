@@ -1,9 +1,9 @@
 ---
-name: commit
+name: hermes-commit
 description: Use when ready to commit changes to git. Verifies code review was done, checks for lint/test errors, then plans and executes atomic commits. Does NOT change code - only commits clean, reviewed code.
 ---
 
-# Commit
+# Hermes (Commit)
 
 ## Overview
 
@@ -12,15 +12,15 @@ Verify that changes are reviewed and clean, then plan and execute atomic commits
 ## When to Use
 
 - When you're ready to commit after coding and reviewing
-- After running /code-review and testing
+- After running /athena-review and testing
 
 ## Workflow
 
 ```dot
 digraph commit {
-    "User triggers /commit" [shape=doublecircle];
+    "User triggers /hermes-commit" [shape=doublecircle];
     "Ask: reviewed?" [shape=diamond];
-    "Run /code-review" [shape=box, style=filled, fillcolor=lightyellow];
+    "Run /athena-review" [shape=box, style=filled, fillcolor=lightyellow];
     "STOP" [shape=octagon, style=filled, fillcolor=red, fontcolor=white];
     "Run format/lint check" [shape=box];
     "Errors?" [shape=diamond];
@@ -32,9 +32,9 @@ digraph commit {
     "Execute commits" [shape=box];
     "Done" [shape=doublecircle];
 
-    "User triggers /commit" -> "Ask: reviewed?";
-    "Ask: reviewed?" -> "Run /code-review" [label="perform code review"];
-    "Run /code-review" -> "STOP" [label="review done, remind to test then /commit again"];
+    "User triggers /hermes-commit" -> "Ask: reviewed?";
+    "Ask: reviewed?" -> "Run /athena-review" [label="perform code review"];
+    "Run /athena-review" -> "STOP" [label="review done, remind to test then /hermes-commit again"];
     "Ask: reviewed?" -> "Run format/lint check" [label="skip code review"];
     "Run format/lint check" -> "Errors?" ;
     "Errors?" -> "Warn and STOP" [label="yes, tell user to fix"];
@@ -54,7 +54,7 @@ Use `AskUserQuestion`:
 
 > "It is recommended to perform code review before commit. Proceed?"
 
-- **Perform code review** -> invoke `/code-review`, then STOP with message: "Review complete. Please test your changes, then run /commit again."
+- **Perform code review** -> invoke `/athena-review`, then STOP with message: "Review complete. Please test your changes, then run /hermes-commit again."
 - **Skip code review** -> proceed to Phase 2
 
 ## Phase 2: Format/Lint Verification
@@ -72,9 +72,9 @@ Detect the project type and run the appropriate check in **verify-only mode** (n
 - Any `lint` script in `package.json` -> `pnpm lint` or `yarn lint`
 
 If errors exist:
-> "Format/lint errors found. Please fix these before committing, then run /commit again."
+> "Format/lint errors found. Please fix these before committing, then run /hermes-commit again."
 
-Show the errors and STOP. Do not fix them -- that's code-review's job.
+Show the errors and STOP. Do not fix them -- that's athena's job.
 
 ## Phase 3: Gather Changes
 
@@ -145,7 +145,7 @@ For each commit in the plan:
 
 ## Red Flags - STOP
 
-- About to fix code during commit - STOP. Tell user to run /code-review and test first.
+- About to fix code during commit - STOP. Tell user to run /athena-review and test first.
 - About to `git add -A` or `git add .` - stage specific files only
 - Committing `.env`, credentials, or secrets - warn the user
 - Commit message doesn't match the actual changes - rewrite it
@@ -156,7 +156,7 @@ For each commit in the plan:
 
 | Mistake | Fix |
 |---------|-----|
-| Fixing code during commit | Never change code. That's /code-review's job. |
+| Fixing code during commit | Never change code. That's athena's job. |
 | Grouping unrelated changes in one commit | Split by logical unit, not by file proximity |
 | Writing commit messages about "what" not "why" | Focus on purpose: "support widget filtering" not "add if statement" |
 | Staging files that weren't reviewed | Only commit files that passed review |
