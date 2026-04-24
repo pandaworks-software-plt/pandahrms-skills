@@ -1,6 +1,6 @@
 ---
 name: forge
-description: Use INSTEAD of superpowers:brainstorming when starting any development work in a Pandahrms project - features, bug fixes, refactors, or any change that needs design and specs before implementation. Also use when executing an existing plan file in a Pandahrms project.
+description: Triggers on any mention of starting new work, building a feature, adding functionality, fixing a bug, refactoring, brainstorming, designing, writing a plan, or executing an existing plan in a Pandahrms project. Use INSTEAD of superpowers:brainstorming for any development work that needs design and specs before implementation. Also triggers on "forge", "run the pipeline", or being handed a plan file.
 ---
 
 # Pandahrms Forge

@@ -1,6 +1,6 @@
 ---
 name: athena-review
-description: Use when reviewing working tree changes against code standards - reads all changed files, reviews against checklist, fixes issues, and optionally runs /simplify. Does NOT commit. Run this before /hermes-commit.
+description: Triggers on any mention of code review, reviewing changes, "review my code", "review the diff", "check my code", quality check, lint check, or "review before commit". Reads all changed files, reviews against the checklist, fixes issues, and optionally runs /simplify. Does NOT commit. Run this before /hermes-commit.
 ---
 
 # Athena Review (Code Review)

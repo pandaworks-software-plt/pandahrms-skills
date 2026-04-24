@@ -1,6 +1,6 @@
 ---
 name: hermes-commit
-description: Use when ready to commit changes to git. Verifies code review was done, checks for lint/test errors, then plans and executes atomic commits. Does NOT change code - only commits clean, reviewed code.
+description: Triggers on any mention of commit, committing, "git commit", "ready to commit", "commit my changes", "save to git", "ship it", or atomic commits. Verifies code review was done, checks for lint/test errors, then plans and executes atomic commits. Does NOT change code - only commits clean, reviewed code.
 ---
 
 # Hermes (Commit)

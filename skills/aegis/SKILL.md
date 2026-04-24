@@ -1,6 +1,6 @@
 ---
 name: aegis
-description: Use when performing a dedicated security review of working tree changes or a feature area in a Pandahrms project - audits auth, authz, input validation, injection, secrets, PII exposure, audit trails, and tenant isolation. Reports findings and fixes approved issues. Does NOT commit.
+description: Triggers on any mention of security review, security audit, security check, OWASP, pen test, auth audit, authz audit, or "check for vulnerabilities". Audits auth, authz, input validation, injection, secrets, PII exposure, audit trails, and tenant isolation in working tree changes or a specified feature area. Reports findings and fixes approved issues. Does NOT commit.
 ---
 
 # Aegis - Security Review
