@@ -51,6 +51,25 @@ If invoked with `/forge --resume`:
 3. Continue from the next incomplete step with full time tracking
 4. If no plan file exists or has no progress section, announce: "No forge state found -- starting fresh." and begin from step 1
 
+## Codex Availability
+
+At the very start of every forge run (before step 1, including Fast Path and Resume Path), detect whether Codex is available locally.
+
+1. Run `command -v codex` via Bash. Empty stdout means unavailable.
+2. Store the result in conversation context as `codex_available` (true/false). Persist it into the plan file's `## Forge Progress` section once the plan exists, on a `Codex available: true|false` line, so resumed runs do not need to re-detect.
+
+When `codex_available` is true, dispatch these review-only steps to the `codex:codex-rescue` subagent for a second-opinion pass:
+
+- **Step 4** -- QA Review Agent
+- **Step 6** -- Plan ↔ Spec cross-review
+- **Step 8** -- Spec Cross-Check Agent
+
+These are analysis-only tasks. The dispatched prompt MUST begin with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.` so codex does not edit the working tree. Findings come back as the rescue subagent's stdout and are reconciled exactly as if the regular `Agent` tool had been used. The skip conditions for each step still apply -- detection only changes who runs the review, not whether it runs.
+
+When `codex_available` is false, fall back to the regular `Agent` tool with the prompts shown in each section.
+
+Announce at start: `"Codex detected -- routing QA review, plan/spec cross-review, and spec cross-check to codex:codex-rescue."` or `"Codex not detected -- using local agents for reviews."`
+
 <HARD-GATE>
 OVERRIDE: When the brainstorming skill completes and instructs you to "invoke writing-plans", do NOT invoke writing-plans. Instead, return to THIS skill and ask the user whether they want to write specs first.
 
@@ -229,6 +248,7 @@ Append a `## Forge Progress` section to the plan file. Backfill steps 1-4 timing
 | 9. Ask user to test | pending | -- |
 
 Forge started: 1718000000
+Codex available: true
 ```
 
 **On each step completion:**
@@ -285,7 +305,9 @@ Announce: "Skipping QA review -- no specs to review."
 
 ### Agent Dispatch
 
-Use the Agent tool with the following prompt structure. Replace the placeholders:
+If `codex_available` is true, dispatch via the `codex:codex-rescue` subagent. Otherwise dispatch via the regular `Agent` tool. In both cases, prefix the prompt with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.` followed by a blank line, then the body below.
+
+Replace the placeholders:
 - `{design_doc_path}` -- path to the approved design document
 - `{spec_file_paths}` -- paths to all written spec files
 - `{scope_notes}` -- brief "in scope / out of scope" summary extracted from the design doc, so the agent doesn't flag edge cases for deferred features
@@ -392,6 +414,10 @@ Announce: "Skipping plan ↔ spec cross-review -- no specs for this feature."
 
 ### How to Review
 
+If `codex_available` is true, dispatch this review to the `codex:codex-rescue` subagent with a prompt that lists the plan file path, the in-scope `.feature` file paths, and the four checks below. Prefix the prompt with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.`. Treat the subagent's output as the review report.
+
+If `codex_available` is false, perform the review inline:
+
 1. Read the plan file and extract every task's spec reference (e.g. `features/.../goal-approval.feature:Scenario: ...`)
 2. Read every in-scope `.feature` file for the feature
 3. Check:
@@ -461,6 +487,8 @@ Announce the skip reason.
 
 ### Agent Dispatch
 
+If `codex_available` is true, dispatch via the `codex:codex-rescue` subagent. Otherwise dispatch via the regular `Agent` tool. In both cases, prefix the prompt with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.` followed by a blank line, then the body below.
+
 ```
 prompt: |
   You are a spec compliance reviewer. Your job is to verify that the
@@ -527,6 +555,8 @@ description: "Spec cross-check: verify implementation matches feature specs"
 | "One class is fine, SOLID is over-engineering" | Follow SOLID. If you think it's over-engineering, re-read the spec -- you may be conflating concerns. |
 | "I'll use technical names like `UserDto`, domain language is pedantic" | DDD requires ubiquitous language from the spec. Names come from the domain, not the tech stack. |
 | "The plan said ship X, spec said ship Y, I picked the plan" | Never silently reconcile. Stop and report the conflict. Authority sources must agree before execution continues. |
+| "Codex is installed but I'll just dispatch the local agent" | If `codex_available` is true, route QA review, plan/spec cross-review, and spec cross-check through `codex:codex-rescue`. Detection happens once at start. |
+| "I'll send the codex review prompt without the read-only prefix" | Codex defaults to `--write`. Every review dispatch MUST start with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.` so codex doesn't edit the working tree. |
 
 ## When to Use
 
