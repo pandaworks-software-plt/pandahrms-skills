@@ -20,7 +20,7 @@ If invoked with a plan file path (e.g., `/forge path/to/plan.md`), skip steps 1-
 - Initialize time tracking as normal
 - Announce: "Executing existing plan -- running Plan ↔ Spec cross-review, then execution."
 - Still run step 5 (Plan ↔ Spec cross-review) to catch drift between the pre-existing plan and current specs
-- Still run step 7 (ask user to test) with the Development Summary
+- After execution, still run step 7 (simplify) and step 8 (ask user to test) with the Development Summary
 
 ## Resume Path
 
@@ -123,6 +123,7 @@ digraph pipeline {
     "Execute plan (subagent-driven)" [shape=box, style=filled, fillcolor=lightgreen];
     "Subagent failed?" [shape=diamond, style=filled, fillcolor=lightyellow];
     "Handle failure" [shape=box, style=filled, fillcolor=orange];
+    "Simplify\n(/simplify)" [shape=box, style=filled, fillcolor=lightblue];
     "Ask user to test" [shape=doublecircle];
 
     "Work request" -> "Plan file provided?";
@@ -148,8 +149,10 @@ digraph pipeline {
     "Execute plan (subagent-driven)" -> "Subagent failed?";
     "Subagent failed?" -> "Handle failure" [label="yes"];
     "Handle failure" -> "Execute plan (subagent-driven)" [label="retry/skip"];
-    "Handle failure" -> "Ask user to test" [label="abort"];
-    "Subagent failed?" -> "Ask user to test" [label="no, all passed"];
+    "Handle failure" -> "Ask user to test" [label="abort, no changes"];
+    "Handle failure" -> "Simplify\n(/simplify)" [label="abort, partial done"];
+    "Subagent failed?" -> "Simplify\n(/simplify)" [label="no, all passed"];
+    "Simplify\n(/simplify)" -> "Ask user to test";
 }
 ```
 
@@ -168,7 +171,8 @@ You MUST create a task for each of these items and complete them in order. Apply
    - **Dependency marking** -- writing-plans must mark task dependencies explicitly so step 6 can parallel-dispatch independent tasks.
 5. **Plan ↔ Spec cross-review** -- after the plan is written (or at Fast Path entry), verify three directions: (a) every plan task references a real spec scenario, (b) every in-scope spec scenario has at least one plan task, and (c) every plan task that touches production code names a test reference with Red-before-Green ordering. The (c) check is the only test-ref validator on Fast Path -- do not skip it. If gaps exist, fix them before execution. See [Plan-Spec Cross-Review](#plan-spec-cross-review) for skip conditions and resolution paths.
 6. **Execute plan** -- the plan will be executed via `superpowers:subagent-driven-development` (v5 default). **Dispatch independent tasks in parallel** -- tasks the plan marks as having no dependencies on each other should be dispatched in a single Agent tool call batch to cut wall-clock time. Every implementer subagent dispatch prompt MUST include the standards prefix from [Execution Standards Prefix](#execution-standards-prefix) -- spec cross-check + TDD + SOLID + DDD. Apply the no-commit override: implementer subagents must NOT commit after tasks. All changes remain uncommitted. Time tracking records the step as a whole (wall-clock from first dispatch to last return); per-subagent timing is NOT tracked. If a subagent fails, follow [Subagent Failure Handling](#subagent-failure-handling).
-7. **Ask user to test** -- present the Development Summary. If the plan file's `## Forge Progress` section has an `### Acknowledged Gaps` block (gaps the user chose to "Proceed anyway" past during Step 5), surface each gap to the user with the line: "**Acknowledged gaps to verify manually:** [gap list]." Then end with: "Please test your changes, then run /hermes-commit when ready."
+7. **Simplify** -- once Step 6 has finished and at least one subagent reported success, invoke the `simplify` skill to review the changed files for reuse, quality, and efficiency, and to fix any issues it finds. Skip this step if Step 6 was aborted with no completed tasks (nothing to simplify). All resulting changes remain uncommitted -- the user still tests in Step 8 before /hermes-commit.
+8. **Ask user to test** -- present the Development Summary. If the plan file's `## Forge Progress` section has an `### Acknowledged Gaps` block (gaps the user chose to "Proceed anyway" past during Step 5), surface each gap to the user with the line: "**Acknowledged gaps to verify manually:** [gap list]." Then end with: "Please test your changes, then run /hermes-commit when ready."
 
 ## Time Tracking
 
@@ -194,9 +198,10 @@ QA review                   --   2m 45s
 Create implementation plan  --  15m 02s
 Plan ↔ Spec cross-review    --   1m 30s
 Execute plan                --  42m 31s
+Simplify                    --   3m 12s
 ===========================
-Grand total (active)        --  1h 22m 43s
-Total wall-clock time       --  2h 08m 50s
+Grand total (active)        --  1h 25m 55s
+Total wall-clock time       --  2h 12m 02s
 User-wait time              --     46m 07s
 ```
 
@@ -235,14 +240,15 @@ Append a `## Forge Progress` section to the plan file. Backfill steps 1-3 timing
 | 4. Create implementation plan | done | 15m 02s |
 | 5. Plan ↔ Spec cross-review | pending | -- |
 | 6. Execute plan | pending | -- |
-| 7. Ask user to test | pending | -- |
+| 7. Simplify | pending | -- |
+| 8. Ask user to test | pending | -- |
 
 Forge started: 1718000000
 Codex available: true
 
 ### Acknowledged Gaps
 
-(Populated only when the user chose "Proceed anyway" during Step 5. One bullet per gap. Step 7 surfaces this list to the user.)
+(Populated only when the user chose "Proceed anyway" during Step 5. One bullet per gap. Step 8 surfaces this list to the user.)
 ```
 
 **On each step completion:**
@@ -435,7 +441,7 @@ If `codex_available` is false, perform the review inline:
 - **Gaps found** -- present the report. Use AskUserQuestion to ask how to resolve:
   - **"Update the plan"** -- loop back to `superpowers:writing-plans` to add missing tasks, spec references, or test references. For fast-path plans, edit the plan file directly to add the missing references rather than re-running writing-plans.
   - **"Update the spec"** -- loop back to `pandahrms:spec-writing` to remove or adjust scenarios that aren't planned.
-  - **"Proceed anyway"** -- append the gap as a bullet to the `### Acknowledged Gaps` block beneath the Forge Progress table (create the block if it doesn't exist), then continue. Step 7 will surface every entry there to the user so they can verify the missing behavior manually or queue a follow-up forge run.
+  - **"Proceed anyway"** -- append the gap as a bullet to the `### Acknowledged Gaps` block beneath the Forge Progress table (create the block if it doesn't exist), then continue. Step 8 will surface every entry there to the user so they can verify the missing behavior manually or queue a follow-up forge run.
 
 Do not proceed to execution while gaps remain unresolved unless the user explicitly acknowledges them.
 
