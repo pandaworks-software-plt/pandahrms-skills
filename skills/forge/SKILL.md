@@ -35,7 +35,7 @@ Skip this section entirely if Fast Path applies (a plan file was provided). Othe
 
 If yes, use AskUserQuestion: "This looks like a narrow task -- skip brainstorming and specs, go directly to writing a short plan?" with options:
 
-- **"Yes, fast-track"** -- skip steps 1-4. Jump to step 5 (Create plan). No brainstorm, no spec changes, QA auto-skipped. Standards in step 7 still apply (TDD, SOLID, DDD, spec cross-check if specs exist).
+- **"Yes, fast-track"** -- skip the brainstorm/spec/QA portions of step 1-4. Jump to step 5 (Create plan). **Context loading is NOT skipped** -- you still read related tests + specs (step 1 substeps a-c) and surface a brief test-change proposal to the user before writing the plan. Standards in step 7 still apply (TDD, SOLID, DDD, spec cross-check if specs exist).
 - **"No, full forge"** -- proceed to step 1 normally.
 
 Ask only when the scope is genuinely narrow. When in doubt, run the full forge -- over-triage erodes quality. Users may override either direction.
@@ -99,6 +99,19 @@ AUTHORITY HIERARCHY:
 </HARD-GATE>
 
 <HARD-GATE>
+TDD + SDD AT DESIGN TIME: Before any brainstorming or planning, you MUST load existing tests and specs as context. Applies to **every** forge run -- new features, bug fixes, refactors, even Tiny-Task fast-tracks.
+
+1. **Identify the affected area** -- module/feature/file paths the change will touch.
+2. **Read related specs** -- every `.feature` file in `pandahrms-spec` for that area. If none exist, note "no existing specs".
+3. **Read related tests** -- every unit/integration test file in the affected codebase (e.g. `*.test.ts`, `*.spec.ts`, `*Tests.cs`). If none exist, note "no existing tests".
+4. **Brainstorm test + spec changes FIRST** -- the brainstorm output MUST address (a) which spec scenarios change/add/remove and (b) which test cases change/add. Only after these are decided does the conversation move to implementation approach.
+5. **Plan tasks must reference both** -- every implementation task names the spec scenario(s) it satisfies AND the test file(s)/case(s) it touches.
+6. **Never write production code before the test exists** -- this is enforced at execution by `superpowers:test-driven-development`, but the test plan is shaped here at design time.
+
+Skipping context loading produces designs that ignore current behavior contracts. Skipping the test/spec change brainstorm produces plans that retrofit tests after the fact -- the opposite of TDD.
+</HARD-GATE>
+
+<HARD-GATE>
 EXECUTION STANDARDS: Every implementer subagent dispatched in step 7 MUST follow:
 
 1. **Plan-driven execution** -- the plan task is the work order
@@ -116,7 +129,8 @@ Each subagent must confirm compliance in its self-report (see [Execution Standar
 digraph pipeline {
     "Work request" [shape=doublecircle];
     "Plan file provided?" [shape=diamond];
-    "Invoke brainstorming" [shape=box];
+    "Load test + spec context" [shape=box, style=filled, fillcolor=lightblue];
+    "Invoke brainstorming\n(covers test + spec changes)" [shape=box];
     "Design approved" [shape=diamond];
     "UI-only work?" [shape=diamond];
     "Auto-skip specs" [shape=box, style=filled, fillcolor=lightyellow];
@@ -135,9 +149,10 @@ digraph pipeline {
 
     "Work request" -> "Plan file provided?";
     "Plan file provided?" -> "Plan ↔ Spec cross-review" [label="yes (fast path)"];
-    "Plan file provided?" -> "Invoke brainstorming" [label="no"];
-    "Invoke brainstorming" -> "Design approved";
-    "Design approved" -> "Invoke brainstorming" [label="no, revise"];
+    "Plan file provided?" -> "Load test + spec context" [label="no"];
+    "Load test + spec context" -> "Invoke brainstorming\n(covers test + spec changes)";
+    "Invoke brainstorming\n(covers test + spec changes)" -> "Design approved";
+    "Design approved" -> "Invoke brainstorming\n(covers test + spec changes)" [label="no, revise"];
     "Design approved" -> "UI-only work?" [label="yes"];
     "UI-only work?" -> "Auto-skip specs" [label="yes"];
     "Auto-skip specs" -> "Invoke writing-plans" [label="QA auto-skipped"];
@@ -166,11 +181,23 @@ digraph pipeline {
 
 You MUST create a task for each of these items and complete them in order. Apply [Time Tracking](#time-tracking) to every step -- record start/end times and pause during user prompts. The timing section has full details; do not duplicate timing logic here.
 
-1. **Brainstorm the design** -- invoke `superpowers:brainstorming` to explore the idea, propose approaches, and present the design. Do NOT auto-commit the design doc -- leave it uncommitted for the user to review. When brainstorming tells you to "invoke writing-plans", STOP and return here instead.
+1. **Load context and brainstorm the design** -- ground the design in current behavior BEFORE proposing anything new. New features and bug fixes alike must start here.
+   a. **Identify the affected area** -- module/feature/file paths the change will touch. Ask the user if unclear.
+   b. **Read related specs** -- every `.feature` file in `pandahrms-spec` for the area. If none exist, note "no existing specs".
+   c. **Read related tests** -- every unit/integration test file in the affected codebase (search the repo with Grep/Glob -- `*.test.ts`, `*.spec.ts`, `*Tests.cs`, `*_test.go`, etc.). If none exist, note "no existing tests".
+   d. **Summarize for the user** -- one short message: "Loaded N spec scenarios and M test files for this area. Key behaviors covered: [1-2 line summary]." Pause for the user to confirm scope before brainstorming.
+   e. **Invoke `superpowers:brainstorming`** -- the brainstorm MUST address, in this order:
+      - **Spec impact** -- which scenarios change, which are added, which can be removed (with justification)
+      - **Test impact** -- which test files/cases change, which are added, what each new test will assert (failing-test-first framing)
+      - **Implementation approach** -- only after the test/spec changes are decided
+   f. Do NOT auto-commit the design doc -- leave it uncommitted for the user to review. When brainstorming tells you to "invoke writing-plans", STOP and return here instead.
 2. **Check: UI-only work?** -- if the work is purely UI/presentation (styling, layout, component design, theming, responsiveness, animations, dark mode, visual polish), auto-skip specs and go directly to step 5 (QA auto-skipped too since no specs). Announce: "Skipping spec-writing -- this is a UI-only change with no business behavior impact."
 3. **Write or update specs?** (non-UI work only) -- use AskUserQuestion to ask: "Would you like to write/update Gherkin specs before proceeding to the implementation plan?" with options: "Yes, write/update specs" and "Skip specs". Users may skip if the session is purely exploratory or an open discussion without concrete implementation targets. If yes, invoke `pandahrms:spec-writing` to write or update specs in pandahrms-spec. **Discussion/decisions are authoritative** -- if the brainstorming produced decisions that diverge from existing specs, update the spec to reflect the new decisions BEFORE writing the plan. Never leave an outdated spec to be reconciled later. Present the written/updated specs to the user for review before proceeding.
 4. **QA review** -- dispatch the QA-review sub-agent (two-pass: design↔spec coverage + edge cases) and wait for it to complete before moving on. See [QA Review Agent](#qa-review-agent) for dispatch prompt and result handling. If QA surfaces coverage gaps or new scenarios, loop back to `pandahrms:spec-writing` to update the specs, then re-run QA. When QA returns zero blocking findings (or the user chooses to proceed), move on to step 5. Skip this step entirely if no specs exist (UI-only or "skip specs" path).
-5. **Create implementation plan** -- invoke `superpowers:writing-plans` to produce the plan. **Plan requirement**: if specs exist, each implementation task must reference the spec scenario(s) it satisfies (e.g. "implements `features/performance/goal-approval.feature:Scenario: approver revokes approval`"). Plans without spec references must be rewritten. If no specs exist (UI-only or "skip specs" path), this requirement does not apply. **Writing-plans must mark task dependencies explicitly** so step 7 can parallel-dispatch independent tasks.
+5. **Create implementation plan** -- invoke `superpowers:writing-plans` to produce the plan. **Plan requirements**:
+   - **Spec reference** -- if specs exist, each implementation task must reference the spec scenario(s) it satisfies (e.g. "implements `features/performance/goal-approval.feature:Scenario: approver revokes approval`"). Plans without spec references must be rewritten. If no specs exist (UI-only or "skip specs" path), this requirement does not apply.
+   - **Test reference** -- each implementation task must name the test file(s) and the new/changed test case(s) it adds, derived from the test-impact decisions made in step 1e. Each task must include an explicit "Red" sub-step (write the failing test) before any "Green" sub-step (production code). Tasks that touch production code without naming a test are rejected -- TDD is non-negotiable.
+   - **Dependency marking** -- writing-plans must mark task dependencies explicitly so step 7 can parallel-dispatch independent tasks.
 6. **Plan ↔ Spec cross-review** -- after the plan is written, verify bi-directional coverage: (a) every plan task references a spec scenario, and (b) every in-scope spec scenario has at least one plan task. If gaps exist, fix them (update the plan, the spec, or both) before execution. Skip if no specs exist. See [Plan-Spec Cross-Review](#plan-spec-cross-review) below.
 7. **Execute plan** -- the plan will be executed via `superpowers:subagent-driven-development` (v5 default). **Dispatch independent tasks in parallel** -- tasks the plan marks as having no dependencies on each other should be dispatched in a single Agent tool call batch to cut wall-clock time. Every implementer subagent dispatch prompt MUST include the standards prefix from [Execution Standards Prefix](#execution-standards-prefix) -- spec cross-check + TDD + SOLID + DDD. Apply the no-commit override: implementer subagents must NOT commit after tasks. All changes remain uncommitted. Time tracking records the step as a whole (wall-clock from first dispatch to last return); per-subagent timing is NOT tracked. If a subagent fails, follow [Subagent Failure Handling](#subagent-failure-handling).
 8. **Spec cross-check** -- after all tasks are executed, dispatch a spec cross-check agent to verify the full implementation matches the feature specs. See [Spec Cross-Check Agent](#spec-cross-check-agent) below. Skip if no specs exist.
@@ -194,7 +221,7 @@ Track **active work time** across the full forge run -- time spent by Claude doi
 ```
 Development Summary (active work time, excludes user-wait)
 ===========================
-Brainstorm the design       --  12m 34s
+Load context + brainstorm   --  12m 34s
 Check: UI-only work?        --   0m 05s
 Write specs                 --   8m 21s
 QA review                   --   2m 45s
@@ -237,7 +264,7 @@ Append a `## Forge Progress` section to the plan file. Backfill steps 1-4 timing
 
 | Step | Status | Duration |
 |------|--------|----------|
-| 1. Brainstorm the design | done | 12m 34s |
+| 1. Load context + brainstorm the design | done | 12m 34s |
 | 2. Check: UI-only work? | done | 0m 05s |
 | 3. Write specs | done | 8m 21s |
 | 4. QA review | skipped | -- |
@@ -450,10 +477,12 @@ what to build.
    {spec_refs}
    Verify your implementation will satisfy them. If plan and spec
    disagree, STOP and report the conflict -- do not silently pick one.
-3. **TDD** -- invoke `superpowers:test-driven-development`. Red-Green-
-   Refactor. Write a failing test first (ideally one test per spec
-   scenario), confirm it fails, then write minimal code to pass. No
-   production code without a failing test.
+3. **TDD** -- invoke `superpowers:test-driven-development`. Before
+   writing your test, READ every existing test file in the affected
+   area so your new test coexists with current ones (replace, extend,
+   or add — never duplicate). Then Red-Green-Refactor: write the
+   failing test named in the plan task, confirm it fails, then write
+   minimal code to pass. No production code without a failing test.
 4. **SOLID** -- follow `~/.claude/rules/SOLID.md`. Single responsibility
    per class, dependency injection (no `new` of collaborators inside
    domain code), small focused interfaces, no god objects.
@@ -466,7 +495,8 @@ what to build.
 
 - Plan task completed: [task name]
 - Spec scenarios verified: [list]
-- Tests written first: [list of test names]
+- Existing tests read before writing: [list of test files]
+- Tests written first (failing → passing): [list of test names]
 - SOLID/DDD decisions: [brief notes on boundaries, DI choices, aggregates]
 - Plan ↔ spec conflicts raised: [list or "none"]
 ```
@@ -539,6 +569,10 @@ description: "Spec cross-check: verify implementation matches feature specs"
 | Thought | Reality |
 |---------|---------|
 | "Brainstorming said invoke writing-plans" | Forge overrides that for Pandahrms projects |
+| "I'll just brainstorm without reading existing tests/specs" | Step 1 mandates loading test + spec context FIRST. Designs without that grounding miss compatibility issues and produce retrofitted tests. |
+| "It's a bug fix, no need to discuss tests upfront" | Bug fixes especially need a failing test that would have caught the bug. Brainstorm must propose that test before the fix is designed. |
+| "I read the specs but skipped the existing tests" | Both are required. Tests encode the actual implemented behavior; specs encode the intended behavior. You need both to design correctly. |
+| "I'll add the test after the production code is in" | Never. Plan tasks must include a Red sub-step before any Green sub-step. Production code without a failing test is rejected. |
 | "I'll skip specs without asking" | Always ask the user. They decide whether specs are needed. |
 | "The design doc is enough" | Design doc captures WHAT. Specs capture BEHAVIOR. Ask the user. |
 | "Specs look fine, skip the review" | Always run QA review after writing specs. It catches design↔spec gaps and missed edge cases. |
