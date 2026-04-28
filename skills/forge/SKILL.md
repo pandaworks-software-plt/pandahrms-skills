@@ -15,13 +15,12 @@ Unified pipeline for Pandahrms projects: brainstorm, spec writing, QA review, im
 
 ## Fast Path (plan provided)
 
-If invoked with a plan file path (e.g., `/forge path/to/plan.md`), skip steps 1-5 and start directly at step 6 (Plan ↔ Spec cross-review), then step 7 (Execute plan).
+If invoked with a plan file path (e.g., `/forge path/to/plan.md`), skip steps 1-4 and start directly at step 5 (Plan ↔ Spec cross-review), then step 6 (Execute plan).
 
 - Initialize time tracking as normal
 - Announce: "Executing existing plan -- running plan/spec cross-review, then execution."
-- Still run step 6 (Plan ↔ Spec cross-review) to catch drift between the pre-existing plan and current specs
-- After execution, still run step 8 (spec cross-check) if specs exist for the feature
-- Still run step 9 (ask user to test) with the Development Summary
+- Still run step 5 (Plan ↔ Spec cross-review) to catch drift between the pre-existing plan and current specs
+- Still run step 7 (ask user to test) with the Development Summary
 
 ## Tiny-Task Triage
 
@@ -35,7 +34,7 @@ Skip this section entirely if Fast Path applies (a plan file was provided). Othe
 
 If yes, use AskUserQuestion: "This looks like a narrow task -- skip brainstorming and specs, go directly to writing a short plan?" with options:
 
-- **"Yes, fast-track"** -- skip the brainstorm/spec/QA portions of step 1-4. Jump to step 5 (Create plan). **Context loading is NOT skipped** -- you still read related tests + specs (step 1 substeps a-c) and surface a brief test-change proposal to the user before writing the plan. Standards in step 7 still apply (TDD, SOLID, DDD, spec cross-check if specs exist).
+- **"Yes, fast-track"** -- skip the brainstorm/spec/QA portions of step 1-3. Jump to step 4 (Create plan). **Context loading is NOT skipped** -- you still read related tests + specs (step 1 substeps a-c) and surface a brief test-change proposal to the user before writing the plan. Standards in step 6 still apply (TDD, SOLID, DDD, spec cross-check if specs exist).
 - **"No, full forge"** -- proceed to step 1 normally.
 
 Ask only when the scope is genuinely narrow. When in doubt, run the full forge -- over-triage erodes quality. Users may override either direction.
@@ -60,15 +59,14 @@ At the very start of every forge run (before step 1, including Fast Path and Res
 
 When `codex_available` is true, dispatch these review-only steps to the `codex:codex-rescue` subagent for a second-opinion pass:
 
-- **Step 4** -- QA Review Agent
-- **Step 6** -- Plan ↔ Spec cross-review
-- **Step 8** -- Spec Cross-Check Agent
+- **Step 3** -- QA Review Agent
+- **Step 5** -- Plan ↔ Spec cross-review
 
 These are analysis-only tasks. The dispatched prompt MUST begin with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.` so codex does not edit the working tree. Findings come back as the rescue subagent's stdout and are reconciled exactly as if the regular `Agent` tool had been used. The skip conditions for each step still apply -- detection only changes who runs the review, not whether it runs.
 
 When `codex_available` is false, fall back to the regular `Agent` tool with the prompts shown in each section.
 
-Announce at start: `"Codex detected -- routing QA review, plan/spec cross-review, and spec cross-check to codex:codex-rescue."` or `"Codex not detected -- using local agents for reviews."`
+Announce at start: `"Codex detected -- routing QA review and plan/spec cross-review to codex:codex-rescue."` or `"Codex not detected -- using local agents for reviews."`
 
 <HARD-GATE>
 OVERRIDE: When the brainstorming skill completes and instructs you to "invoke writing-plans", do NOT invoke writing-plans. Instead, return to THIS skill and ask the user whether they want to write specs first.
@@ -77,7 +75,7 @@ The brainstorming skill says: "The ONLY skill you invoke after brainstorming is 
 </HARD-GATE>
 
 <HARD-GATE>
-OVERRIDE: At the end of `superpowers:writing-plans`, the skill asks the user to choose between "Subagent-Driven" and "Inline Execution". DO NOT present this choice. Auto-select subagent-driven and proceed first to step 6 (Plan ↔ Spec cross-review), then to step 7 (Execute). Forge requires subagent-driven execution — inline execution is not an option.
+OVERRIDE: At the end of `superpowers:writing-plans`, the skill asks the user to choose between "Subagent-Driven" and "Inline Execution". DO NOT present this choice. Auto-select subagent-driven and proceed first to step 5 (Plan ↔ Spec cross-review), then to step 6 (Execute). Forge requires subagent-driven execution — inline execution is not an option.
 
 Announce: "Plan complete. Running plan/spec cross-review, then subagent-driven execution."
 </HARD-GATE>
@@ -91,9 +89,9 @@ This applies to ALL subagent dispatch prompts -- never include commit instructio
 <HARD-GATE>
 AUTHORITY HIERARCHY:
 
-**Design time (steps 1-5):** Discussion/decisions are the source of truth. If a discussion or decision diverges from the existing spec, UPDATE the spec before writing the plan. Never write a plan that contradicts the spec -- update the spec first, then plan from the updated spec.
+**Design time (steps 1-4):** Discussion/decisions are the source of truth. If a discussion or decision diverges from the existing spec, UPDATE the spec before writing the plan. Never write a plan that contradicts the spec -- update the spec first, then plan from the updated spec.
 
-**Execution time (step 7):** The plan is the source of truth for each implementer subagent. But implementers MUST cross-check against the spec. If plan and spec disagree, STOP and report -- never silently pick one.
+**Execution time (step 6):** The plan is the source of truth for each implementer subagent. But implementers MUST cross-check against the spec. If plan and spec disagree, STOP and report -- never silently pick one.
 
 **Never silently reconcile.** Always ask the user or flag the conflict when authority sources disagree.
 </HARD-GATE>
@@ -112,7 +110,7 @@ Skipping context loading produces designs that ignore current behavior contracts
 </HARD-GATE>
 
 <HARD-GATE>
-EXECUTION STANDARDS: Every implementer subagent dispatched in step 7 MUST follow:
+EXECUTION STANDARDS: Every implementer subagent dispatched in step 6 MUST follow:
 
 1. **Plan-driven execution** -- the plan task is the work order
 2. **Spec cross-check** -- verify the implementation satisfies the spec scenarios the plan task references. If plan and spec disagree, stop and report.
@@ -132,10 +130,9 @@ digraph pipeline {
     "Load test + spec context" [shape=box, style=filled, fillcolor=lightblue];
     "Invoke brainstorming\n(covers test + spec changes)" [shape=box];
     "Design approved" [shape=diamond];
-    "UI-only work?" [shape=diamond];
-    "Auto-skip specs" [shape=box, style=filled, fillcolor=lightyellow];
-    "Write specs?" [shape=diamond];
+    "Write specs?\n(UI-only auto-skip\nor user choice)" [shape=diamond];
     "Invoke spec-writing" [shape=box];
+    "Run QA review?\n(<3 new scenarios → skip)" [shape=diamond];
     "Invoke QA review" [shape=box, style=filled, fillcolor=lightblue];
     "QA gaps or edge cases?" [shape=diamond];
     "Invoke writing-plans" [shape=box];
@@ -144,7 +141,6 @@ digraph pipeline {
     "Execute plan (subagent-driven)" [shape=box, style=filled, fillcolor=lightgreen];
     "Subagent failed?" [shape=diamond, style=filled, fillcolor=lightyellow];
     "Handle failure" [shape=box, style=filled, fillcolor=orange];
-    "Spec cross-check agent" [shape=box, style=filled, fillcolor=lightblue];
     "Ask user to test" [shape=doublecircle];
 
     "Work request" -> "Plan file provided?";
@@ -153,13 +149,12 @@ digraph pipeline {
     "Load test + spec context" -> "Invoke brainstorming\n(covers test + spec changes)";
     "Invoke brainstorming\n(covers test + spec changes)" -> "Design approved";
     "Design approved" -> "Invoke brainstorming\n(covers test + spec changes)" [label="no, revise"];
-    "Design approved" -> "UI-only work?" [label="yes"];
-    "UI-only work?" -> "Auto-skip specs" [label="yes"];
-    "Auto-skip specs" -> "Invoke writing-plans" [label="QA auto-skipped"];
-    "UI-only work?" -> "Write specs?" [label="no"];
-    "Write specs?" -> "Invoke spec-writing" [label="yes"];
-    "Write specs?" -> "Invoke writing-plans" [label="skip, QA auto-skipped"];
-    "Invoke spec-writing" -> "Invoke QA review";
+    "Design approved" -> "Write specs?\n(UI-only auto-skip\nor user choice)" [label="yes"];
+    "Write specs?\n(UI-only auto-skip\nor user choice)" -> "Invoke spec-writing" [label="yes"];
+    "Write specs?\n(UI-only auto-skip\nor user choice)" -> "Invoke writing-plans" [label="UI-only or skip"];
+    "Invoke spec-writing" -> "Run QA review?\n(<3 new scenarios → skip)";
+    "Run QA review?\n(<3 new scenarios → skip)" -> "Invoke QA review" [label="≥3 new scenarios"];
+    "Run QA review?\n(<3 new scenarios → skip)" -> "Invoke writing-plans" [label="<3, skip"];
     "Invoke QA review" -> "QA gaps or edge cases?";
     "QA gaps or edge cases?" -> "Invoke spec-writing" [label="yes, fix specs"];
     "QA gaps or edge cases?" -> "Invoke writing-plans" [label="no, reconciled"];
@@ -172,8 +167,7 @@ digraph pipeline {
     "Subagent failed?" -> "Handle failure" [label="yes"];
     "Handle failure" -> "Execute plan (subagent-driven)" [label="retry/skip"];
     "Handle failure" -> "Ask user to test" [label="abort"];
-    "Subagent failed?" -> "Spec cross-check agent" [label="no, all passed"];
-    "Spec cross-check agent" -> "Ask user to test";
+    "Subagent failed?" -> "Ask user to test" [label="no, all passed"];
 }
 ```
 
@@ -191,17 +185,17 @@ You MUST create a task for each of these items and complete them in order. Apply
       - **Test impact** -- which test files/cases change, which are added, what each new test will assert (failing-test-first framing)
       - **Implementation approach** -- only after the test/spec changes are decided
    f. Do NOT auto-commit the design doc -- leave it uncommitted for the user to review. When brainstorming tells you to "invoke writing-plans", STOP and return here instead.
-2. **Check: UI-only work?** -- if the work is purely UI/presentation (styling, layout, component design, theming, responsiveness, animations, dark mode, visual polish), auto-skip specs and go directly to step 5 (QA auto-skipped too since no specs). Announce: "Skipping spec-writing -- this is a UI-only change with no business behavior impact."
-3. **Write or update specs?** (non-UI work only) -- use AskUserQuestion to ask: "Would you like to write/update Gherkin specs before proceeding to the implementation plan?" with options: "Yes, write/update specs" and "Skip specs". Users may skip if the session is purely exploratory or an open discussion without concrete implementation targets. If yes, invoke `pandahrms:spec-writing` to write or update specs in pandahrms-spec. **Discussion/decisions are authoritative** -- if the brainstorming produced decisions that diverge from existing specs, update the spec to reflect the new decisions BEFORE writing the plan. Never leave an outdated spec to be reconciled later. Present the written/updated specs to the user for review before proceeding.
-4. **QA review** -- dispatch the QA-review sub-agent (two-pass: design↔spec coverage + edge cases) and wait for it to complete before moving on. See [QA Review Agent](#qa-review-agent) for dispatch prompt and result handling. If QA surfaces coverage gaps or new scenarios, loop back to `pandahrms:spec-writing` to update the specs, then re-run QA. When QA returns zero blocking findings (or the user chooses to proceed), move on to step 5. Skip this step entirely if no specs exist (UI-only or "skip specs" path).
-5. **Create implementation plan** -- invoke `superpowers:writing-plans` to produce the plan. **Plan requirements**:
+2. **Write or update specs?** -- this step covers two routing decisions in one place:
+   - **UI-only auto-skip**: if the work is purely UI/presentation (styling, layout, component design, theming, responsiveness, animations, dark mode, visual polish), announce "Skipping spec-writing -- UI-only change with no business behavior impact" and proceed to step 4 (QA auto-skipped too).
+   - **Otherwise**: use AskUserQuestion: "Would you like to write/update Gherkin specs before proceeding to the implementation plan?" with options "Yes, write/update specs" and "Skip specs". Users may skip if the session is purely exploratory or open discussion. If yes, invoke `pandahrms:spec-writing` to write or update specs in pandahrms-spec. **Discussion/decisions are authoritative** -- if the brainstorming produced decisions that diverge from existing specs, update the spec to reflect the new decisions BEFORE writing the plan. Never leave an outdated spec to be reconciled later. Present the written/updated specs to the user for review before proceeding.
+3. **QA review (conditional)** -- skip when EITHER no specs exist OR fewer than 3 NEW scenarios were added in step 2 (modifications to existing scenarios do not count -- step 1's brainstorm already covered impact for small changes). Otherwise dispatch the QA-review sub-agent (two-pass: design↔spec coverage + edge cases) and wait for it to complete. See [QA Review Agent](#qa-review-agent) for dispatch prompt, skip-condition detection, and result handling. If QA surfaces coverage gaps or new scenarios, loop back to `pandahrms:spec-writing` to update the specs, then re-run QA. When QA returns zero blocking findings (or the user chooses to proceed), move on to step 4.
+4. **Create implementation plan** -- invoke `superpowers:writing-plans` to produce the plan. **Plan requirements**:
    - **Spec reference** -- if specs exist, each implementation task must reference the spec scenario(s) it satisfies (e.g. "implements `features/performance/goal-approval.feature:Scenario: approver revokes approval`"). Plans without spec references must be rewritten. If no specs exist (UI-only or "skip specs" path), this requirement does not apply.
    - **Test reference** -- each implementation task must name the test file(s) and the new/changed test case(s) it adds, derived from the test-impact decisions made in step 1e. Each task must include an explicit "Red" sub-step (write the failing test) before any "Green" sub-step (production code). Tasks that touch production code without naming a test are rejected -- TDD is non-negotiable.
-   - **Dependency marking** -- writing-plans must mark task dependencies explicitly so step 7 can parallel-dispatch independent tasks.
-6. **Plan ↔ Spec cross-review** -- after the plan is written, verify bi-directional coverage: (a) every plan task references a spec scenario, and (b) every in-scope spec scenario has at least one plan task. If gaps exist, fix them (update the plan, the spec, or both) before execution. Skip if no specs exist. See [Plan-Spec Cross-Review](#plan-spec-cross-review) below.
-7. **Execute plan** -- the plan will be executed via `superpowers:subagent-driven-development` (v5 default). **Dispatch independent tasks in parallel** -- tasks the plan marks as having no dependencies on each other should be dispatched in a single Agent tool call batch to cut wall-clock time. Every implementer subagent dispatch prompt MUST include the standards prefix from [Execution Standards Prefix](#execution-standards-prefix) -- spec cross-check + TDD + SOLID + DDD. Apply the no-commit override: implementer subagents must NOT commit after tasks. All changes remain uncommitted. Time tracking records the step as a whole (wall-clock from first dispatch to last return); per-subagent timing is NOT tracked. If a subagent fails, follow [Subagent Failure Handling](#subagent-failure-handling).
-8. **Spec cross-check** -- after all tasks are executed, dispatch a spec cross-check agent to verify the full implementation matches the feature specs. See [Spec Cross-Check Agent](#spec-cross-check-agent) below. Skip if no specs exist.
-9. **Ask user to test** -- present the spec cross-check results and the Development Summary, then end with: "Please test your changes, then run /hermes-commit when ready."
+   - **Dependency marking** -- writing-plans must mark task dependencies explicitly so step 6 can parallel-dispatch independent tasks.
+5. **Plan ↔ Spec cross-review** -- after the plan is written, verify bi-directional coverage: (a) every plan task references a spec scenario, and (b) every in-scope spec scenario has at least one plan task. If gaps exist, fix them (update the plan, the spec, or both) before execution. Skip if no specs exist. See [Plan-Spec Cross-Review](#plan-spec-cross-review) below.
+6. **Execute plan** -- the plan will be executed via `superpowers:subagent-driven-development` (v5 default). **Dispatch independent tasks in parallel** -- tasks the plan marks as having no dependencies on each other should be dispatched in a single Agent tool call batch to cut wall-clock time. Every implementer subagent dispatch prompt MUST include the standards prefix from [Execution Standards Prefix](#execution-standards-prefix) -- spec cross-check + TDD + SOLID + DDD. Apply the no-commit override: implementer subagents must NOT commit after tasks. All changes remain uncommitted. Time tracking records the step as a whole (wall-clock from first dispatch to last return); per-subagent timing is NOT tracked. If a subagent fails, follow [Subagent Failure Handling](#subagent-failure-handling).
+7. **Ask user to test** -- present the Development Summary, then end with: "Please test your changes, then run /hermes-commit when ready."
 
 ## Time Tracking
 
@@ -222,17 +216,15 @@ Track **active work time** across the full forge run -- time spent by Claude doi
 Development Summary (active work time, excludes user-wait)
 ===========================
 Load context + brainstorm   --  12m 34s
-Check: UI-only work?        --   0m 05s
 Write specs                 --   8m 21s
 QA review                   --   2m 45s
 Create implementation plan  --  15m 02s
 Plan ↔ Spec cross-review    --   1m 30s
 Execute plan                --  42m 31s
-Spec cross-check            --   1m 20s
 ===========================
-Grand total (active)        --  1h 24m 08s
-Total wall-clock time       --  2h 10m 15s
-User-wait time              --     44m 27s
+Grand total (active)        --  1h 22m 43s
+Total wall-clock time       --  2h 08m 50s
+User-wait time              --     46m 07s
 ```
 
 ### What counts as paused time
@@ -246,7 +238,7 @@ User-wait time              --     44m 27s
 
 ### Implementation
 
-Use the plan file as the single source of truth for both progress tracking and timing. Before the plan file exists (steps 1-4), hold timestamps in conversation context. Once the plan is created (step 5), persist everything into the plan file.
+Use the plan file as the single source of truth for both progress tracking and timing. Before the plan file exists (steps 1-3), hold timestamps in conversation context. Once the plan is created (step 4), persist everything into the plan file.
 
 Use the Read and Write tools for all plan file I/O. Only use Bash for `date +%s`.
 
@@ -255,9 +247,9 @@ Use the Read and Write tools for all plan file I/O. Only use Bash for `date +%s`
 1. Run `date +%s` in Bash to get the epoch
 2. Hold the forge start time and step timestamps in conversation context until the plan file is created
 
-**On plan creation (step 5):**
+**On plan creation (step 4):**
 
-Append a `## Forge Progress` section to the plan file. Backfill steps 1-4 timing from conversation context:
+Append a `## Forge Progress` section to the plan file. Backfill steps 1-3 timing from conversation context:
 
 ```markdown
 ## Forge Progress
@@ -265,14 +257,12 @@ Append a `## Forge Progress` section to the plan file. Backfill steps 1-4 timing
 | Step | Status | Duration |
 |------|--------|----------|
 | 1. Load context + brainstorm the design | done | 12m 34s |
-| 2. Check: UI-only work? | done | 0m 05s |
-| 3. Write specs | done | 8m 21s |
-| 4. QA review | skipped | -- |
-| 5. Create implementation plan | done | 15m 02s |
-| 6. Plan-Spec cross-review | pending | -- |
-| 7. Execute plan | pending | -- |
-| 8. Spec cross-check | pending | -- |
-| 9. Ask user to test | pending | -- |
+| 2. Write specs | done | 8m 21s |
+| 3. QA review | skipped | -- |
+| 4. Create implementation plan | done | 15m 02s |
+| 5. Plan-Spec cross-review | pending | -- |
+| 6. Execute plan | pending | -- |
+| 7. Ask user to test | pending | -- |
 
 Forge started: 1718000000
 Codex available: true
@@ -285,9 +275,9 @@ Codex available: true
 3. Update the step's row in the Forge Progress table (status and duration)
 4. Use the **Write** tool to save the plan file back
 
-**On task completion (step 7):**
+**On task completion (step 6):**
 
-When a subagent completes a plan task, update the task's checkbox in the plan file from `- [ ]` to `- [x]`, then update the Forge Progress table for step 7's running duration.
+When a subagent completes a plan task, update the task's checkbox in the plan file from `- [ ]` to `- [x]`, then update the Forge Progress table for step 6's running duration.
 
 Active duration = `(end - start) - sum(resume - pause for each pause)`
 
@@ -295,7 +285,7 @@ Format durations by computing in your reasoning: `Xm YYs`. Skipped steps show `-
 
 ### Execution step timing
 
-Step 7 (execute plan) is tracked as a single step:
+Step 6 (execute plan) is tracked as a single step:
 
 - **Duration** = wall-clock time from first subagent dispatch to last subagent completion
 - Per-subagent timing is NOT tracked. If multiple subagents run in parallel, they overlap inside this one duration.
@@ -315,20 +305,26 @@ Failures do not alter the step-level Development Summary other than annotating t
 
 ## QA Review Agent
 
-In step 4, after specs are written/updated, dispatch a sub-agent to audit the specs in two passes in a single run. The agent runs in the foreground -- wait for it to return and reconcile findings before moving on to plan-writing (step 5).
+In step 3, after specs are written/updated, dispatch a sub-agent to audit the specs in two passes in a single run. The agent runs in the foreground -- wait for it to return and reconcile findings before moving on to plan-writing (step 4).
 
 1. **Design↔Spec structural coverage** -- does every design requirement have a corresponding spec scenario? (replaces the standalone spec-review step)
 2. **Edge-case hunt** -- what did both the design and spec miss? Unhappy paths, boundary conditions, implicit requirements.
 
 ### Skip Condition
 
-Skip this step entirely when no specs exist to review. Detect this by:
+Skip this step when EITHER condition holds:
+
+**A. No specs to review** -- detect by:
 - No `.feature` files were created or updated in this session, AND
 - No in-scope `.feature` files exist for the feature area in `pandahrms-spec`
 
-This covers UI-only work, "skip specs" path, Tiny-Task Triage fast-track, and any invocation against a spec-less feature.
+Covers UI-only work, "skip specs" path, Tiny-Task Triage fast-track, and any invocation against a spec-less feature.
 
-Announce: "Skipping QA review -- no specs to review."
+**B. Light spec changes** -- specs were edited but fewer than 3 NEW scenarios were added in step 2. Modifications to existing scenarios DO NOT count. Step 1's brainstorm already covered impact for small edits, so a fresh edge-case hunt isn't worth the cost.
+
+To count new scenarios, run `git diff` on the spec files updated in this session and count `^+\s*Scenario:` and `^+\s*Scenario Outline:` lines (added scenario headers only). If the count is < 3, skip.
+
+Announce the skip reason -- e.g. `"Skipping QA review -- no specs to review."` or `"Skipping QA review -- only N new scenario(s) added (threshold: 3)."`
 
 ### Agent Dispatch
 
@@ -420,10 +416,10 @@ description: "QA review specs for edge cases"
 
 After the agent returns:
 
-- **Zero findings (both parts)** -- announce "QA review complete -- coverage is complete and no additional edge cases found." Proceed to step 5 (Create implementation plan).
+- **Zero findings (both parts)** -- announce "QA review complete -- coverage is complete and no additional edge cases found." Proceed to step 4 (Create implementation plan).
 - **Findings returned** -- present the agent's report to the user, then use AskUserQuestion: "QA review found [coverage_count] coverage gaps and [edge_count] edge cases ([high_count] high severity). Would you like to add these to the specs?" with options:
   - **"Yes, add to specs"** -- loop back to `pandahrms:spec-writing` to incorporate coverage gaps AND high/medium severity edge-case findings as new scenarios. Then re-run QA review on the updated specs.
-  - **"No, proceed"** -- proceed to step 5 (Create implementation plan). The findings are still visible in the conversation for reference during planning and implementation.
+  - **"No, proceed"** -- proceed to step 4 (Create implementation plan). The findings are still visible in the conversation for reference during planning and implementation.
 
 ## Plan-Spec Cross-Review
 
@@ -454,17 +450,17 @@ If `codex_available` is false, perform the review inline:
 
 ### Handling Results
 
-- **Both directions covered** -- announce "Plan and spec aligned. Proceeding to execution." Go to step 7.
+- **Both directions covered** -- announce "Plan and spec aligned. Proceeding to execution." Go to step 6.
 - **Gaps found** -- present the report. Use AskUserQuestion to ask how to resolve:
   - **"Update the plan"** -- loop back to `superpowers:writing-plans` to add missing tasks or add spec references
   - **"Update the spec"** -- loop back to `pandahrms:spec-writing` to remove or adjust scenarios that aren't planned
-  - **"Proceed anyway"** -- record the acknowledged gap in the plan file's Pipeline Progress section and continue. Flag gaps will surface again in step 8 spec cross-check.
+  - **"Proceed anyway"** -- record the acknowledged gap in the plan file's Forge Progress section and continue. Acknowledged gaps must be flagged to the user in step 7 (Ask user to test) so they can verify the missing behavior manually or queue a follow-up forge run.
 
 Do not proceed to execution while gaps remain unresolved unless the user explicitly acknowledges them.
 
 ## Execution Standards Prefix
 
-Every implementer subagent dispatch prompt in step 7 MUST include this prefix block BEFORE the task-specific instructions. Substitute `{spec_refs}` with the spec scenario references from the plan task.
+Every implementer subagent dispatch prompt in step 6 MUST include this prefix block BEFORE the task-specific instructions. Substitute `{spec_refs}` with the spec scenario references from the plan task.
 
 ```
 ## Standards
@@ -501,69 +497,6 @@ what to build.
 - Plan ↔ spec conflicts raised: [list or "none"]
 ```
 
-## Spec Cross-Check Agent
-
-After all plan tasks are executed, dispatch a spec cross-check agent to verify the implementation covers all feature specs. This catches scenarios that span multiple tasks, plan gaps where a spec scenario had no corresponding task, and integration gaps between tasks.
-
-### Skip Condition
-
-Skip when no specs exist to cross-check against. Detect this by:
-- No in-scope `.feature` files exist for the feature area in `pandahrms-spec`, OR
-- The `pandahrms-spec` repo cannot be located from the current working directory
-
-This covers UI-only work, "skip specs" path, Tiny-Task Triage fast-track, and fast-path invocations against spec-less features.
-
-Announce the skip reason.
-
-### Agent Dispatch
-
-If `codex_available` is true, dispatch via the `codex:codex-rescue` subagent. Otherwise dispatch via the regular `Agent` tool. In both cases, prefix the prompt with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.` followed by a blank line, then the body below.
-
-```
-prompt: |
-  You are a spec compliance reviewer. Your job is to verify that the
-  implementation matches the feature's Gherkin specs.
-
-  ## Task
-
-  1. Run `git diff` to get all working tree changes
-  2. Locate the spec repo: search for a `pandahrms-spec` directory as a
-     sibling of the current working directory, then check parent directories.
-     Try these in order:
-     - `$(dirname $PWD)/pandahrms-spec/`
-     - `$(dirname $(dirname $PWD))/pandahrms-spec/`
-     - Search: `find $(dirname $PWD) -maxdepth 2 -type d -name pandahrms-spec`
-     If not found, report "Spec repo not found" and skip the cross-check.
-  3. Identify which module/feature area the changes belong to
-  4. Find all related `.feature` files
-  5. For each spec scenario, check whether the implementation satisfies it:
-     - Are the described behaviors implemented?
-     - Do validation rules match spec expectations?
-     - Are authorization checks in place as specified?
-     - Do status transitions match the spec flow?
-  6. Report findings
-
-  ## Report Format
-
-  ## Spec Cross-Check Results
-
-  ### Summary
-  - Spec scenarios checked: [count]
-  - Implemented: [count]
-  - Not implemented: [count]
-  - Divergent: [count]
-
-  ### Issues (if any)
-  | # | Spec Scenario | File | Status | Notes |
-  |---|---|---|---|---|
-  | 1 | [scenario] | [file.feature] | Not implemented | [what's missing] |
-  | 2 | [scenario] | [file.feature] | Divergent | [how it differs] |
-
-  If all scenarios are covered, state that explicitly.
-
-description: "Spec cross-check: verify implementation matches feature specs"
-```
-
 ## Red Flags
 
 | Thought | Reality |
@@ -575,12 +508,10 @@ description: "Spec cross-check: verify implementation matches feature specs"
 | "I'll add the test after the production code is in" | Never. Plan tasks must include a Red sub-step before any Green sub-step. Production code without a failing test is rejected. |
 | "I'll skip specs without asking" | Always ask the user. They decide whether specs are needed. |
 | "The design doc is enough" | Design doc captures WHAT. Specs capture BEHAVIOR. Ask the user. |
-| "Specs look fine, skip the review" | Always run QA review after writing specs. It catches design↔spec gaps and missed edge cases. |
+| "Specs look fine, skip the review" | QA is conditional now. Run it whenever ≥3 NEW scenarios were added in step 2; skip it for smaller edits. Don't skip a qualifying run on a hunch. |
 | "This change is too small for specs" | Don't assume -- ask the user. They may still want specs (unless it's UI-only, then auto-skip). |
 | "Let me commit after each task" | Never commit. User tests first, then /hermes-commit. |
-| "I'll just execute the plan in the main session" | Never. Step 7 dispatches subagents. Main session only orchestrates. |
-| "Subagent self-reports covered specs" | Self-reports check individual tasks. The spec cross-check catches gaps across tasks and missing scenarios. Always run it. |
-| "I'll skip the spec cross-check" | It's mandatory when specs exist. Only skip when no specs exist for this feature (see skip conditions). |
+| "I'll just execute the plan in the main session" | Never. Step 6 dispatches subagents. Main session only orchestrates. |
 | "Discussion decided X but spec still says Y, I'll implement X" | Stop. Update the spec to reflect the decision FIRST, then plan. Never leave the spec outdated. |
 | "The plan is clear, I don't need to read the spec" | Always cross-check during execution. Plan ↔ spec conflicts must be flagged, not silently resolved. |
 | "Plan has no spec refs, but I'll just implement it" | Plans without spec refs must be rewritten before execution. No shortcuts. |
@@ -589,7 +520,7 @@ description: "Spec cross-check: verify implementation matches feature specs"
 | "One class is fine, SOLID is over-engineering" | Follow SOLID. If you think it's over-engineering, re-read the spec -- you may be conflating concerns. |
 | "I'll use technical names like `UserDto`, domain language is pedantic" | DDD requires ubiquitous language from the spec. Names come from the domain, not the tech stack. |
 | "The plan said ship X, spec said ship Y, I picked the plan" | Never silently reconcile. Stop and report the conflict. Authority sources must agree before execution continues. |
-| "Codex is installed but I'll just dispatch the local agent" | If `codex_available` is true, route QA review, plan/spec cross-review, and spec cross-check through `codex:codex-rescue`. Detection happens once at start. |
+| "Codex is installed but I'll just dispatch the local agent" | If `codex_available` is true, route QA review and plan/spec cross-review through `codex:codex-rescue`. Detection happens once at start. |
 | "I'll send the codex review prompt without the read-only prefix" | Codex defaults to `--write`. Every review dispatch MUST start with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.` so codex doesn't edit the working tree. |
 
 ## When to Use
