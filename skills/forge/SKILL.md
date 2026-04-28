@@ -7,7 +7,7 @@ description: Triggers on any mention of starting new work, building a feature, a
 
 ## Overview
 
-Unified pipeline for Pandahrms projects: brainstorm, spec writing, QA review, implementation planning, plan/spec cross-review, and execution -- all in a single session.
+Unified pipeline for Pandahrms projects: brainstorm, spec writing, QA review, implementation planning, Plan ↔ Spec cross-review, and execution -- all in a single session.
 
 **Use this skill INSTEAD of invoking `superpowers:brainstorming` directly** in any Pandahrms project.
 
@@ -18,7 +18,7 @@ Unified pipeline for Pandahrms projects: brainstorm, spec writing, QA review, im
 If invoked with a plan file path (e.g., `/forge path/to/plan.md`), skip steps 1-4 and start directly at step 5 (Plan ↔ Spec cross-review), then step 6 (Execute plan).
 
 - Initialize time tracking as normal
-- Announce: "Executing existing plan -- running plan/spec cross-review, then execution."
+- Announce: "Executing existing plan -- running Plan ↔ Spec cross-review, then execution."
 - Still run step 5 (Plan ↔ Spec cross-review) to catch drift between the pre-existing plan and current specs
 - Still run step 7 (ask user to test) with the Development Summary
 
@@ -66,7 +66,7 @@ These are analysis-only tasks. The dispatched prompt MUST begin with `READ-ONLY 
 
 When `codex_available` is false, fall back to the regular `Agent` tool with the prompts shown in each section.
 
-Announce at start: `"Codex detected -- routing QA review and plan/spec cross-review to codex:codex-rescue."` or `"Codex not detected -- using local agents for reviews."`
+Announce at start: `"Codex detected -- routing QA review and Plan ↔ Spec cross-review to codex:codex-rescue."` or `"Codex not detected -- using local agents for reviews."`
 
 <HARD-GATE>
 OVERRIDE: When the brainstorming skill completes and instructs you to "invoke writing-plans", do NOT invoke writing-plans. Instead, return to THIS skill and ask the user whether they want to write specs first.
@@ -77,7 +77,7 @@ The brainstorming skill says: "The ONLY skill you invoke after brainstorming is 
 <HARD-GATE>
 OVERRIDE: At the end of `superpowers:writing-plans`, the skill asks the user to choose between "Subagent-Driven" and "Inline Execution". DO NOT present this choice. Auto-select subagent-driven and proceed first to step 5 (Plan ↔ Spec cross-review), then to step 6 (Execute). Forge requires subagent-driven execution — inline execution is not an option.
 
-Announce: "Plan complete. Running plan/spec cross-review, then subagent-driven execution."
+Announce: "Plan complete. Running Plan ↔ Spec cross-review, then subagent-driven execution."
 </HARD-GATE>
 
 <HARD-GATE>
@@ -195,7 +195,7 @@ You MUST create a task for each of these items and complete them in order. Apply
    - **Dependency marking** -- writing-plans must mark task dependencies explicitly so step 6 can parallel-dispatch independent tasks.
 5. **Plan ↔ Spec cross-review** -- after the plan is written, verify bi-directional coverage: (a) every plan task references a spec scenario, and (b) every in-scope spec scenario has at least one plan task. If gaps exist, fix them (update the plan, the spec, or both) before execution. Skip if no specs exist. See [Plan-Spec Cross-Review](#plan-spec-cross-review) below.
 6. **Execute plan** -- the plan will be executed via `superpowers:subagent-driven-development` (v5 default). **Dispatch independent tasks in parallel** -- tasks the plan marks as having no dependencies on each other should be dispatched in a single Agent tool call batch to cut wall-clock time. Every implementer subagent dispatch prompt MUST include the standards prefix from [Execution Standards Prefix](#execution-standards-prefix) -- spec cross-check + TDD + SOLID + DDD. Apply the no-commit override: implementer subagents must NOT commit after tasks. All changes remain uncommitted. Time tracking records the step as a whole (wall-clock from first dispatch to last return); per-subagent timing is NOT tracked. If a subagent fails, follow [Subagent Failure Handling](#subagent-failure-handling).
-7. **Ask user to test** -- present the Development Summary, then end with: "Please test your changes, then run /hermes-commit when ready."
+7. **Ask user to test** -- present the Development Summary. If the plan file's `## Forge Progress` section has an `### Acknowledged Gaps` block (gaps the user chose to "Proceed anyway" past during Step 5), surface each gap to the user with the line: "**Acknowledged gaps to verify manually:** [gap list]." Then end with: "Please test your changes, then run /hermes-commit when ready."
 
 ## Time Tracking
 
@@ -205,7 +205,7 @@ Track **active work time** across the full forge run -- time spent by Claude doi
 
 1. **On step start** -- record the current time (use `date +%s` via Bash)
 2. **Before any user prompt** -- record a pause timestamp. This includes:
-   - AskUserQuestion calls (design approval, "write specs?", "add QA findings to specs?", "how to resolve plan/spec gaps?", subagent-failure prompts)
+   - AskUserQuestion calls (design approval, "write specs?", "add QA findings to specs?", "how to resolve Plan ↔ Spec gaps?", subagent-failure prompts)
    - Any blocker requiring user action (e.g., environment issue, missing access)
    - Presenting results and waiting for user to respond
 3. **After user responds** -- record a resume timestamp. Add the paused duration to the step's excluded time.
@@ -260,12 +260,16 @@ Append a `## Forge Progress` section to the plan file. Backfill steps 1-3 timing
 | 2. Write specs | done | 8m 21s |
 | 3. QA review | skipped | -- |
 | 4. Create implementation plan | done | 15m 02s |
-| 5. Plan-Spec cross-review | pending | -- |
+| 5. Plan ↔ Spec cross-review | pending | -- |
 | 6. Execute plan | pending | -- |
 | 7. Ask user to test | pending | -- |
 
 Forge started: 1718000000
 Codex available: true
+
+### Acknowledged Gaps
+
+(Populated only when the user chose "Proceed anyway" during Step 5. One bullet per gap. Step 7 surfaces this list to the user.)
 ```
 
 **On each step completion:**
@@ -454,7 +458,7 @@ If `codex_available` is false, perform the review inline:
 - **Gaps found** -- present the report. Use AskUserQuestion to ask how to resolve:
   - **"Update the plan"** -- loop back to `superpowers:writing-plans` to add missing tasks or add spec references
   - **"Update the spec"** -- loop back to `pandahrms:spec-writing` to remove or adjust scenarios that aren't planned
-  - **"Proceed anyway"** -- record the acknowledged gap in the plan file's Forge Progress section and continue. Acknowledged gaps must be flagged to the user in step 7 (Ask user to test) so they can verify the missing behavior manually or queue a follow-up forge run.
+  - **"Proceed anyway"** -- append the gap as a bullet to the `### Acknowledged Gaps` block beneath the Forge Progress table (create the block if it doesn't exist), then continue. Step 7 will surface every entry there to the user so they can verify the missing behavior manually or queue a follow-up forge run.
 
 Do not proceed to execution while gaps remain unresolved unless the user explicitly acknowledges them.
 
@@ -520,7 +524,7 @@ what to build.
 | "One class is fine, SOLID is over-engineering" | Follow SOLID. If you think it's over-engineering, re-read the spec -- you may be conflating concerns. |
 | "I'll use technical names like `UserDto`, domain language is pedantic" | DDD requires ubiquitous language from the spec. Names come from the domain, not the tech stack. |
 | "The plan said ship X, spec said ship Y, I picked the plan" | Never silently reconcile. Stop and report the conflict. Authority sources must agree before execution continues. |
-| "Codex is installed but I'll just dispatch the local agent" | If `codex_available` is true, route QA review and plan/spec cross-review through `codex:codex-rescue`. Detection happens once at start. |
+| "Codex is installed but I'll just dispatch the local agent" | If `codex_available` is true, route QA review and Plan ↔ Spec cross-review through `codex:codex-rescue`. Detection happens once at start. |
 | "I'll send the codex review prompt without the read-only prefix" | Codex defaults to `--write`. Every review dispatch MUST start with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.` so codex doesn't edit the working tree. |
 
 ## When to Use
