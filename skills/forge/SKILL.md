@@ -22,25 +22,6 @@ If invoked with a plan file path (e.g., `/forge path/to/plan.md`), skip steps 1-
 - Still run step 5 (Plan ↔ Spec cross-review) to catch drift between the pre-existing plan and current specs
 - Still run step 7 (ask user to test) with the Development Summary
 
-## Tiny-Task Triage
-
-Skip this section entirely if Fast Path applies (a plan file was provided). Otherwise, before starting step 1, check whether the request is a **narrow, well-specified task** that does not warrant a full brainstorm + spec cycle. Examples:
-
-- Single-file bug fix with a clear reproduction
-- Rename/refactor with no behavior change
-- Config/dependency bump
-- Adjusting a specific validation rule that's already in the spec
-- Adding a unit test for existing behavior
-
-If yes, use AskUserQuestion: "This looks like a narrow task -- skip brainstorming and specs, go directly to writing a short plan?" with options:
-
-- **"Yes, fast-track"** -- skip the brainstorm/spec/QA portions of step 1-3. Jump to step 4 (Create plan). **Context loading is NOT skipped** -- you still read related tests + specs (step 1 substeps a-c) and surface a brief test-change proposal to the user before writing the plan. Standards in step 6 still apply (TDD, SOLID, DDD, spec cross-check if specs exist).
-- **"No, full forge"** -- proceed to step 1 normally.
-
-Ask only when the scope is genuinely narrow. When in doubt, run the full forge -- over-triage erodes quality. Users may override either direction.
-
-Record the triage decision in the plan file's `## Forge Progress` section once the plan exists.
-
 ## Resume Path
 
 If invoked with `/forge --resume`:
@@ -97,14 +78,15 @@ AUTHORITY HIERARCHY:
 </HARD-GATE>
 
 <HARD-GATE>
-TDD + SDD AT DESIGN TIME: Before any brainstorming or planning, you MUST load existing tests and specs as context. Applies to **every** forge run -- new features, bug fixes, refactors, even Tiny-Task fast-tracks.
+TDD + SDD AT DESIGN TIME: Before any brainstorming or planning, you MUST load existing tests and specs as context. Applies to **every** forge run -- new features, bug fixes, refactors. This gate is the full contract for Step 1 (`Load context and brainstorm the design`); the checklist entry just points back here.
 
-1. **Identify the affected area** -- module/feature/file paths the change will touch.
-2. **Read related specs** -- every `.feature` file in `pandahrms-spec` for that area. If none exist, note "no existing specs".
-3. **Read related tests** -- every unit/integration test file in the affected codebase (e.g. `*.test.ts`, `*.spec.ts`, `*Tests.cs`). If none exist, note "no existing tests".
-4. **Brainstorm test + spec changes FIRST** -- the brainstorm output MUST address (a) which spec scenarios change/add/remove and (b) which test cases change/add. Only after these are decided does the conversation move to implementation approach.
-5. **Plan tasks must reference both** -- every implementation task names the spec scenario(s) it satisfies AND the test file(s)/case(s) it touches.
-6. **Never write production code before the test exists** -- this is enforced at execution by `superpowers:test-driven-development`, but the test plan is shaped here at design time.
+1. **Identify the affected area** -- module/feature/file paths the change will touch. Ask the user if unclear.
+2. **Read related specs** -- every `.feature` file in `pandahrms-spec` for that area, using Grep/Glob. If none exist, note "no existing specs".
+3. **Read related tests** -- every unit/integration test file in the affected codebase (`*.test.ts`, `*.spec.ts`, `*Tests.cs`, `*_test.go`, etc.). If none exist, note "no existing tests".
+4. **Summarize for the user and pause** -- one short message: `"Loaded N spec scenarios and M test files for this area. Key behaviors covered: [1-2 line summary]."` Wait for the user to confirm scope before brainstorming.
+5. **Brainstorm test + spec changes FIRST, then implementation** -- invoke `superpowers:brainstorming`. The brainstorm output MUST address, in this order: (a) **spec impact** (which scenarios change/add/remove, with justification), (b) **test impact** (which test files/cases change/add, what each new test will assert in failing-test-first framing), then (c) **implementation approach**. Do NOT auto-commit the design doc -- leave it uncommitted for the user to review. When brainstorming says to "invoke writing-plans", STOP and return to the forge checklist.
+6. **Plan tasks must reference both** -- every implementation task names the spec scenario(s) it satisfies AND the test file(s)/case(s) it touches.
+7. **Never write production code before the test exists** -- enforced at execution by `superpowers:test-driven-development`. The test plan is shaped here at design time.
 
 Skipping context loading produces designs that ignore current behavior contracts. Skipping the test/spec change brainstorm produces plans that retrofit tests after the fact -- the opposite of TDD.
 </HARD-GATE>
@@ -137,7 +119,7 @@ digraph pipeline {
     "QA gaps or edge cases?" [shape=diamond];
     "Invoke writing-plans" [shape=box];
     "Plan ↔ Spec cross-review" [shape=box, style=filled, fillcolor=lightblue];
-    "Plan/spec aligned?" [shape=diamond];
+    "Plan aligned\n(spec + test refs)?" [shape=diamond];
     "Execute plan (subagent-driven)" [shape=box, style=filled, fillcolor=lightgreen];
     "Subagent failed?" [shape=diamond, style=filled, fillcolor=lightyellow];
     "Handle failure" [shape=box, style=filled, fillcolor=orange];
@@ -159,10 +141,10 @@ digraph pipeline {
     "QA gaps or edge cases?" -> "Invoke spec-writing" [label="yes, fix specs"];
     "QA gaps or edge cases?" -> "Invoke writing-plans" [label="no, reconciled"];
     "Invoke writing-plans" -> "Plan ↔ Spec cross-review";
-    "Plan ↔ Spec cross-review" -> "Plan/spec aligned?";
-    "Plan/spec aligned?" -> "Invoke writing-plans" [label="no, update plan"];
-    "Plan/spec aligned?" -> "Invoke spec-writing" [label="no, update spec"];
-    "Plan/spec aligned?" -> "Execute plan (subagent-driven)" [label="yes"];
+    "Plan ↔ Spec cross-review" -> "Plan aligned\n(spec + test refs)?";
+    "Plan aligned\n(spec + test refs)?" -> "Invoke writing-plans" [label="no, update plan"];
+    "Plan aligned\n(spec + test refs)?" -> "Invoke spec-writing" [label="no, update spec"];
+    "Plan aligned\n(spec + test refs)?" -> "Execute plan (subagent-driven)" [label="yes"];
     "Execute plan (subagent-driven)" -> "Subagent failed?";
     "Subagent failed?" -> "Handle failure" [label="yes"];
     "Handle failure" -> "Execute plan (subagent-driven)" [label="retry/skip"];
@@ -175,25 +157,16 @@ digraph pipeline {
 
 You MUST create a task for each of these items and complete them in order. Apply [Time Tracking](#time-tracking) to every step -- record start/end times and pause during user prompts. The timing section has full details; do not duplicate timing logic here.
 
-1. **Load context and brainstorm the design** -- ground the design in current behavior BEFORE proposing anything new. New features and bug fixes alike must start here.
-   a. **Identify the affected area** -- module/feature/file paths the change will touch. Ask the user if unclear.
-   b. **Read related specs** -- every `.feature` file in `pandahrms-spec` for the area. If none exist, note "no existing specs".
-   c. **Read related tests** -- every unit/integration test file in the affected codebase (search the repo with Grep/Glob -- `*.test.ts`, `*.spec.ts`, `*Tests.cs`, `*_test.go`, etc.). If none exist, note "no existing tests".
-   d. **Summarize for the user** -- one short message: "Loaded N spec scenarios and M test files for this area. Key behaviors covered: [1-2 line summary]." Pause for the user to confirm scope before brainstorming.
-   e. **Invoke `superpowers:brainstorming`** -- the brainstorm MUST address, in this order:
-      - **Spec impact** -- which scenarios change, which are added, which can be removed (with justification)
-      - **Test impact** -- which test files/cases change, which are added, what each new test will assert (failing-test-first framing)
-      - **Implementation approach** -- only after the test/spec changes are decided
-   f. Do NOT auto-commit the design doc -- leave it uncommitted for the user to review. When brainstorming tells you to "invoke writing-plans", STOP and return here instead.
+1. **Load context and brainstorm the design** -- execute the **TDD + SDD AT DESIGN TIME** HARD-GATE above in full (substeps 1-5 of that gate). Output: an uncommitted design doc plus an explicit spec-impact and test-impact list ready for step 2.
 2. **Write or update specs?** -- this step covers two routing decisions in one place:
    - **UI-only auto-skip**: if the work is purely UI/presentation (styling, layout, component design, theming, responsiveness, animations, dark mode, visual polish), announce "Skipping spec-writing -- UI-only change with no business behavior impact" and proceed to step 4 (QA auto-skipped too).
    - **Otherwise**: use AskUserQuestion: "Would you like to write/update Gherkin specs before proceeding to the implementation plan?" with options "Yes, write/update specs" and "Skip specs". Users may skip if the session is purely exploratory or open discussion. If yes, invoke `pandahrms:spec-writing` to write or update specs in pandahrms-spec. **Discussion/decisions are authoritative** -- if the brainstorming produced decisions that diverge from existing specs, update the spec to reflect the new decisions BEFORE writing the plan. Never leave an outdated spec to be reconciled later. Present the written/updated specs to the user for review before proceeding.
 3. **QA review (conditional)** -- skip when EITHER no specs exist OR fewer than 3 NEW scenarios were added in step 2 (modifications to existing scenarios do not count -- step 1's brainstorm already covered impact for small changes). Otherwise dispatch the QA-review sub-agent (two-pass: design↔spec coverage + edge cases) and wait for it to complete. See [QA Review Agent](#qa-review-agent) for dispatch prompt, skip-condition detection, and result handling. If QA surfaces coverage gaps or new scenarios, loop back to `pandahrms:spec-writing` to update the specs, then re-run QA. When QA returns zero blocking findings (or the user chooses to proceed), move on to step 4.
 4. **Create implementation plan** -- invoke `superpowers:writing-plans` to produce the plan. **Plan requirements**:
    - **Spec reference** -- if specs exist, each implementation task must reference the spec scenario(s) it satisfies (e.g. "implements `features/performance/goal-approval.feature:Scenario: approver revokes approval`"). Plans without spec references must be rewritten. If no specs exist (UI-only or "skip specs" path), this requirement does not apply.
-   - **Test reference** -- each implementation task must name the test file(s) and the new/changed test case(s) it adds, derived from the test-impact decisions made in step 1e. Each task must include an explicit "Red" sub-step (write the failing test) before any "Green" sub-step (production code). Tasks that touch production code without naming a test are rejected -- TDD is non-negotiable.
+   - **Test reference** -- each implementation task must name the test file(s) and the new/changed test case(s) it adds, derived from the test-impact list produced in step 1. Each task must include an explicit "Red" sub-step (write the failing test) before any "Green" sub-step (production code). Tasks that touch production code without naming a test are rejected -- TDD is non-negotiable.
    - **Dependency marking** -- writing-plans must mark task dependencies explicitly so step 6 can parallel-dispatch independent tasks.
-5. **Plan ↔ Spec cross-review** -- after the plan is written, verify bi-directional coverage: (a) every plan task references a spec scenario, and (b) every in-scope spec scenario has at least one plan task. If gaps exist, fix them (update the plan, the spec, or both) before execution. Skip if no specs exist. See [Plan-Spec Cross-Review](#plan-spec-cross-review) below.
+5. **Plan ↔ Spec cross-review** -- after the plan is written (or at Fast Path entry), verify three directions: (a) every plan task references a real spec scenario, (b) every in-scope spec scenario has at least one plan task, and (c) every plan task that touches production code names a test reference with Red-before-Green ordering. The (c) check is the only test-ref validator on Fast Path -- do not skip it. If gaps exist, fix them before execution. See [Plan-Spec Cross-Review](#plan-spec-cross-review) for skip conditions and resolution paths.
 6. **Execute plan** -- the plan will be executed via `superpowers:subagent-driven-development` (v5 default). **Dispatch independent tasks in parallel** -- tasks the plan marks as having no dependencies on each other should be dispatched in a single Agent tool call batch to cut wall-clock time. Every implementer subagent dispatch prompt MUST include the standards prefix from [Execution Standards Prefix](#execution-standards-prefix) -- spec cross-check + TDD + SOLID + DDD. Apply the no-commit override: implementer subagents must NOT commit after tasks. All changes remain uncommitted. Time tracking records the step as a whole (wall-clock from first dispatch to last return); per-subagent timing is NOT tracked. If a subagent fails, follow [Subagent Failure Handling](#subagent-failure-handling).
 7. **Ask user to test** -- present the Development Summary. If the plan file's `## Forge Progress` section has an `### Acknowledged Gaps` block (gaps the user chose to "Proceed anyway" past during Step 5), surface each gap to the user with the line: "**Acknowledged gaps to verify manually:** [gap list]." Then end with: "Please test your changes, then run /hermes-commit when ready."
 
@@ -322,7 +295,7 @@ Skip this step when EITHER condition holds:
 - No `.feature` files were created or updated in this session, AND
 - No in-scope `.feature` files exist for the feature area in `pandahrms-spec`
 
-Covers UI-only work, "skip specs" path, Tiny-Task Triage fast-track, and any invocation against a spec-less feature.
+Covers UI-only work, "skip specs" path, and any invocation against a spec-less feature.
 
 **B. Light spec changes** -- specs were edited but fewer than 3 NEW scenarios were added in step 2. Modifications to existing scenarios DO NOT count. Step 1's brainstorm already covered impact for small edits, so a fresh edge-case hunt isn't worth the cost.
 
@@ -427,37 +400,41 @@ After the agent returns:
 
 ## Plan-Spec Cross-Review
 
-After `superpowers:writing-plans` produces the plan file, verify bi-directional coverage between the plan and the feature specs before executing anything.
+After `superpowers:writing-plans` produces the plan file (or when entering Fast Path with an externally-authored plan), verify the plan's integrity against both specs and tests before executing anything.
+
+This step is the only validator for fast-path plans -- since Fast Path skips Step 4's plan-requirements check, Step 5 must cover those guarantees too.
 
 ### Skip Condition
 
-Skip when no specs exist to cross-check against. Detect this by:
+Skip only when there are NO specs AND NO existing tests in the affected area. Detect this by:
 - The plan file contains zero spec references, AND
-- No `.feature` files exist for the feature area in `pandahrms-spec`
+- No `.feature` files exist for the feature area in `pandahrms-spec`, AND
+- No test files exist in the affected codebase
 
-This covers UI-only work, "skip specs" path, Tiny-Task Triage fast-track, and fast-path invocations against plans for spec-less features.
+This covers UI-only work with no tests, "skip specs" path with a spec-less and test-less area, and fast-path invocations against truly content-less features.
 
-Announce: "Skipping plan ↔ spec cross-review -- no specs for this feature."
+Announce the applicable skip reason -- e.g. `"Skipping Plan ↔ Spec cross-review -- no specs or tests for this feature."`
 
 ### How to Review
 
-If `codex_available` is true, dispatch this review to the `codex:codex-rescue` subagent with a prompt that lists the plan file path, the in-scope `.feature` file paths, and the four checks below. Prefix the prompt with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.`. Treat the subagent's output as the review report.
+If `codex_available` is true, dispatch this review to the `codex:codex-rescue` subagent with a prompt that lists the plan file path, the in-scope `.feature` file paths, the test file inventory from step 1, and the three checks below. Prefix the prompt with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.`. Treat the subagent's output as the review report.
 
 If `codex_available` is false, perform the review inline:
 
-1. Read the plan file and extract every task's spec reference (e.g. `features/.../goal-approval.feature:Scenario: ...`)
-2. Read every in-scope `.feature` file for the feature
-3. Check:
-   - **Plan → Spec**: Does every plan task reference a real spec scenario? Flag tasks with no spec reference or broken references.
-   - **Spec → Plan**: Does every in-scope spec scenario have at least one plan task implementing it? Flag uncovered scenarios.
+1. Read the plan file and extract every task's spec reference and test reference.
+2. Read every in-scope `.feature` file for the feature.
+3. Check three directions:
+   - **Plan → Spec** -- does every plan task that touches business behavior reference a real spec scenario? Flag tasks with no spec reference or broken references. (Skip this check if no specs exist.)
+   - **Spec → Plan** -- does every in-scope spec scenario have at least one plan task implementing it? Flag uncovered scenarios. (Skip this check if no specs exist.)
+   - **Plan → Test** -- does every plan task that touches production code name at least one test file/case it will add or modify, with an explicit Red-before-Green ordering? Flag any production-code task that lacks a test reference. (This check runs whenever any tests exist OR whenever the plan modifies production code.)
 4. Present findings to the user.
 
 ### Handling Results
 
-- **Both directions covered** -- announce "Plan and spec aligned. Proceeding to execution." Go to step 6.
+- **All directions covered** -- announce "Plan, spec, and tests aligned. Proceeding to execution." Go to step 6.
 - **Gaps found** -- present the report. Use AskUserQuestion to ask how to resolve:
-  - **"Update the plan"** -- loop back to `superpowers:writing-plans` to add missing tasks or add spec references
-  - **"Update the spec"** -- loop back to `pandahrms:spec-writing` to remove or adjust scenarios that aren't planned
+  - **"Update the plan"** -- loop back to `superpowers:writing-plans` to add missing tasks, spec references, or test references. For fast-path plans, edit the plan file directly to add the missing references rather than re-running writing-plans.
+  - **"Update the spec"** -- loop back to `pandahrms:spec-writing` to remove or adjust scenarios that aren't planned.
   - **"Proceed anyway"** -- append the gap as a bullet to the `### Acknowledged Gaps` block beneath the Forge Progress table (create the block if it doesn't exist), then continue. Step 7 will surface every entry there to the user so they can verify the missing behavior manually or queue a follow-up forge run.
 
 Do not proceed to execution while gaps remain unresolved unless the user explicitly acknowledges them.
