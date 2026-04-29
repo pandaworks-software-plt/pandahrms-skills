@@ -103,11 +103,28 @@ digraph design {
 
 **Understanding the idea:**
 
-- Ask questions **one at a time** to refine the idea -- never batch
 - Prefer multiple-choice questions when possible; open-ended is fine when needed
-- Only one question per message -- if a topic needs more exploration, break it into multiple questions
 - Focus on purpose, constraints, success criteria
 - The design output MUST address, in this order: (a) **spec impact** -- which scenarios change/add/remove and why, (b) **test impact** -- which test files/cases change/add and what each new test will assert in failing-test-first framing, then (c) **implementation approach**
+
+### Question Pacing
+
+Default to **one question at a time** -- this gives the answer the focus it needs and surfaces follow-ups naturally. But sequential round-trips are expensive when questions are clearly independent of each other; batching saves wall-clock without losing information.
+
+**Use a single AskUserQuestion with multiple questions when ALL of these hold:**
+
+- The questions are **causally independent** -- the answer to one does NOT change the framing or options of another. Example: "wizard placement" and "validation range" are independent; "approach A vs B vs C" and "should we add a cache?" are NOT independent (cache only matters under approach B).
+- Each question has clear, exhaustive multiple-choice options.
+- The total number of questions in the batch is **2-4**. Never batch 5+ -- that's a design that hasn't been refined enough yet.
+
+**Always ask one at a time when:**
+
+- The next question's framing depends on the previous answer.
+- The question is open-ended (no good multiple-choice options exist).
+- You're in section-approval mode (presenting a design section -- one approval at a time).
+- Approach selection (2-3 approaches with trade-offs) -- this gets its own dedicated AskUserQuestion since it shapes everything downstream.
+
+**Section approval gates** for `lightweight` Scope Profile (set after Step 1 in atlas/forge): a single end-of-section approval is enough; do not gate per-section. For `standard` or `heavyweight`, keep the per-section approval flow.
 
 **Exploring approaches:**
 
@@ -163,7 +180,7 @@ Fix issues inline. No need to re-review -- just fix and move on. The user review
 
 ## Key Principles
 
-- **One question at a time** -- never batch clarifying questions
+- **One question at a time by default** -- batch 2-4 only when questions are causally independent and multiple-choice (see [Question Pacing](#question-pacing))
 - **Multiple choice preferred** -- easier to answer than open-ended when possible
 - **YAGNI ruthlessly** -- remove unnecessary features from all designs
 - **Explore alternatives** -- always propose 2-3 approaches before settling
@@ -175,7 +192,8 @@ Fix issues inline. No need to re-review -- just fix and move on. The user review
 
 | Thought | Reality |
 |---------|---------|
-| "I'll batch a few questions to save round-trips" | One question at a time. Batching loses focus and produces shallow answers. |
+| "I'll batch a 5+ question survey to be efficient" | Cap at 2-4 batched questions, and only when they're causally independent and have clear multiple-choice options. 5+ means the design isn't refined enough yet -- ask the most-blocking question first and let the answer narrow the rest. |
+| "These two questions feel related, but I'll batch them anyway to save a round-trip" | If the second question's framing depends on the first's answer, ask sequentially. Batching dependent questions produces shallow or contradictory answers. |
 | "I'll skip reading existing specs/tests" | Required. Designs without that grounding miss compatibility issues. |
 | "pandahrms-spec is on main but the project is on a feature branch -- close enough" | No. Align the spec repo to the project's branch BEFORE reading specs. Reading from the wrong branch hides in-flight spec edits and produces designs that contradict them. See [Spec Branch Alignment](#spec-branch-alignment). |
 | "It's a bug fix, no need to discuss tests upfront" | Bug fixes especially need a failing test that would have caught the bug. The design proposes that test before the fix. |

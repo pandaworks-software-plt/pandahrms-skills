@@ -40,6 +40,68 @@ Each step is one action (2-5 minutes):
 - "Run the tests and make sure they pass" -- step
 - "Commit" -- step
 
+## Task Decomposition Heuristics
+
+The orchestrator (atlas/forge) sets a Scope Profile after design approval. Use it to right-size the plan:
+
+| Scope Profile | Target task count | Decomposition rule |
+|---------------|-------------------|---------------------|
+| `lightweight` | 5-7 tasks | Collapse strictly-sequential wiring tasks into a single task. See [Collapse Rule](#collapse-rule) below. |
+| `standard` | 8-15 tasks | Default decomposition -- one task per logical concern. |
+| `heavyweight` | 15+ tasks | Decompose aggressively to keep parallel-dispatch wide. |
+
+If no Scope Profile is set (rare), default to `standard`.
+
+### Collapse Rule
+
+When the work is small enough that decomposition produces fake granularity, collapse strictly-sequential tasks that:
+
+- Are causally chained (each must complete before the next starts), AND
+- Touch the same logical concern (e.g. "persist X" = entity property + EF mapping + migration), AND
+- Cannot run in parallel even with a `Depends on:` graph
+
+...into a single task with all the steps inside it. The combined task still gets ONE `Spec ref:`, ONE `Test ref:` (or `Verification:` slot), and a single Red-Green-Refactor cycle covering the whole concern.
+
+**Example -- collapse:**
+- Task A: Add `PromotionProbation` property to `Appraisal` entity
+- Task B: Add EF `OwnsOne` mapping for `PromotionProbation`
+- Task C: Generate and apply migration `Add_PromotionProbation`
+
+These are strictly sequential, all "persist promotion probation" -- collapse into:
+- Task: **Persist promotion probation on Appraisal** -- entity property + EF mapping + migration as numbered sub-steps inside one task.
+
+**Example -- do NOT collapse:**
+- Task X: Validator rejects out-of-range values
+- Task Y: Handler writes the value to the entity
+
+These touch different concerns (validation vs persistence) even when sequential -- keep separate.
+
+### Manual Gates (not tasks)
+
+Some steps are not implementer work -- they are operator commands that the user (or the orchestrator) runs once:
+
+- `pnpm openapi-ts` (or equivalent regen)
+- `dotnet ef database update` against a local DB
+- Deploying a service so swagger is live before FE work begins
+
+These should NOT be numbered tasks in the plan. They appear as **Manual Gate** entries between tasks, marked with the command and a one-line "why this gate exists" note. Atlas reads gates and pauses execution to surface them to the user; once the user confirms completion, atlas resumes with the next task.
+
+**Manual Gate format:**
+
+```markdown
+---
+
+**Manual Gate: API regen**
+
+Run: `cd apps/performance-fe && pnpm openapi-ts`
+
+Why: Backend types must be regenerated before any FE task that imports the new endpoint.
+
+User confirms: type "regen done" to resume.
+
+---
+```
+
 ## Plan Document Header
 
 Every plan MUST start with this header:

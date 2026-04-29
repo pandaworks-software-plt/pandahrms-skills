@@ -178,6 +178,29 @@ Every scenario MUST describe **user behavior and business outcomes**, NOT UI imp
 - Permission checks, rule enforcement, data consistency
 - NOT: toasts, modals, colors, redirects, spinners
 
+#### Don't Hard-Code Validation Messages or Input Behavior
+
+A specific class of UI leak that's easy to miss: scenarios that name a literal validation message string ("must be between 1 and 24 months") or commit to a specific input behavior (auto-clamp vs reject). Both bake in implementation choices that a later UI redesign or input-component swap will invalidate -- forcing spec rewrites mid-pipeline.
+
+**Prohibited:**
+
+| Bad (hard-coded) | Why it leaks |
+|-----------------|--------------|
+| `Then I see "Months must be between 1 and 24"` | Couples the spec to one error-message string. Localization or copy revision breaks the spec. |
+| `Then the system shows "Invalid input"` | Same issue -- couples to UI copy. |
+| `When I enter 25 then the input becomes 24` | Commits to auto-clamping behavior. If the input swaps to one that throws an error instead, the scenario is unsatisfiable. |
+| `When I enter 0.5 then the value is rounded to 1` | Same -- commits to auto-rounding. |
+
+**Required (behavior-focused):**
+
+| Good (implementation-agnostic) | Why it survives changes |
+|--------------------------------|-------------------------|
+| `Then the request is rejected as out of range` | Asserts the business outcome, not the message. |
+| `Then 25 is not accepted as a valid value` | Says nothing about how rejection surfaces (clamp, error, disabled submit). |
+| `Then 0.5 is not accepted as a valid value` | Same -- the outcome (not accepted) holds regardless of the input control's coercion strategy. |
+
+If a particular error message IS the business behavior (e.g., a specific compliance-required disclosure that legal mandates), call it out in the design and write the scenario with the literal string PLUS a comment naming the requirement. Otherwise: outcome only.
+
 **Bad -- UI-focused:**
 ```gherkin
 Scenario: Apply for leave
