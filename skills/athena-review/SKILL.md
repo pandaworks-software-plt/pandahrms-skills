@@ -238,6 +238,7 @@ Apply these checks to every changed file. Include any lint/format violations fro
 | **Error handling** | Specific exceptions caught, meaningful messages, no swallowed errors. Consistent error response format. |
 | **Readability** | Self-documenting code. No unnecessary complexity or over-engineering. Clear naming. |
 | **Dead code** | No commented-out code, unused variables, unreachable branches, or leftover debugging code. |
+| **No silent TODOs** | No `TODO`, `FIXME`, or `XXX` comments in the diff -- whether newly written by the implementer or inherited from existing code in files that were edited. Surface every occurrence to the user as a major finding so it can be resolved (finished, tracked, or dropped) -- never accepted silently. |
 | **Async correctness** | `async`/`await` used properly. No `async void` (except event handlers). No blocking on async (`.Result`, `.Wait()`). |
 
 ### Categorize Issues

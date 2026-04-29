@@ -212,7 +212,7 @@ final report.
 - Work from: `{worktree_or_repo_path}`
 - **Stage changes only -- do NOT run `git commit`.** The user tests first, then runs `/hermes-commit`.
 - Follow each step exactly. Run the verifications the plan specifies.
-- Red-before-Green: never write production code without a failing test in place first.
+- Red-before-Green: never write production code without a failing test in place first. TDD is universal -- no "mechanical task" exemption. Always announce the explicit `RED -- <test name> failing with <reason>` and `GREEN -- <test name> passing` markers in your task report.
 - If the plan and the spec disagree, STOP and return Status: BLOCKED with the conflict in your report.
 
 ## Report (end of your response)
@@ -229,7 +229,10 @@ Then provide:
 - Plan task completed: [task name, or "incomplete -- see Status"]
 - Spec scenarios verified: [list, or "n/a"]
 - Existing tests read before writing: [list of test files]
-- Tests written first (failing -> passing): [list of test names]
+- TDD log: must include both phases per test, in order:
+  - `RED -- <test name> failing with <one-line reason>`
+  - `GREEN -- <test name> passing`
+  Tasks that report `Status: DONE` without RED + GREEN entries for every test are out of policy -- the controller treats them as failing the TDD check and re-dispatches.
 - SOLID/DDD decisions: [brief notes on boundaries, DI choices, aggregates]
 - Plan <-> spec conflicts raised: [list or "none"]
 - Concerns (only for DONE_WITH_CONCERNS): [list]
@@ -303,11 +306,25 @@ what to build.
    {spec_refs}
    Verify your implementation will satisfy them. If plan and spec
    disagree, STOP and report the conflict -- do not silently pick one.
-3. **TDD** -- Red-Green-Refactor. Before writing your test, READ every
-   existing test file in the affected area so your new test coexists with
-   current ones (replace, extend, or add -- never duplicate). Then write
-   the failing test named in the plan task, confirm it fails, then write
-   minimal code to pass. No production code without a failing test.
+3. **TDD** -- Red-Green-Refactor. Universal in this workflow -- there are
+   no "mechanical task" exemptions (EF mappings, migrations, DTOs,
+   generated types, config flags all use TDD; the plan picks the right
+   test pattern). Before writing your test, READ every existing test file
+   in the affected area so your new test coexists with current ones
+   (replace, extend, or add -- never duplicate). Then:
+
+   a. Write the failing test named in the plan task.
+   b. Run it and confirm it fails. **Announce: `RED -- <test name> failing
+      with <one-line reason>`** in your task report so the orchestrator
+      and user can see the failure phase.
+   c. Write minimal code to pass.
+   d. Run the test again and confirm it passes. **Announce: `GREEN --
+      <test name> passing`** in your task report.
+   e. Refactor if needed; tests must stay green.
+
+   The RED and GREEN call-outs are required output -- a task report that
+   skips them is treated as failing the TDD check even if the code looks
+   correct. No production code without a failing test first.
 4. **SOLID** -- follow `~/.claude/rules/SOLID.md`. Single responsibility
    per class, dependency injection (no `new` of collaborators inside
    domain code), small focused interfaces, no god objects.

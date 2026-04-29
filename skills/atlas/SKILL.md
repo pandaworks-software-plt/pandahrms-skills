@@ -399,12 +399,12 @@ If `codex_available` is true, dispatch this review to the `codex:codex-rescue` s
 
 If `codex_available` is false, perform the review inline:
 
-1. Read the plan file and extract every task's spec reference, test reference, and (where present) verification slot.
+1. Read the plan file and extract every task's spec reference and test reference.
 2. Read every in-scope `.feature` file for the feature.
 3. Check three directions:
    - **Plan -> Spec** -- does every plan task that touches business behavior reference a real spec scenario? Flag tasks with no spec reference or broken references. (Skip this check if no specs exist.)
    - **Spec -> Plan** -- does every in-scope spec scenario have at least one plan task implementing it? Flag uncovered scenarios. (Skip this check if no specs exist.)
-   - **Plan -> Test** -- does every plan task that touches production code carry EITHER a `Test ref:` (with explicit Red-before-Green ordering) OR a `Verification:` slot whose category appears in the [pandahrms:plan No-Test-Pattern Categories](../plan/SKILL.md#no-test-pattern-categories) table (EF mapping, EF migration, read DTO + projection, API regen, pure config)? **Do NOT flag tasks with a valid `Verification:` slot -- accept them silently as fulfilling the requirement.** Flag only tasks that have neither a Test ref nor a recognized Verification slot. (This check runs whenever any tests exist OR whenever the plan modifies production code.)
+   - **Plan -> Test** -- does every plan task that touches production code name at least one test file/case it will add or modify, with an explicit Red-before-Green ordering? Flag any production-code task that lacks a test reference. TDD is universal -- there is no "mechanical task" exemption. (This check runs whenever any tests exist OR whenever the plan modifies production code.)
 4. Present findings to the user, partitioned by direction so resolution can route automatically (see Handling Results below).
 
 ### Handling Results
@@ -413,19 +413,15 @@ If `codex_available` is false, perform the review inline:
 - **Gaps found** -- the cross-review auto-resolves any gap that has real coverage value. It does NOT prompt the user. Resolution by direction:
   - **Plan -> Spec gap (plan task with no spec scenario)** -- discrepancy belongs in the spec. Loop back to `pandahrms:spec-writing` and add the missing scenario. Announce "Plan-Spec cross-review found N missing scenarios -- adding to specs."
   - **Spec -> Plan gap (spec scenario with no plan task)** -- plan completeness issue. Loop back to `pandahrms:plan` to add the missing task. For fast-path plans, edit the plan file directly. Announce "Plan-Spec cross-review found N uncovered scenarios -- adding plan tasks."
-  - **Plan -> Test gap (production-code task missing both Test ref and Verification)** -- loop back to `pandahrms:plan` to add the missing reference. For fast-path plans, edit the plan file directly:
-     - If the task fits a recognized No-Test-Pattern Category, write a `Verification:` slot with the category and the verification method.
-     - Otherwise, add a real `Test ref:` with Red-before-Green ordering.
-     Announce "Plan-Spec cross-review found N tasks missing test references -- resolving."
+  - **Plan -> Test gap (production-code task missing a Test ref)** -- loop back to `pandahrms:plan` to add a real Test ref with Red-before-Green ordering. For fast-path plans, edit the plan file directly. Announce "Plan-Spec cross-review found N tasks missing test references -- resolving."
   - **Mixed gaps** -- handle each direction per the rules above; loop-backs can be sequential or parallel.
 
 **Auto-accepted (do NOT loop back, do NOT report as gaps):**
-- Tasks with a valid `Verification:` slot whose category appears in the [pandahrms:plan No-Test-Pattern Categories](../plan/SKILL.md#no-test-pattern-categories) table.
 - Spec scenarios marked out-of-scope in the design doc's scope section.
 
 Only fall back to AskUserQuestion when:
 1. A loop-back surfaces an irreconcilable conflict (e.g. the design itself contradicts the new spec scenario the cross-review wants to add), OR
-2. A `Verification:` slot uses a category NOT in the recognized table -- this requires a user decision on whether to add the category to `pandahrms:plan` or convert the task to a real Test ref.
+2. A plan task genuinely cannot be tested (no integration-test pattern, no structural assertion, no consuming endpoint to exercise it). The user decides whether to define a new test pattern, restructure the task to be testable, or explicitly accept the gap with a written rationale -- the cross-review must not silently let it through.
 
 Do not proceed to execution while real gaps remain unresolved.
 
@@ -443,9 +439,8 @@ Do not proceed to execution while real gaps remain unresolved.
 | "Spec scenario has no plan task, but the plan looks complete" | Bi-directional coverage required. Either add a task or remove the scenario -- don't execute around it. |
 | "QA found edge cases -- I'll ask the user whether to add them to specs" | Don't ask. Spec-review discrepancies always go into the spec automatically. Loop back to pandahrms:spec-writing without prompting. |
 | "Plan-Spec cross-review found a missing scenario -- I'll AskUserQuestion how to resolve" | Don't ask for Plan -> Spec gaps. Auto-add the scenario via pandahrms:spec-writing. Only ask when an irreconcilable conflict surfaces during the loop-back. |
-| "Cross-review found a task missing a test ref -- I'll flag it" | Check first whether it fits a No-Test-Pattern Category (EF mapping, migration, read DTO + projection, API regen, pure config). If yes, the resolution is to add a `Verification:` slot, not a Test ref. Only flag tasks that have neither a Test ref nor a valid Verification slot. |
-| "I'll list noisy 'no test by convention' findings in the cross-review report" | No. Tasks with a valid Verification slot are silently accepted. The cross-review report only contains real gaps that need fixing. |
-| "Cross-review found gaps -- I'll ask the user whether to fix them" | No. Real gaps with coverage value are auto-resolved by looping back to spec-writing or plan. The user is only asked when an irreconcilable conflict surfaces or when a Verification category isn't in the recognized list. |
+| "This task is mechanical (EF mapping / migration / DTO / generated types) so it doesn't need a test ref" | Wrong. TDD is universal in this workflow. Loop back to pandahrms:plan to add a real Test ref -- typically an integration test against the consuming endpoint, a structural schema assertion, or a typecheck assertion. |
+| "Cross-review found gaps -- I'll ask the user whether to fix them" | No. Real gaps with coverage value are auto-resolved by looping back to spec-writing or plan. The user is only asked when an irreconcilable conflict surfaces or when a task genuinely cannot be tested. |
 | "Codex is installed but I'll just dispatch the local agent" | If `codex_available` is true, route QA review and Plan <-> Spec cross-review through `codex:codex-rescue`. |
 | "I'll send the codex review prompt without the read-only prefix" | Codex defaults to `--write`. Every review dispatch MUST start with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.` so codex doesn't edit the working tree. |
 | "I'll let an implementer commit since the plan says to commit" | Plans should not contain `git commit` steps. pandahrms:execute strips them on dispatch. /hermes-commit owns commits. |
