@@ -10,8 +10,14 @@ This is the **pandahrms-skills** repository -- a Claude Code plugin containing P
 pandahrms-skills/
 ├── .claude-plugin/plugin.json   # Plugin metadata and version
 ├── skills/                      # Claude Code skills (SKILL.md files)
-│   │  # Core workflow (orchestrated by forge)
-│   ├── forge/                   # Unified pipeline: brainstorm -> specs -> plan -> execute -> test
+│   │  # Pipeline orchestrators (entry points)
+│   ├── forge/                   # Superpowers-based pipeline; first action asks user to pick forge or atlas
+│   ├── atlas/                   # No-superpowers pipeline; manual-only -- only forge or /atlas can trigger
+│   │  # Pipeline components (used by atlas; forge uses superpowers equivalents)
+│   ├── design/                  # Design refinement (replaces superpowers:brainstorming for atlas)
+│   ├── plan/                    # Implementation plan writing (replaces superpowers:writing-plans for atlas)
+│   ├── execute/                 # Subagent-driven execution with codex modes (replaces superpowers:subagent-driven-development for atlas)
+│   │  # Spec + review skills (used by both pipelines)
 │   ├── spec-writing/            # Gherkin spec writing (hard gate before implementation)
 │   ├── spec-review/             # Cross-check design docs against Gherkin specs
 │   ├── athena-review/           # Code review, fix issues, /simplify (no commits)

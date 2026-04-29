@@ -13,6 +13,37 @@ Unified pipeline for Pandahrms projects: brainstorm, spec writing, QA review, im
 
 **Announce at start:** "I'm using Pandahrms forge to orchestrate design through execution."
 
+## Pipeline Selection (first action)
+
+Before any other initialization (Fast Path detection, Resume Path detection, Codex Availability detection, time tracking), ask the user which pipeline to run.
+
+### Auto-detect when possible
+
+Skip the question and select automatically when the choice is unambiguous:
+
+- **Fast Path with an existing plan file** -- read the plan and check its progress section header. If it has `## Atlas Progress`, hand off to `pandahrms:atlas` immediately. If it has `## Forge Progress`, continue with this skill. If neither is present, fall through to the question.
+- **Resume Path** -- the previous run already chose a pipeline. Read the existing progress section header (`## Atlas Progress` vs `## Forge Progress`) and resume on that pipeline. If both are missing or both are present, fall through to the question.
+- **Fresh start (no plan file)** -- always ask.
+
+### The question
+
+Use AskUserQuestion:
+
+```
+question: "Which pipeline should run this work?"
+header: "Pipeline"
+options:
+  - label: "Forge (superpowers-based)"
+    description: "Current behavior. Uses superpowers:brainstorming, superpowers:writing-plans, and superpowers:subagent-driven-development with mandatory two-stage review on every task. Highest review depth, slowest per-task throughput."
+  - label: "Atlas (no-superpowers, faster) (Recommended)"
+    description: "Pandahrms-native pipeline. Uses pandahrms:design, pandahrms:plan, pandahrms:execute. Single-stage review by default; second-stage review only on tasks tagged Risk: high. Faster per-task throughput, equivalent design + planning rigor."
+```
+
+### After the answer
+
+- **"Forge"** -- announce "Continuing with Forge (superpowers-based pipeline)." Proceed to Fast Path / Resume Path / Codex Availability detection and the rest of this skill.
+- **"Atlas"** -- announce "Handing off to pandahrms:atlas. Forge ends here." Invoke `pandahrms:atlas` (passing along any plan file path or `--resume` flag the user provided) and STOP. Do not continue any of the steps below.
+
 ## Fast Path (plan provided)
 
 If invoked with a plan file path (e.g., `/forge path/to/plan.md`), skip steps 1-4 and start directly at step 5 (Plan ↔ Spec cross-review), then step 6 (Execute plan).

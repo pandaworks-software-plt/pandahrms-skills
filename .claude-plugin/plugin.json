@@ -1,8 +1,8 @@
 {
   "name": "pandahrms",
-  "description": "Pandahrms-specific skills for Claude Code: forge (design through execution), spec writing, spec review, bridge-file cross-project messaging, system setup, EF Core migrations, athena code review, aegis security review, commit workflow, and safe branching",
-  "version": "3.6.0",
+  "description": "Pandahrms-specific skills for Claude Code: forge (superpowers-based pipeline) and atlas (no-superpowers pipeline) orchestrators, design / plan / execute components, spec writing, spec review, bridge-file cross-project messaging, system setup, EF Core migrations, athena code review, aegis security review, commit workflow, and safe branching",
+  "version": "3.7.0",
   "author": { "name": "Pandaworks" },
   "license": "UNLICENSED",
-  "keywords": ["pandahrms", "skills", "gherkin", "specs", "setup", "bridge", "security", "aegis", "athena", "forge"]
+  "keywords": ["pandahrms", "skills", "gherkin", "specs", "setup", "bridge", "security", "aegis", "athena", "forge", "atlas"]
 }
