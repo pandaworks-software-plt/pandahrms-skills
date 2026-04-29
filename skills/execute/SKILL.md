@@ -133,16 +133,20 @@ digraph execute {
 
 For each batch (smallest batch number first):
 
-1. Build one implementer prompt per task in the batch (see [Implementer Prompt Template](#implementer-prompt-template))
-2. **Pick the dispatcher per task** based on the codex mode:
+1. **Capture batch_prep_start** -- run `date +%s` and store as the moment you started building prompts for this batch. (See [Step 6 Timing Breakdown](#step-6-timing-breakdown).)
+2. Build one implementer prompt per task in the batch (see [Implementer Prompt Template](#implementer-prompt-template))
+3. **Pick the dispatcher per task** based on the codex mode:
    - `none` -- always Agent
    - `partial-parallel` -- Agent for standard-risk, codex:codex-rescue for `Risk: high`
    - `full` -- always codex:codex-rescue
-3. Dispatch all tasks in the batch **in a single message with multiple tool calls** -- this is what "parallel dispatch" means in this skill, and it works whether the dispatchers are all Agent, all codex, or a mix
-4. Wait for all subagents in the batch to return before evaluating any of them
-5. Collect each subagent's report
+4. **Capture dispatched_at** for the batch -- run `date +%s` immediately before the dispatch message. Record it as the per-task `dispatched_at` for every task in this batch (they all start in the same message). The delta `dispatched_at - batch_prep_start` is the batch's **dispatch-prep time**.
+5. Dispatch all tasks in the batch **in a single message with multiple tool calls** -- this is what "parallel dispatch" means in this skill, and it works whether the dispatchers are all Agent, all codex, or a mix
+6. Wait for all subagents in the batch to return before evaluating any of them
+7. **Capture returned_at** for the batch -- run `date +%s` once all subagents have returned. Record as per-task `returned_at`. Per-task wall-clock = `returned_at - dispatched_at` (in a parallel batch this is identical for every task because the batch waits on the slowest one; that's correct for measurement purposes -- the **subagent-active time** for each task is the slowest run, and the difference between fastest and slowest is **idle-wait time**).
+8. Collect each subagent's report. Extract the optional `Test runtime: <s>` field from each TDD log entry if the subagent reported it.
+9. **Persist the per-task timing row** to the plan file's `### Step 6 Task Timing` table (see [Step 6 Timing Breakdown](#step-6-timing-breakdown) for format). Update once per batch, not per task.
 
-If a subagent fails (build error, test failure, merge conflict, non-zero exit), stop dispatching further batches and hand off to atlas's [Subagent Failure Handling](../atlas/SKILL.md#subagent-failure-handling) (or the equivalent in whatever orchestrator invoked you). Do NOT silently retry, skip, or guess -- the orchestrator decides.
+If a subagent fails (build error, test failure, merge conflict, non-zero exit), stop dispatching further batches and hand off to atlas's [Subagent Failure Handling](../atlas/SKILL.md#subagent-failure-handling) (or the equivalent in whatever orchestrator invoked you). Do NOT silently retry, skip, or guess -- the orchestrator decides. The timing row for the failed task records `Wall-clock: <duration>` and `Status: <failure status>`.
 
 ### 3. Conditional second-stage review
 
@@ -174,6 +178,68 @@ Cap parallelism at **5 subagents per batch**. If a batch has more than 5 indepen
 ### Display vocabulary
 
 When announcing the dispatch plan or progress to the user, always call these groupings **"Batch"** (e.g. "Batch 1: T1", "Batch 2: T2, T5 (parallel)"). Do NOT use synonyms like "Wave", "Round", "Phase", or "Tier" -- they introduce vocabulary drift between the skill's internal terminology (Batch 0, Batch 1, ...) and the user-facing announcement. One word, used everywhere.
+
+## Step 6 Timing Breakdown
+
+The orchestrator records Step 6 wall-clock as a single number (first dispatch -> last return). That hides where the time actually went. For benchmarking and future tuning, capture per-task and per-batch timing as you go and persist it to the plan file.
+
+### What to record per task
+
+| Field | Source | How |
+|-------|--------|-----|
+| `dispatched_at` | orchestrator | `date +%s` immediately before the dispatch message |
+| `returned_at` | orchestrator | `date +%s` once all subagents in the batch have returned |
+| `wall_clock` | derived | `returned_at - dispatched_at` (seconds) |
+| `dispatcher` | orchestrator | `Agent` or `codex:codex-rescue` -- determined by codex mode + task risk |
+| `task_type` | plan | `test-ref` or `verification` (from the plan task's slot) |
+| `batch_n` | orchestrator | the batch number this task ran in |
+| `test_runtime` | subagent | the `Test runtime: <s>` line in the task report (or `--` if not reported) |
+| `risk_high` | plan | `yes` if the plan tagged the task `**Risk:** high`, else `no` |
+| `status` | subagent | the `Status:` line from the report |
+
+### What to record per batch
+
+| Field | Source | How |
+|-------|--------|-----|
+| `batch_prep_seconds` | orchestrator | `dispatched_at - batch_prep_start` |
+| `batch_wall_clock` | orchestrator | `returned_at - dispatched_at` (same for every task in the batch) |
+| `idle_wait_seconds` | derived | for parallel batches: `batch_wall_clock - max(per-task active time)`. Since we don't know per-task active time directly, approximate: if a batch has 3 tasks and 2 of them clearly finished early (their reports include early file writes vs the late task's writes), idle-wait = duration the early-finishers waited. When in doubt, leave `--`. |
+
+### Where to store
+
+Append a `### Step 6 Task Timing` block beneath the Atlas Progress table, after each batch completes. The orchestrator updates this section incrementally -- not at the end -- so a partial run still has data.
+
+```markdown
+### Step 6 Task Timing
+
+| Task | Batch | Dispatcher | Type | Wall-clock | Test runtime | Risk | Status | Notes |
+|------|-------|------------|------|------------|--------------|------|--------|-------|
+| T1   | 1     | Agent      | test-ref     | 2m 14s | 12s | no  | DONE | |
+| T2   | 2     | Agent      | test-ref     | 1m 47s |  8s | no  | DONE | |
+| T3   | 2     | Agent      | verification | 0m 33s |  4s | no  | DONE | EF mapping verified via ProbationApiTests |
+| T4   | 4     | codex      | test-ref     | 3m 22s | 18s | yes | DONE | second-stage review +0m 41s |
+| T5   | 4     | Agent      | test-ref     | 2m 03s | 11s | no  | DONE | idle-wait 1m 19s (batch slowed by T4) |
+
+**Batch summary:**
+
+| Batch | Prep | Wall-clock | Tasks | Notes |
+|-------|------|------------|-------|-------|
+| 1 | 4s | 2m 14s | 1 | sequential entry |
+| 2 | 6s | 1m 47s | 2 | T2+T3 parallel; T3 finished 1m 14s earlier |
+| 4 | 11s | 4m 03s | 2 | T4+T5 parallel; T4 dominated wall-clock; second-stage review for T4 added 41s |
+```
+
+### Why the buckets matter
+
+- **Dispatch-prep time** (sum of `batch_prep_seconds`) -- how much the orchestrator spends building prompts and reading the plan. If this grows linearly with task count, the plan reading is a bottleneck.
+- **Subagent-active time** (sum of `wall_clock` per batch, NOT per task) -- the real cost of execution. This is the dominant component on most runs.
+- **Test runtime** (sum across tasks) -- how much of subagent-active time was the test runner itself. If high, the test suite is slow; if low, the implementer is spending most of its time on thinking/code generation.
+- **Idle-wait time** (sum across batches) -- wall-clock lost to fast tasks waiting for slow tasks in the same batch. If high, the batch composition is uneven (mix a 30s task with a 3m task and you waste 2.5m on the fast one).
+- **Risk: high tax** -- compare wall-clock of `risk_high=yes` tasks to standard tasks. The second-stage review adds wall-clock; this surfaces how much.
+
+### Don't bikeshed the buckets
+
+The point is data, not precision. If a value is hard to capture exactly, leave `--` rather than fabricate. The orchestrator's job is to record what's easy to know (dispatched_at, returned_at, dispatcher, type) and let the subagent self-report what only it knows (test runtime). Estimates that aren't directly measurable (idle-wait, dispatch-prep below 5s) can be left out of small-batch runs without losing benchmarking value.
 
 ## Implementer Prompt Template
 
@@ -236,6 +302,7 @@ Then provide:
   - **Verification-slot tasks** (No-Test-Pattern Categories only) -- one entry naming the category and command output:
     - `VERIFICATION -- <category>: <command output summary>`
   A `Status: DONE` task report missing the appropriate entries is out of policy -- the controller treats it as failing the TDD/verification check and re-dispatches.
+- Test runtime: the wall-clock seconds your test runner spent (sum across all RED + GREEN runs in this task). Format: `Test runtime: 14s` (whole seconds is enough). For Verification-slot tasks, report the verification command's runtime instead. This lets the orchestrator separate test-execution time from implementer thinking time when benchmarking.
 - SOLID/DDD decisions: [brief notes on boundaries, DI choices, aggregates]
 - Plan <-> spec conflicts raised: [list or "none"]
 - Concerns (only for DONE_WITH_CONCERNS): [list]

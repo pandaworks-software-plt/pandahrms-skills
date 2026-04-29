@@ -68,8 +68,12 @@ At the very start of every atlas run (before step 1, including Fast Path and Res
 
 When `codex_available` is true, dispatch these review-only steps to the `codex:codex-rescue` subagent for a second-opinion pass:
 
-- **Step 3** -- QA Review Agent
-- **Step 5** -- Plan <-> Spec cross-review
+- **Step 3** -- QA Review Agent (already auto-skips on lightweight scope -- so codex only runs here on standard/heavyweight)
+- **Step 5** -- Plan <-> Spec cross-review (gated on Scope Profile -- see below)
+
+**Step 5 codex gating by Scope Profile:**
+- `lightweight` -- skip codex entirely. Run the cross-review inline via the local `Agent` tool (or skip altogether if pragmatic mode has nothing to flag). The independent-second-opinion benefit doesn't justify the codex round-trip on small features.
+- `standard` and `heavyweight` -- route through `codex:codex-rescue` as before.
 
 These are analysis-only tasks. The dispatched prompt MUST begin with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.` so codex does not edit the working tree. Findings come back as the rescue subagent's stdout and are reconciled exactly as if the regular `Agent` tool had been used. The skip conditions for each step still apply -- detection only changes who runs the review, not whether it runs.
 
@@ -196,8 +200,13 @@ Design                       --  12m 34s
 Write specs                  --   8m 21s
 QA review                    --     skipped (lightweight)
 Create implementation plan   --  15m 02s
-Plan <-> Spec cross-review   --   1m 30s (pragmatic)
+Plan <-> Spec cross-review   --   1m 30s (pragmatic, inline)
 Execute plan                 --  18m 14s
+  Dispatch-prep              --     0m 21s (1.9%)
+  Subagent-active            --  17m 53s (98.1%)
+    Test runtime sum         --   3m 12s
+    Risk:high tasks          --   0 of 7
+    Idle-wait observed       --     1m 19s (Batch 2: T3 waited on T2)
 Simplify                     --     skipped (lightweight, no concerns)
 Playwright e2e               --   2m 06s
 ===========================
@@ -273,10 +282,24 @@ Format durations by computing in your reasoning: `Xm YYs`. Skipped steps show `-
 
 ### Execution step timing
 
-Step 6 (execute plan) is tracked as a single step:
+Step 6 (execute plan) is tracked as a single step at the orchestrator level (wall-clock from first subagent dispatch to last subagent completion), AND with per-task / per-batch breakdown for benchmarking.
 
-- **Duration** = wall-clock time from first subagent dispatch to last subagent completion
-- Per-subagent timing is NOT tracked. If multiple subagents run in parallel, they overlap inside this one duration.
+**Roll-up duration** -- the headline number shown in the Development Summary header for Step 6 is wall-clock from first dispatch to last return.
+
+**Breakdown** -- pandahrms:execute populates a `### Step 6 Task Timing` block beneath the Atlas Progress table as each batch completes. See [pandahrms:execute Step 6 Timing Breakdown](../execute/SKILL.md#step-6-timing-breakdown) for the exact schema (per-task: dispatcher, type, wall-clock, test runtime, risk, status; per-batch: prep time, wall-clock, idle-wait notes).
+
+**Surfacing in the Development Summary** -- after the Step 6 row, append a sub-block summarizing the breakdown so the user gets benchmarking data without opening the plan file:
+
+```
+Execute plan                 --  18m 14s
+  Dispatch-prep              --     0m 21s (1.9%)
+  Subagent-active            --  17m 53s (98.1%)
+    Test runtime sum         --   3m 12s
+    Risk:high tasks          --   1 of 8 (T4 -- 3m 22s incl. 0m 41s review)
+    Idle-wait observed       --   2m 03s (Batch 4: T5 waited on T4)
+```
+
+If a field can't be measured (e.g. a single-task batch has no idle-wait), omit the line rather than show `0`.
 
 ## Subagent Failure Handling
 
@@ -447,9 +470,14 @@ For `standard` and `heavyweight` profiles, all three directions run with full st
 
 ### How to Review
 
-If `codex_available` is true, dispatch this review to the `codex:codex-rescue` subagent with a prompt that lists the plan file path, the in-scope `.feature` file paths, the test file inventory from step 1, and the three checks below. Prefix the prompt with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.`. Treat the subagent's output as the review report.
+**Dispatcher selection** (per [Codex Availability](#codex-availability) gating):
+- Scope Profile is `standard` or `heavyweight` AND `codex_available` is true: dispatch via `codex:codex-rescue` for the independent-second-opinion pass.
+- Scope Profile is `lightweight` (regardless of codex availability): run the review inline via local `Agent` tool. Skip codex entirely on small features -- the round-trip cost (~3-4m) outweighs the marginal value when pragmatic mode is in effect.
+- `codex_available` is false: run inline regardless.
 
-If `codex_available` is false, perform the review inline:
+When dispatching to codex, prompt with the plan file path, the in-scope `.feature` file paths, the test file inventory from step 1, and the three checks below. Prefix the prompt with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.`. Treat the subagent's output as the review report.
+
+When running inline (lightweight or no-codex):
 
 1. Read the plan file and extract every task's spec reference, test reference, and (where present) verification slot.
 2. Read every in-scope `.feature` file for the feature.
