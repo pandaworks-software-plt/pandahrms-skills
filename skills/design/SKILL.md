@@ -21,12 +21,35 @@ Do NOT invoke any implementation skill, write any code, scaffold any project, or
 LOAD TEST + SPEC CONTEXT BEFORE DESIGNING. Applies to every invocation -- features, bug fixes, refactors. Skipping this produces designs that ignore current behavior contracts and retrofit tests after the fact.
 
 1. **Identify the affected area** -- which modules, features, or files the change will touch. Ask the user if unclear.
-2. **Read related specs** -- every `.feature` file in `pandahrms-spec` for that area (use Grep/Glob). If none exist, note "no existing specs".
-3. **Read related tests** -- every unit/integration test file in the affected codebase (`*.test.ts`, `*.spec.ts`, `*Tests.cs`, `*_test.go`, etc.). If none exist, note "no existing tests".
-4. **Summarize and pause** -- one short message: `"Loaded N spec scenarios and M test files for this area. Key behaviors covered: [1-2 line summary]."` Wait for the user to confirm scope before refining the idea.
+2. **Align `pandahrms-spec` branch with the working project** -- before reading any spec, check that the `pandahrms-spec` repo is on the SAME branch as the current working project. See [Spec Branch Alignment](#spec-branch-alignment) for the exact procedure. Skip this substep only when the project is non-Pandahrms (no `pandahrms-spec` repo in the workspace).
+3. **Read related specs** -- every `.feature` file in `pandahrms-spec` for that area (use Grep/Glob). If none exist, note "no existing specs".
+4. **Read related tests** -- every unit/integration test file in the affected codebase (`*.test.ts`, `*.spec.ts`, `*Tests.cs`, `*_test.go`, etc.). If none exist, note "no existing tests".
+5. **Summarize and pause** -- one short message: `"Loaded N spec scenarios and M test files for this area (pandahrms-spec on branch <name>). Key behaviors covered: [1-2 line summary]."` Wait for the user to confirm scope before refining the idea.
 
-When invoked from forge, the orchestrator may have already loaded this context -- still confirm by stating what was loaded before asking the first refinement question. When invoked standalone, run substeps 1-4 in full.
+When invoked from forge, the orchestrator may have already loaded this context -- still confirm by stating what was loaded (including the spec branch) before asking the first refinement question. When invoked standalone, run substeps 1-5 in full.
 </HARD-GATE>
+
+## Spec Branch Alignment
+
+Reading specs from the wrong branch produces designs that contradict in-flight spec changes -- e.g. you design against `main` while a teammate (or a previous session of yours) already updated specs on the feature branch. Always align `pandahrms-spec` to the working project's branch before reading.
+
+### Procedure
+
+1. **Locate `pandahrms-spec`** -- it is typically a sibling directory of the working project (e.g. `~/Developer/pandaworks/_pandahrms/pandahrms-spec`). Use `git rev-parse --show-toplevel` from the working project, then look for `pandahrms-spec` as a sibling under the parent. If not found, ask the user for the path.
+2. **Read the working project's branch** -- `git -C <project> rev-parse --abbrev-ref HEAD`.
+3. **Read the spec repo's current branch** -- `git -C <spec-repo> rev-parse --abbrev-ref HEAD`.
+4. **If they match** -- announce `"pandahrms-spec already on branch <name>."` and proceed to read specs.
+5. **If they differ** -- check whether the working project's branch exists in `pandahrms-spec`:
+   - **Branch exists locally in pandahrms-spec** (`git -C <spec-repo> show-ref --verify --quiet refs/heads/<name>`): check it out with `git -C <spec-repo> checkout <name>`. If pandahrms-spec has uncommitted changes that would block the checkout, STOP and surface them to the user -- do not stash or discard.
+   - **Branch exists only on remote** (`git -C <spec-repo> ls-remote --exit-code --heads origin <name>` succeeds): fetch then checkout (`git -C <spec-repo> fetch origin <name>:<name> && git -C <spec-repo> checkout <name>`).
+   - **Branch does not exist anywhere** -- this is normal for fresh feature work where specs haven't been touched yet. Announce: `"Working project on branch <name>; no matching branch in pandahrms-spec. Reading specs from <spec-current-branch> -- spec branch will be created later by spec-writing if needed."` and proceed. Do NOT auto-create the spec branch here -- creation belongs to the spec-writing step.
+6. **Announce the final state** -- include the spec branch in the load summary so the user can verify (`"pandahrms-spec on <branch>"`).
+
+### Edge cases
+
+- **Working project branch is `main` or `master`** -- align spec to the same; this is the steady-state case.
+- **Detached HEAD in pandahrms-spec** -- treat as a mismatch and ask the user how to proceed.
+- **Working project has uncommitted spec-related work in pandahrms-spec already** -- if `git -C <spec-repo> status --porcelain` is non-empty, surface the changes to the user before any branch operation. The user may have in-progress spec edits that a checkout would lose.
 
 ## Anti-Pattern: "This Is Too Simple To Need A Design"
 
@@ -154,6 +177,7 @@ Fix issues inline. No need to re-review -- just fix and move on. The user review
 |---------|---------|
 | "I'll batch a few questions to save round-trips" | One question at a time. Batching loses focus and produces shallow answers. |
 | "I'll skip reading existing specs/tests" | Required. Designs without that grounding miss compatibility issues. |
+| "pandahrms-spec is on main but the project is on a feature branch -- close enough" | No. Align the spec repo to the project's branch BEFORE reading specs. Reading from the wrong branch hides in-flight spec edits and produces designs that contradict them. See [Spec Branch Alignment](#spec-branch-alignment). |
 | "It's a bug fix, no need to discuss tests upfront" | Bug fixes especially need a failing test that would have caught the bug. The design proposes that test before the fix. |
 | "I'll auto-commit the design doc when I save it" | Never. The design doc stays uncommitted for user review. |
 | "This is too small for a design" | Every project. The design can be a few sentences, but it must be presented and approved. |

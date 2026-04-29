@@ -132,9 +132,25 @@ Run: `git add tests/services/goal-approval.test.ts src/services/goal-approval.ts
 Each task that touches production code or specs MUST carry:
 
 1. **Spec ref** -- one or more Gherkin scenarios the task satisfies. Omit only when no specs exist for the area (UI-only or skip-specs path). If specs exist for the area but you cannot link a task to one, the plan is incomplete -- update the spec or rewrite the task.
-2. **Test ref** -- the test file path and the new/changed test case name(s). Every production-code task names at least one test. Tasks that touch production code without a test reference are rejected.
-3. **Red-before-Green ordering** -- the failing-test step always precedes the implementation step. No production code without a failing test.
+2. **Test ref** OR **Verification** -- one of the two MUST be present on every production-code task:
+   - **Test ref** -- the test file path and the new/changed test case name(s). This is the default and required for any task that has an applicable unit/integration-test pattern in this codebase.
+   - **Verification** -- only allowed for tasks in the [No-Test-Pattern Categories](#no-test-pattern-categories) below. State the category in parens, then describe how the task is actually verified (e.g. `Verification: (EF mapping) -- no unit-test pattern in this codebase; verified via integration test of the consuming endpoint + runtime`).
+3. **Red-before-Green ordering** -- when a Test ref is used, the failing-test step always precedes the implementation step. No production code without a failing test. (Verification-slot tasks skip this since no test is being written.)
 4. **Depends on** -- explicit task IDs, or `none`. Independent tasks let atlas parallel-dispatch and cut wall-clock time.
+
+### No-Test-Pattern Categories
+
+Tasks in these categories may use the `Verification:` slot in lieu of a `Test ref:`. The list is closed -- if a task does not match one of these categories, it needs a test ref. Adding a new category is a discussion with the user, not a unilateral plan-writer call.
+
+| Category | Why no test ref | Required verification |
+|----------|-----------------|----------------------|
+| **EF mapping** (configuring a property/relationship in `IEntityTypeConfiguration<T>`) | This codebase has no unit-test pattern for EF mappings. They are exercised by integration tests of the consuming endpoint and at runtime. | The integration test or endpoint that exercises the mapping; runtime smoke is acceptable when no integration test exists. |
+| **EF migration** (an `Add-Migration` artifact) | This codebase has no automated migration test pattern. The convention is inspect the generated migration, apply locally, verify with `sqlcmd` or equivalent. | "Inspect generated migration + apply locally + verify schema with sqlcmd" -- name the verification command and the table/column to inspect. |
+| **Read DTO + projection** (a DTO with a pure projection from an EF query, no business logic) | No unit-test pattern in this codebase for projections. They are verified through Swagger inspection + integration test of the consuming endpoint. | The integration test or Swagger endpoint that exercises the projection. |
+| **API regen / generated types** (`pnpm openapi-ts`, swagger-typescript-api, etc.) | Purely mechanical -- the generator produces the file. | `pnpm tsc --noEmit` (or the equivalent type-check command) is the verification. |
+| **Pure config change** (appsettings flag, tsconfig path alias, env var) with no behavior branch | No code path to test directly. | The build command and a runtime check that the config is honored. |
+
+A task that combines a no-test-pattern category WITH custom logic (e.g. an EF mapping that has a `HasConversion` lambda doing real work) is NOT a no-test-pattern task -- it needs a real test ref against the conversion logic.
 
 ## No Placeholders
 
@@ -167,8 +183,8 @@ After writing the complete plan, look at the design doc + spec files with fresh 
 
 1. **Spec coverage** -- skim each in-scope spec scenario. Can you point to a task that implements it? List any gaps.
 2. **Design coverage** -- skim each functional requirement in the design doc. Can you point to a task that delivers it? List any gaps.
-3. **Test ref completeness** -- every production-code task names a test file and case. List any tasks missing this.
-4. **Red-before-Green** -- every production-code task has a failing-test step before any implementation step. Flag any task that puts implementation first.
+3. **Test ref or Verification completeness** -- every production-code task carries either a `Test ref:` or a `Verification:` (only when the task is in a [No-Test-Pattern Category](#no-test-pattern-categories)). List any tasks missing both. A task with `Verification:` whose category does NOT appear in the table is also a gap -- either move it to a real test ref or discuss adding the category with the user.
+4. **Red-before-Green** -- every production-code task with a `Test ref:` has a failing-test step before any implementation step. Flag any task that puts implementation first. (Tasks using `Verification:` are exempt -- they do not run a TDD loop.)
 5. **Placeholder scan** -- search the plan for the red-flag patterns from "No Placeholders" above. Fix them.
 6. **Type consistency** -- do the types, method signatures, and property names you used in later tasks match what you defined in earlier tasks? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a bug.
 7. **Dependency markers** -- every task has a `Depends on:` line, even if it's `none`. Atlas reads these to parallel-dispatch.
@@ -195,7 +211,9 @@ When invoked outside atlas (rare), announce:
 | "I'll write 'add validation here' to keep tasks short" | No placeholders. Show the actual validation code. |
 | "Tasks 4 and 6 are nearly identical, I'll just say 'similar to Task 4'" | Default to repeating the code. Reference earlier tasks only when execution is strictly sequential. |
 | "I'll add a `git commit` at the end of each task" | Never. Atlas + /hermes-commit own the commit step. Plans only stage changes. |
-| "This task touches production code but the test is 'obvious'" | Every production-code task names a test ref. No exceptions. |
+| "This task touches production code but the test is 'obvious'" | Every production-code task carries either a Test ref or, if it falls in a recognized No-Test-Pattern Category (EF mapping, migration, read DTO + projection, API regen, pure config), a Verification slot. "Obvious" is not a category. |
+| "This EF mapping has a HasConversion lambda doing real work, but it's still 'just a mapping'" | No -- once there's behavior in the mapping, it needs a real test ref against that behavior. The Verification slot is for mechanical mapping only. |
+| "I'll invent a new no-test-pattern category since this task feels mechanical" | The category list is closed. If you think a new one belongs there, surface the discussion to the user before using a Verification slot. |
 | "I'll skip the spec ref for this small task" | If specs exist for the area, every task has a spec ref. If no specs exist (UI-only / skip-specs), say so in the header. |
 | "I'll let the engineer figure out task dependencies" | Mark dependencies explicitly. Atlas parallel-dispatches based on this -- missing markers serialize the run. |
 | "I'll let writing-plans-style mandate decide whether to duplicate code" | Pandahrms plan picks pragmatically: reference earlier tasks when sequential, repeat code when parallel-dispatched. Default to repeating. |
