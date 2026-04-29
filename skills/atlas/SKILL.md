@@ -135,8 +135,9 @@ You MUST create a task for each of these items and complete them in order. Apply
    - **No commit steps** -- plans stage changes only; /hermes-commit owns commits
 5. **Plan <-> Spec cross-review** -- after the plan is written (or at Fast Path entry), verify three directions: (a) every plan task references a real spec scenario, (b) every in-scope spec scenario has at least one plan task, and (c) every plan task that touches production code names a test reference with Red-before-Green ordering. The (c) check is the only test-ref validator on Fast Path -- do not skip it. If gaps exist, fix them before execution. See [Plan-Spec Cross-Review](#plan-spec-cross-review) for skip conditions and resolution paths.
 6. **Execute plan** -- invoke `pandahrms:execute`. The skill reads the plan, resolves the codex execution mode (asks the user once if `codex_available` is true and the mode isn't already set in the progress section), groups tasks by `Depends on:`, parallel-dispatches independent batches (cap 5 per batch, Agent + codex counted together), runs single-stage review by default, and opts into second-stage spec-compliance review only for tasks tagged `**Risk:** high` (reviewer routes through codex when available). Implementer subagents stage changes but never commit. Time tracking records the step as a whole (wall-clock from first dispatch to last return). If a subagent fails, follow [Subagent Failure Handling](#subagent-failure-handling).
-7. **Simplify** -- once Step 6 has finished and at least one subagent reported success, invoke the `simplify` skill to review the changed files for reuse, quality, and efficiency, and to fix any issues it finds. Skip this step if Step 6 was aborted with no completed tasks (nothing to simplify). All resulting changes remain uncommitted -- the user still tests in Step 8 before /hermes-commit.
-8. **Ask user to test** -- present the Development Summary. If the plan file's `## Atlas Progress` section has an `### Acknowledged Gaps` block (gaps the user chose to "Proceed anyway" past during Step 5), surface each gap with: "**Acknowledged gaps to verify manually:** [gap list]." Then end with: "Please test your changes, then run /hermes-commit when ready."
+7. **Simplify** -- once Step 6 has finished and at least one subagent reported success, invoke the `simplify` skill to review the changed files for reuse, quality, and efficiency, and to fix any issues it finds. Skip this step if Step 6 was aborted with no completed tasks (nothing to simplify). All resulting changes remain uncommitted -- the user still tests in Step 9 before /hermes-commit.
+8. **Playwright e2e (conditional)** -- if Playwright is configured for the working project, run an e2e pass on the changes from this session. See [Playwright E2E Step](#playwright-e2e-step) for the detection and execution rules. Skip silently when Playwright isn't installed.
+9. **Ask user to test** -- present the Development Summary. If the plan file's `## Atlas Progress` section has an `### Acknowledged Gaps` block (gaps the user chose to "Proceed anyway" past during Step 5), surface each gap with: "**Acknowledged gaps to verify manually:** [gap list]." Then end with: "Please test your changes, then run /hermes-commit when ready."
 
 ## Time Tracking
 
@@ -163,9 +164,10 @@ Create implementation plan   --  15m 02s
 Plan <-> Spec cross-review   --   1m 30s
 Execute plan                 --  18m 14s
 Simplify                     --   3m 12s
+Playwright e2e               --   2m 06s
 ===========================
-Grand total (active)         --  1h 01m 38s
-Total wall-clock time        --  1h 42m 11s
+Grand total (active)         --  1h 03m 44s
+Total wall-clock time        --  1h 44m 17s
 User-wait time               --     40m 33s
 ```
 
@@ -205,15 +207,17 @@ Append a `## Atlas Progress` section to the plan file. Backfill steps 1-3 timing
 | 5. Plan <-> Spec cross-review | pending | -- |
 | 6. Execute plan | pending | -- |
 | 7. Simplify | pending | -- |
-| 8. Ask user to test | pending | -- |
+| 8. Playwright e2e | pending | -- |
+| 9. Ask user to test | pending | -- |
 
 Atlas started: 1718000000
 Codex available: true
 Codex execution mode: none
+Playwright e2e: auto-detect
 
 ### Acknowledged Gaps
 
-(Populated only when the user chose "Proceed anyway" during Step 5. One bullet per gap. Step 8 surfaces this list to the user.)
+(Populated only when the user chose "Proceed anyway" during Step 5. One bullet per gap. Step 9 surfaces this list to the user.)
 ```
 
 **On each step completion:**
@@ -399,12 +403,12 @@ If `codex_available` is true, dispatch this review to the `codex:codex-rescue` s
 
 If `codex_available` is false, perform the review inline:
 
-1. Read the plan file and extract every task's spec reference and test reference.
+1. Read the plan file and extract every task's spec reference, test reference, and (where present) verification slot.
 2. Read every in-scope `.feature` file for the feature.
 3. Check three directions:
    - **Plan -> Spec** -- does every plan task that touches business behavior reference a real spec scenario? Flag tasks with no spec reference or broken references. (Skip this check if no specs exist.)
    - **Spec -> Plan** -- does every in-scope spec scenario have at least one plan task implementing it? Flag uncovered scenarios. (Skip this check if no specs exist.)
-   - **Plan -> Test** -- does every plan task that touches production code name at least one test file/case it will add or modify, with an explicit Red-before-Green ordering? Flag any production-code task that lacks a test reference. TDD is universal -- there is no "mechanical task" exemption. (This check runs whenever any tests exist OR whenever the plan modifies production code.)
+   - **Plan -> Test** -- does every plan task that touches production code carry EITHER a `Test ref:` (with explicit Red-before-Green ordering) OR a `Verification:` slot whose category appears in the [pandahrms:plan No-Test-Pattern Categories](../plan/SKILL.md#no-test-pattern-categories) table (EF mapping, EF migration, read DTO + projection, API regen, pure config)? **Do NOT flag tasks with a valid `Verification:` slot -- accept them silently as fulfilling the requirement.** Flag only tasks that have neither a Test ref nor a recognized Verification slot. (This check runs whenever any tests exist OR whenever the plan modifies production code.)
 4. Present findings to the user, partitioned by direction so resolution can route automatically (see Handling Results below).
 
 ### Handling Results
@@ -413,17 +417,80 @@ If `codex_available` is false, perform the review inline:
 - **Gaps found** -- the cross-review auto-resolves any gap that has real coverage value. It does NOT prompt the user. Resolution by direction:
   - **Plan -> Spec gap (plan task with no spec scenario)** -- discrepancy belongs in the spec. Loop back to `pandahrms:spec-writing` and add the missing scenario. Announce "Plan-Spec cross-review found N missing scenarios -- adding to specs."
   - **Spec -> Plan gap (spec scenario with no plan task)** -- plan completeness issue. Loop back to `pandahrms:plan` to add the missing task. For fast-path plans, edit the plan file directly. Announce "Plan-Spec cross-review found N uncovered scenarios -- adding plan tasks."
-  - **Plan -> Test gap (production-code task missing a Test ref)** -- loop back to `pandahrms:plan` to add a real Test ref with Red-before-Green ordering. For fast-path plans, edit the plan file directly. Announce "Plan-Spec cross-review found N tasks missing test references -- resolving."
+  - **Plan -> Test gap (production-code task missing both Test ref and Verification)** -- loop back to `pandahrms:plan` to add the missing reference. For fast-path plans, edit the plan file directly:
+     - If the task fits a recognized No-Test-Pattern Category, write a `Verification:` slot with the category and the verification method.
+     - Otherwise, add a real `Test ref:` with Red-before-Green ordering.
+     Announce "Plan-Spec cross-review found N tasks missing test references -- resolving."
   - **Mixed gaps** -- handle each direction per the rules above; loop-backs can be sequential or parallel.
 
 **Auto-accepted (do NOT loop back, do NOT report as gaps):**
+- Tasks with a valid `Verification:` slot whose category appears in the [pandahrms:plan No-Test-Pattern Categories](../plan/SKILL.md#no-test-pattern-categories) table.
 - Spec scenarios marked out-of-scope in the design doc's scope section.
 
 Only fall back to AskUserQuestion when:
 1. A loop-back surfaces an irreconcilable conflict (e.g. the design itself contradicts the new spec scenario the cross-review wants to add), OR
-2. A plan task genuinely cannot be tested (no integration-test pattern, no structural assertion, no consuming endpoint to exercise it). The user decides whether to define a new test pattern, restructure the task to be testable, or explicitly accept the gap with a written rationale -- the cross-review must not silently let it through.
+2. A `Verification:` slot uses a category NOT in the recognized table -- this requires a user decision on whether to add the category to `pandahrms:plan` or convert the task to a real Test ref.
 
 Do not proceed to execution while real gaps remain unresolved.
+
+## Playwright E2E Step
+
+Step 8 runs an end-to-end pass with Playwright after `simplify` and before handing the run back to the user, but only when Playwright is actually configured for the project. The goal is to catch UI-level regressions on the changes made this session before the user takes over.
+
+### Detection
+
+Check for Playwright in this order. The first match wins; stop checking once one is found.
+
+1. `playwright.config.ts`, `playwright.config.js`, or `playwright.config.mjs` exists at the working project's root.
+2. The project's `package.json` has `@playwright/test` (or `playwright`) under `dependencies` or `devDependencies`.
+3. The user has previously authorized Playwright access in this session (the `mcp__playwright__*` tools have already been used).
+
+If none match, announce `"Skipping Playwright e2e -- not configured for this project."` and proceed to Step 9. Do not install Playwright on the user's behalf.
+
+### Scope: changes made this session
+
+Run e2e only against the user-visible flows touched in this session, not the entire project's e2e suite. Identify scope from the staged diff:
+
+1. Run `git diff --name-only --cached` (and `git diff --name-only` for unstaged) to list files changed in this session.
+2. Map FE files to user-visible routes/components. Examples:
+   - `src/routes/admin/appraisals/**` -> the appraisals admin pages.
+   - `src/lib/components/forms/<Form>.svelte` -> any page that mounts that form.
+3. Map BE files via the consuming endpoints, then to the FE pages that call them.
+4. If no FE-visible change is detected (BE-only refactor, EF migration, internal helper), announce `"Skipping Playwright e2e -- session changes have no FE-visible surface."` and proceed.
+
+### Execution
+
+Use the `mcp__playwright__*` MCP tools (browser automation) -- not the project's offline `playwright test` runner -- so the user can watch the pass. The full toolset is loaded via `ToolSearch` with `select:mcp__playwright__browser_navigate,mcp__playwright__browser_click,mcp__playwright__browser_snapshot,...`.
+
+For each scoped flow:
+1. Navigate to the route the changed code controls (`browser_navigate`).
+2. Execute the golden-path interaction (click, fill, submit) per the design doc's "happy path" description.
+3. Take a snapshot (`browser_snapshot`) so the result is visible to the user.
+4. Test at least one obvious failure mode the spec covers (validation error, permission denied, etc.).
+5. Capture console errors (`browser_console_messages`) and network failures (`browser_network_requests`).
+
+### Reporting
+
+After the e2e pass, append a `### Playwright E2E` block to the Development Summary in Step 9:
+
+```
+### Playwright E2E
+
+| Flow | Result | Notes |
+|------|--------|-------|
+| <route or page> | pass | golden path + 1 failure-mode |
+| <route or page> | fail | <one-line failure summary> |
+```
+
+If any flow failed, surface the failures in plain language to the user as part of "ask user to test" -- they decide whether the failure is real (block /hermes-commit) or a flaky test (proceed). Do not auto-rerun more than once.
+
+### Skip conditions
+
+Skip Step 8 entirely (with announcement) when any of these hold:
+- Playwright is not configured (per Detection).
+- This session's changes have no FE-visible surface.
+- The user types `/atlas --skip-e2e` or has set `Playwright e2e: skip` in the plan's `## Atlas Progress` section.
+- Step 6 was aborted with no completed tasks (nothing to test).
 
 ## Red Flags
 
@@ -439,8 +506,9 @@ Do not proceed to execution while real gaps remain unresolved.
 | "Spec scenario has no plan task, but the plan looks complete" | Bi-directional coverage required. Either add a task or remove the scenario -- don't execute around it. |
 | "QA found edge cases -- I'll ask the user whether to add them to specs" | Don't ask. Spec-review discrepancies always go into the spec automatically. Loop back to pandahrms:spec-writing without prompting. |
 | "Plan-Spec cross-review found a missing scenario -- I'll AskUserQuestion how to resolve" | Don't ask for Plan -> Spec gaps. Auto-add the scenario via pandahrms:spec-writing. Only ask when an irreconcilable conflict surfaces during the loop-back. |
-| "This task is mechanical (EF mapping / migration / DTO / generated types) so it doesn't need a test ref" | Wrong. TDD is universal in this workflow. Loop back to pandahrms:plan to add a real Test ref -- typically an integration test against the consuming endpoint, a structural schema assertion, or a typecheck assertion. |
-| "Cross-review found gaps -- I'll ask the user whether to fix them" | No. Real gaps with coverage value are auto-resolved by looping back to spec-writing or plan. The user is only asked when an irreconcilable conflict surfaces or when a task genuinely cannot be tested. |
+| "Cross-review found a task missing a test ref -- I'll flag it" | Check first whether it fits a No-Test-Pattern Category (EF mapping, migration, read DTO + projection, API regen, pure config). If yes, the resolution is to add a `Verification:` slot, not a Test ref. Only flag tasks that have neither a Test ref nor a valid Verification slot. |
+| "I'll list noisy 'no test by convention' findings in the cross-review report" | No. Tasks with a valid Verification slot are silently accepted. The cross-review report only contains real gaps that need fixing. |
+| "Cross-review found gaps -- I'll ask the user whether to fix them" | No. Real gaps with coverage value are auto-resolved by looping back to spec-writing or plan. The user is only asked when an irreconcilable conflict surfaces or when a Verification category isn't in the recognized list. |
 | "Codex is installed but I'll just dispatch the local agent" | If `codex_available` is true, route QA review and Plan <-> Spec cross-review through `codex:codex-rescue`. |
 | "I'll send the codex review prompt without the read-only prefix" | Codex defaults to `--write`. Every review dispatch MUST start with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.` so codex doesn't edit the working tree. |
 | "I'll let an implementer commit since the plan says to commit" | Plans should not contain `git commit` steps. pandahrms:execute strips them on dispatch. /hermes-commit owns commits. |

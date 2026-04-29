@@ -212,7 +212,7 @@ final report.
 - Work from: `{worktree_or_repo_path}`
 - **Stage changes only -- do NOT run `git commit`.** The user tests first, then runs `/hermes-commit`.
 - Follow each step exactly. Run the verifications the plan specifies.
-- Red-before-Green: never write production code without a failing test in place first. TDD is universal -- no "mechanical task" exemption. Always announce the explicit `RED -- <test name> failing with <reason>` and `GREEN -- <test name> passing` markers in your task report.
+- Red-before-Green: never write production code without a failing test in place first (when the plan task has a `Test ref:`). Always announce the explicit `RED -- <test name> failing with <reason>` and `GREEN -- <test name> passing` markers in your task report. Tasks using a `Verification:` slot (No-Test-Pattern Categories only) report a single `VERIFICATION -- <category>: <command output>` line instead.
 - If the plan and the spec disagree, STOP and return Status: BLOCKED with the conflict in your report.
 
 ## Report (end of your response)
@@ -229,10 +229,13 @@ Then provide:
 - Plan task completed: [task name, or "incomplete -- see Status"]
 - Spec scenarios verified: [list, or "n/a"]
 - Existing tests read before writing: [list of test files]
-- TDD log: must include both phases per test, in order:
-  - `RED -- <test name> failing with <one-line reason>`
-  - `GREEN -- <test name> passing`
-  Tasks that report `Status: DONE` without RED + GREEN entries for every test are out of policy -- the controller treats them as failing the TDD check and re-dispatches.
+- TDD log: required on every task. Format depends on the plan task's slot:
+  - **Test-ref tasks** -- one pair of entries per test, in order:
+    - `RED -- <test name> failing with <one-line reason>`
+    - `GREEN -- <test name> passing`
+  - **Verification-slot tasks** (No-Test-Pattern Categories only) -- one entry naming the category and command output:
+    - `VERIFICATION -- <category>: <command output summary>`
+  A `Status: DONE` task report missing the appropriate entries is out of policy -- the controller treats it as failing the TDD/verification check and re-dispatches.
 - SOLID/DDD decisions: [brief notes on boundaries, DI choices, aggregates]
 - Plan <-> spec conflicts raised: [list or "none"]
 - Concerns (only for DONE_WITH_CONCERNS): [list]
@@ -306,12 +309,10 @@ what to build.
    {spec_refs}
    Verify your implementation will satisfy them. If plan and spec
    disagree, STOP and report the conflict -- do not silently pick one.
-3. **TDD** -- Red-Green-Refactor. Universal in this workflow -- there are
-   no "mechanical task" exemptions (EF mappings, migrations, DTOs,
-   generated types, config flags all use TDD; the plan picks the right
-   test pattern). Before writing your test, READ every existing test file
-   in the affected area so your new test coexists with current ones
-   (replace, extend, or add -- never duplicate). Then:
+3. **TDD** (when the plan task has a `Test ref:`) -- Red-Green-Refactor.
+   Before writing your test, READ every existing test file in the
+   affected area so your new test coexists with current ones (replace,
+   extend, or add -- never duplicate). Then:
 
    a. Write the failing test named in the plan task.
    b. Run it and confirm it fails. **Announce: `RED -- <test name> failing
@@ -322,9 +323,18 @@ what to build.
       <test name> passing`** in your task report.
    e. Refactor if needed; tests must stay green.
 
-   The RED and GREEN call-outs are required output -- a task report that
-   skips them is treated as failing the TDD check even if the code looks
-   correct. No production code without a failing test first.
+   The RED and GREEN call-outs are required output for any task with a
+   `Test ref:`. A task report that skips them is treated as failing the
+   TDD check even if the code looks correct.
+
+   **Verification-slot exemption** -- if the plan task uses a
+   `Verification:` slot instead of `Test ref:` (only allowed for the
+   closed list of No-Test-Pattern Categories: EF mapping, EF migration,
+   read DTO + projection, API regen, pure config), there is no test to
+   write. Run the verification command stated in the plan, capture its
+   output, and report it under the `TDD log` field as
+   `VERIFICATION -- <category>: <command output summary>`. RED and GREEN
+   markers do not apply to these tasks.
 4. **SOLID** -- follow `~/.claude/rules/SOLID.md`. Single responsibility
    per class, dependency injection (no `new` of collaborators inside
    domain code), small focused interfaces, no god objects.
