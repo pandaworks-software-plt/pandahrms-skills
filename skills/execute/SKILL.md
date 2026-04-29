@@ -180,9 +180,12 @@ Every implementer dispatch uses this structure. Substitute placeholders before s
 
 ## Your Task
 
-You are implementing **Task {N}: {task name}** from the plan at `{plan_path}`.
+You are implementing **Task {N}: {task name}**.
 
-Read that task carefully -- the plan is the source of truth for what to build.
+The controller has provided the full task content below -- this is your complete
+context. Do NOT re-read the entire plan file or attempt to infer broader session
+history; if anything you need is missing, return Status: NEEDS_CONTEXT in your
+final report.
 
 ### Task Files
 
@@ -206,18 +209,41 @@ Read that task carefully -- the plan is the source of truth for what to build.
 - **Stage changes only -- do NOT run `git commit`.** The user tests first, then runs `/hermes-commit`.
 - Follow each step exactly. Run the verifications the plan specifies.
 - Red-before-Green: never write production code without a failing test in place first.
-- If the plan and the spec disagree, STOP and report the conflict in your final report.
+- If the plan and the spec disagree, STOP and return Status: BLOCKED with the conflict in your report.
 
 ## Report (end of your response)
 
-- Plan task completed: [task name]
+Start your final report with one of these statuses on its own line:
+
+- `Status: DONE` -- task complete, all verifications passed, no concerns
+- `Status: DONE_WITH_CONCERNS` -- task complete but you noticed something the orchestrator should review (unexpected coupling, fragile assumption, hidden dependency, ambiguous spec). Concerns are NOT failures, but they need controller attention before the task is marked complete.
+- `Status: NEEDS_CONTEXT` -- you cannot proceed because required context (a file, a type, a spec scenario, an env var) is missing from this prompt. Do NOT guess; do NOT read the broader codebase trying to find it. List exactly what's missing.
+- `Status: BLOCKED` -- a plan/spec conflict, a failing verification you couldn't resolve, or a structural issue (e.g. an existing test that contradicts the new test) blocks completion. Describe the blocker; do not try to work around it.
+
+Then provide:
+
+- Plan task completed: [task name, or "incomplete -- see Status"]
 - Spec scenarios verified: [list, or "n/a"]
 - Existing tests read before writing: [list of test files]
 - Tests written first (failing -> passing): [list of test names]
 - SOLID/DDD decisions: [brief notes on boundaries, DI choices, aggregates]
 - Plan <-> spec conflicts raised: [list or "none"]
-- Files staged: [list of paths git-added]
+- Concerns (only for DONE_WITH_CONCERNS): [list]
+- Missing context (only for NEEDS_CONTEXT): [list]
+- Blocker details (only for BLOCKED): [describe]
+- Files staged: [list of paths git-added, or "none"]
 ```
+
+## Controller Behavior Per Status
+
+When an implementer subagent returns:
+
+| Status | Controller action |
+|--------|-------------------|
+| `DONE` | Mark batch task complete; proceed to second-stage review (if `Risk: high`) or next batch. |
+| `DONE_WITH_CONCERNS` | Surface the concerns to the user before marking the task complete. The user decides: accept (mark complete), re-dispatch with guidance, or escalate. |
+| `NEEDS_CONTEXT` | Re-dispatch the same implementer with the missing context filled in. If the missing context isn't available, escalate to the user via [Subagent Failure Handling](#when-to-stop-and-ask-the-orchestrator). Do NOT guess. |
+| `BLOCKED` | Stop dispatching further batches. Hand off to the orchestrator's failure handler with the blocker details. |
 
 ## Spec Reviewer Prompt Template
 

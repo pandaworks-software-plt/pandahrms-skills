@@ -240,14 +240,23 @@ Step 6 (execute plan) is tracked as a single step:
 
 ## Subagent Failure Handling
 
-When a subagent reports a failure (build error, test failure, merge conflict, or any non-zero exit):
+When a subagent returns `Status: BLOCKED`, `Status: NEEDS_CONTEXT`, or any non-success exit (build error, test failure, merge conflict):
 
 1. **Pause execution** -- wait for all in-flight subagents in the current parallel batch to return, then do not dispatch any further batches until the user decides how to proceed
-2. **Present the error** -- show the failing subagent's name, task description, and error output
-3. **Ask the user** via AskUserQuestion: "Subagent '[task name]' failed. How would you like to proceed?" with options:
-   - **"Retry"** -- re-dispatch the same subagent with the same prompt
+2. **Classify the failure** -- before offering retry, identify the failure mode. This avoids blind retries that waste time:
+   - **Missing context** (typically `Status: NEEDS_CONTEXT`) -- the implementer prompt was missing a file, type, scenario, or env var the task requires. Resolution: re-dispatch with the missing context added.
+   - **Insufficient reasoning** -- the subagent attempted the task but produced incorrect or incomplete code (e.g. failed verification it should have passed). Resolution: re-dispatch using a stronger model or codex if available; consider switching the codex execution mode for this task.
+   - **Task too large** -- the subagent partially completed work but the scope exceeds what fits in one dispatch. Resolution: return to `pandahrms:plan` to split the task; do not retry as-is.
+   - **Plan or spec error** (typically `Status: BLOCKED` with conflict details) -- the plan and spec disagree, the spec is internally contradictory, or the plan references something that doesn't exist. Resolution: escalate to the user; loop back to `pandahrms:spec-writing` or `pandahrms:plan` as appropriate.
+3. **Present the error and classification** -- show the failing subagent's name, task description, returned status, error output, and your classification.
+4. **Ask the user** via AskUserQuestion: "Subagent '[task name]' returned [status] -- classified as [missing context / insufficient reasoning / task too large / plan or spec error]. How would you like to proceed?" with options matched to the classification:
+   - **"Re-dispatch with added context"** (missing context) -- you provide the missing piece, atlas re-dispatches the same task
+   - **"Re-dispatch with stronger model"** (insufficient reasoning) -- atlas re-dispatches via codex (or escalates the codex mode), if available
+   - **"Send back to plan/spec"** (task too large or plan/spec error) -- atlas pauses execute, loops back to the relevant skill, then resumes
    - **"Skip and continue"** -- note the failed task in the conversation and proceed with remaining tasks
    - **"Abort atlas"** -- stop execution, display the Development Summary with the Execute step marked failed, and end with: "Atlas aborted. Completed tasks remain uncommitted. Run /hermes-commit when ready or discard with git restore."
+
+When the implementer returns `Status: DONE_WITH_CONCERNS`, do NOT silently mark the task complete. Surface the concerns via AskUserQuestion: accept (mark complete), re-dispatch with guidance, or escalate to design/plan.
 
 Failures do not alter the step-level Development Summary other than annotating the Execute step's outcome (e.g. `Execute plan -- 18m 14s (1 task failed, skipped)`).
 

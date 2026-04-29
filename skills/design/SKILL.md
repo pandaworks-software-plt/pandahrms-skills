@@ -104,6 +104,7 @@ digraph design {
 
 - Break the system into smaller units that each have one clear purpose, communicate through well-defined interfaces, and can be understood and tested independently
 - For each unit, you should be able to answer: what does it do, how do you use it, what does it depend on?
+- **Boundary test** -- for each proposed unit, check both directions: (a) can a caller use this unit without reading its internals? (b) can the unit's internals change without breaking its consumers? If either answer is no, the boundary or interface needs revision before the design is approved.
 - Smaller, well-bounded units are easier to reason about and produce more reliable edits
 
 **Working in existing codebases:**
@@ -120,6 +121,17 @@ digraph design {
   - User preferences for design location override this default
 - Use elements-of-style:writing-clearly-and-concisely if available
 - **Do NOT commit the design doc** -- it stays uncommitted so the user can review before specs/plans build on it
+
+**Self-review (fresh eyes, before handoff):**
+
+After writing the design doc, re-read it once before handing off. Fix inline:
+
+- **Placeholder scan** -- any "TBD", "TODO", incomplete sections, or vague requirements? Replace with the chosen value.
+- **Internal consistency** -- do any sections contradict each other? Does the architecture match the feature descriptions? Reconcile.
+- **Scope drift** -- does the doc include anything beyond the approved design (features the user didn't sign off on, speculative extensions, unrelated refactors)? Remove it.
+- **Ambiguity** -- could any requirement be interpreted two ways? Pick one and make it explicit.
+
+Fix issues inline. No need to re-review -- just fix and move on. The user reviews the file later; this pass catches the obvious gaps before they propagate to specs and plans.
 
 **Hand off:**
 
