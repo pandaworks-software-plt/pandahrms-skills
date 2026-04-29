@@ -171,6 +171,10 @@ Sequential `Agent` calls -- even within the same response -- run one after anoth
 
 Cap parallelism at **5 subagents per batch**. If a batch has more than 5 independent tasks, split it into chunks of 5 and dispatch chunks sequentially -- still using parallel dispatch within each chunk.
 
+### Display vocabulary
+
+When announcing the dispatch plan or progress to the user, always call these groupings **"Batch"** (e.g. "Batch 1: T1", "Batch 2: T2, T5 (parallel)"). Do NOT use synonyms like "Wave", "Round", "Phase", or "Tier" -- they introduce vocabulary drift between the skill's internal terminology (Batch 0, Batch 1, ...) and the user-facing announcement. One word, used everywhere.
+
 ## Implementer Prompt Template
 
 Every implementer dispatch uses this structure. Substitute placeholders before sending.
@@ -357,6 +361,7 @@ The orchestrator (atlas, or whoever invoked you) decides whether to retry, skip,
 | "I'll prefix the codex implementer dispatch with READ-ONLY REVIEW" | No. The read-only prefix is for atlas's QA review and Plan-Spec cross-review only. Implementation prompts let codex write. |
 | "Codex mode is `partial-parallel` but I'll dispatch the codex tasks in a separate message to be safe" | Same batch, same message. Mixing Agent + codex in one parallel batch is the whole point of `partial-parallel`. |
 | "I'll re-ask the codex mode question on every batch" | Ask once. Persist the answer to the orchestrator's progress section. Resumed runs read it back. |
+| "I'll call the dispatch groupings 'Wave' (or 'Round' / 'Phase') in the user-facing plan" | No. The vocabulary is **Batch**, used everywhere. Synonyms cause confusion when the user reads the skill text. See [Display vocabulary](#display-vocabulary). |
 
 ## When to Use
 
