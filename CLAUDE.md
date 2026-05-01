@@ -27,8 +27,7 @@ pandahrms-skills/
 │   ├── branching/               # Safe branch creation with upstream protection
 │   ├── bridge-file/             # Communication between FE/BE Claude sessions
 │   ├── ef-migrations/           # Entity Framework Core migrations
-│   ├── forge-slow-mode/         # Experimental, manual-only iterative pipeline (one piece at a time)
-│   └── system-setup/            # Developer workstation setup
+│   └── forge-slow-mode/         # Experimental, manual-only iterative pipeline (one piece at a time)
 ├── hooks/                       # Claude Code hooks (session-start, etc.)
 └── docs/                        # Plans and documentation
 ```

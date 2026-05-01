@@ -15,7 +15,6 @@ Pandahrms-specific skills plugin for Claude Code. Provides domain skills that in
 | **branching** | `/pandahrms:branching` | Safe branch creation with upstream protection and folder-based naming |
 | **bridge-file** | `/pandahrms:bridge-file` | Structured protocol for debugging cross-project FE/BE issues |
 | **ef-migrations** | `/pandahrms:ef-migrations` | EF Core migration commands for Performance and Recruitment APIs |
-| **system-setup** | `/pandahrms:system-setup` | Guide new developers through environment setup (macOS + Windows, Docker or IIS) |
 
 ## Installation
 
@@ -63,7 +62,7 @@ Any work request --> pandahrms:forge
 
 `forge` is the single orchestrator from brainstorming through execution. It ensures `spec-writing` is never skipped after brainstorming, and that code review, security review (when applicable), simplification, and spec compliance are verified before the user tests.
 
-Additional standalone skills: `pandahrms:branching`, `pandahrms:bridge-file`, `pandahrms:system-setup`, and `pandahrms:ef-migrations`.
+Additional standalone skills: `pandahrms:branching`, `pandahrms:bridge-file`, and `pandahrms:ef-migrations`.
 
 ## License
 
