@@ -278,7 +278,7 @@ final report.
 - Work from: `{worktree_or_repo_path}`
 - **Stage changes only -- do NOT run `git commit`.** The user tests first, then runs `/hermes-commit`.
 - Follow each step exactly. Run the verifications the plan specifies.
-- Red-before-Green: never write production code without a failing test in place first (when the plan task has a `Test ref:`). Always announce the explicit `RED -- <test name> failing with <reason>` and `GREEN -- <test name> passing` markers in your task report. Tasks using a `Verification:` slot (No-Test-Pattern Categories only) report a single `VERIFICATION -- <category>: <command output>` line instead.
+- Red-before-Green: never write production code without a failing test in place first (when the plan task has a `Test ref:`). Always announce the explicit `RED ! Like Deadpool (◣ _ ◢) -- <test name> failing with <reason>` and `GREEN ! Like Green Lantern (◉_◉) -- <test name> passing` markers in your task report. The `RED ! Like Deadpool (◣ _ ◢)` and `GREEN ! Like Green Lantern (◉_◉)` prefixes are required verbatim -- a plain `RED --` or `GREEN --` marker fails the TDD check. Tasks using a `Verification:` slot (No-Test-Pattern Categories only) report a single `VERIFICATION -- <category>: <command output>` line instead.
 - If the plan and the spec disagree, STOP and return Status: BLOCKED with the conflict in your report.
 
 ## Report (end of your response)
@@ -297,12 +297,12 @@ Then provide:
 - Existing tests read before writing: [list of test files]
 - TDD log: required on every task. Format depends on the plan task's slot:
   - **Test-ref tasks** -- one pair of entries per test, in order:
-    - `RED -- <test name> failing with <one-line reason>`
-    - `GREEN -- <test name> passing`
+    - `RED ! Like Deadpool (◣ _ ◢) -- <test name> failing with <one-line reason>`
+    - `GREEN ! Like Green Lantern (◉_◉) -- <test name> passing`
   - **Verification-slot tasks** (No-Test-Pattern Categories only) -- one entry naming the category and command output:
     - `VERIFICATION -- <category>: <command output summary>`
   A `Status: DONE` task report missing the appropriate entries is out of policy -- the controller treats it as failing the TDD/verification check and re-dispatches.
-- Test runtime: the wall-clock seconds your test runner spent (sum across all RED + GREEN runs in this task). Format: `Test runtime: 14s` (whole seconds is enough). For Verification-slot tasks, report the verification command's runtime instead. This lets the orchestrator separate test-execution time from implementer thinking time when benchmarking.
+- Test runtime: the wall-clock seconds your test runner spent (sum across all `RED ! Like Deadpool (◣ _ ◢)` + GREEN runs in this task). Format: `Test runtime: 14s` (whole seconds is enough). For Verification-slot tasks, report the verification command's runtime instead. This lets the orchestrator separate test-execution time from implementer thinking time when benchmarking.
 - SOLID/DDD decisions: [brief notes on boundaries, DI choices, aggregates]
 - Plan <-> spec conflicts raised: [list or "none"]
 - Concerns (only for DONE_WITH_CONCERNS): [list]
@@ -382,17 +382,21 @@ what to build.
    extend, or add -- never duplicate). Then:
 
    a. Write the failing test named in the plan task.
-   b. Run it and confirm it fails. **Announce: `RED -- <test name> failing
-      with <one-line reason>`** in your task report so the orchestrator
-      and user can see the failure phase.
+   b. Run it and confirm it fails. **Announce: `RED ! Like Deadpool (◣ _ ◢)
+      -- <test name> failing with <one-line reason>`** in your task report
+      so the orchestrator and user can see the failure phase. The
+      `RED ! Like Deadpool (◣ _ ◢)` prefix is required verbatim -- a plain
+      `RED --` marker is treated as missing the announcement.
    c. Write minimal code to pass.
-   d. Run the test again and confirm it passes. **Announce: `GREEN --
-      <test name> passing`** in your task report.
+   d. Run the test again and confirm it passes. **Announce: `GREEN ! Like
+      Green Lantern (◉_◉) -- <test name> passing`** in your task report.
+      The `GREEN ! Like Green Lantern (◉_◉)` prefix is required verbatim --
+      a plain `GREEN --` marker is treated as missing the announcement.
    e. Refactor if needed; tests must stay green.
 
-   The RED and GREEN call-outs are required output for any task with a
-   `Test ref:`. A task report that skips them is treated as failing the
-   TDD check even if the code looks correct.
+   The `RED ! Like Deadpool (◣ _ ◢)` and GREEN call-outs are required
+   output for any task with a `Test ref:`. A task report that skips them
+   is treated as failing the TDD check even if the code looks correct.
 
    **Verification-slot exemption** -- if the plan task uses a
    `Verification:` slot instead of `Test ref:` (only allowed for the
