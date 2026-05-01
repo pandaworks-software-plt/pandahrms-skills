@@ -9,7 +9,11 @@ description: Use when starting any work in a Pandahrms project - writing or upda
 
 Specs come first. Before implementing any change in any Pandahrms project -- feature, bug fix, or refactor -- Gherkin specifications must be written or updated in the `pandahrms-spec` repository. This is a hard gate: no implementation begins until specs are in place.
 
-**Announce at start:** "I'm using the spec-writing skill to write/update specs before implementation."
+**Announce at start with exactly one of these strings:**
+- "I'm using the spec-writing skill to write specs before implementation." -- use when no relevant specs exist for the affected feature area.
+- "I'm using the spec-writing skill to update specs before implementation." -- use when existing specs will be modified.
+
+Do NOT emit the literal string "write/update". Choose one variant based on the situation.
 
 ## Skip Condition: Non-Pandahrms Project
 
@@ -18,42 +22,74 @@ Specs come first. Before implementing any change in any Pandahrms project -- fea
 **How to detect a Pandahrms project:**
 - The project directory name starts with `pandahrms-` or `Pandahrms_` or `PandaHRMS_` (case-insensitive prefix match)
 - OR the project is inside a workspace that contains `pandahrms-spec/` as a sibling
-- OR the project has a CLAUDE.md that references Pandahrms
+- OR the project's CLAUDE.md contains the literal string "Pandahrms project", "Pandahrms monorepo", or "Pandahrms workspace", OR sets a frontmatter/header field naming Pandahrms as the product (e.g. `product: Pandahrms`). A casual mention of the word "Pandahrms" in passing does NOT qualify.
 
 **If the project is NOT Pandahrms-related:**
-- Do NOT look for or write to `pandahrms-spec/`
-- Instead, write specs within the project's own repository
+- Do NOT read, write, search, list, or otherwise reference `pandahrms-spec/` at any point during this skill. Treat it as if it does not exist on the filesystem.
+- Instead, write specs within the project's own repository.
 - Look for an existing spec directory by checking these paths in order:
   1. `.project/specs/` (preferred convention)
   2. `docs/specs/`
   3. `specs/`
   4. `features/`
-- If none exist, create `.project/specs/` and use that
-- All Gherkin writing guidelines in this skill still apply -- only the spec location changes
+- If none exist, create `.project/specs/` and use that.
+- All Gherkin writing guidelines in this skill still apply -- only the spec location changes.
 - Announce: "This is not a Pandahrms project -- specs will be written in this project's own repository instead of pandahrms-spec."
 
 ## Skip Condition: UI-Only Changes
 
 **If the work is purely about UI/presentation** -- styling, layout, component design, theming, responsiveness, animations, dark mode, or visual polish -- **skip this skill entirely.** These changes don't alter business behavior and don't need Gherkin specs.
 
-Announce: "Skipping spec-writing -- this is a UI-only change with no business behavior impact." Then proceed directly to the next step in the workflow.
+Announce: "Skipping spec-writing -- this is a UI-only change with no business behavior impact."
+
+When skipping for UI-only work:
+- Do NOT search for `pandahrms-spec/` (or any other spec directory).
+- Do NOT read any `.feature` file.
+- Do NOT create or modify any `.feature` file.
+- Do NOT ask the user spec-related questions.
+- After emitting the announce-string, return control to the calling skill (pandahrms:forge or pandahrms:atlas). If invoked directly, return control to the user and stop. Do NOT auto-invoke pandahrms:spec-review or any downstream skill in the diagram below.
 
 **Examples of UI-only work (skip):**
 - Redesigning a page layout or component appearance
 - Adjusting spacing, colors, typography, or responsiveness
 - Adding dark mode support
-- Building a new UI component with no new business logic
+- Building a new UI component that renders existing data and calls only existing endpoints (no new state transitions, validations, persisted fields, or API contracts)
 - Fixing visual bugs (alignment, overflow, z-index)
 
 **Examples that still need specs (don't skip):**
-- Adding a new form that creates/updates data
+- Adding a new form that creates/updates data (even if it calls an existing endpoint, if the form introduces new validation or new persisted fields)
 - Changing validation rules or error messages
 - Adding filtering, sorting, or pagination behavior
 - Changing workflow or status transitions
 - Adding role-based visibility or permissions
 
+## Skip Condition: No Behavior Change
+
+**If the change has NO observable behavior change at any system boundary** (UI, API, DB, events, logs that callers depend on), **skip this skill entirely.** Examples:
+- Pure rename of a private symbol
+- Code formatting or whitespace cleanup
+- Type-only annotation changes that do not alter runtime behavior
+- Comment edits or documentation-only changes
+- Internal refactors that preserve all observable outputs
+- Dependency upgrades that do not change call sites
+
+Announce: "Skipping spec-writing -- no observable behavior change."
+
+Apply the same return-to-caller rules as the UI-only skip above (do not search, read, or write any `.feature` file; do not auto-invoke downstream skills).
+
 <HARD-GATE>
-Do NOT write any implementation code, create any migration, or modify any project files until the relevant specs have been written or updated and approved by the user. This applies to ALL changes: features, bug fixes, and refactors.
+Until the relevant specs have been written or updated AND approved by the user, do NOT:
+- write or stage implementation code (in files OR as preview/example code blocks in chat)
+- create, generate, or run any database migration
+- modify ANY file outside `pandahrms-spec/` (or, for non-Pandahrms projects, outside the project's own spec directory determined by the Skip Condition rules above)
+- dispatch subagents that will modify files
+- run build, deploy, or test commands
+- create branches, commits, or pull requests in any repository other than the spec repository
+- scaffold directories, stub files, or placeholder modules in the implementation project
+
+Reading existing project code IS allowed (and is expected during Step 1 to understand the change).
+
+This applies to ALL changes: features, bug fixes, and refactors.
 </HARD-GATE>
 
 ### Where This Fits
@@ -113,41 +149,70 @@ Resolve the path as: `$(dirname $PWD)/pandahrms-spec/`
 
 Do NOT proceed with spec writing until the project directory is confirmed to exist.
 
+**Branch alignment check.** Before reading any `.feature` file, run `git -C $(dirname $PWD)/pandahrms-spec rev-parse --abbrev-ref HEAD` and compare the result with the current implementation project's branch (`git rev-parse --abbrev-ref HEAD`). If they do not match, ask the user (via AskUserQuestion) whether to:
+1. Checkout the matching branch in `pandahrms-spec`
+2. Stay on the current `pandahrms-spec` branch and proceed
+3. Abort
+
+Do NOT auto-checkout, auto-fetch, or auto-pull `pandahrms-spec`.
+
 ## The Process
 
 ### Step 1: Understand the Change
 
 Identify what the user is about to work on. This could come from:
 
-- **A design/plan document** — read it and extract features, actors, and behaviors
-- **A bug report or issue** — understand the expected vs. actual behavior
-- **A verbal request** — ask clarifying questions to understand the scope
-- **A refactor** — understand what behavior must be preserved
+- **A design/plan document** — read it and extract features, actors, and behaviors.
+- **A bug report or issue** — understand the expected vs. actual behavior.
+- **A verbal/informal request without a design doc** — ask focused clarifying questions one at a time using AskUserQuestion until you can answer all three of the items below. Stop asking once those three are resolved. Do NOT ask more than necessary; do NOT proceed without them.
+- **A refactor** — understand what behavior must be preserved.
 
 Determine:
-1. **What module** it belongs to: `performance`, `hr`, `leave`, `campaign`, or other
-2. **What feature area** is affected
-3. **What behaviors** are being added, changed, or must be preserved
+1. **What module** it belongs to: `performance`, `hr`, `leave`, or `campaign`. If the answer is none of these, STOP and ask the user (via AskUserQuestion) which module folder under `pandahrms-spec/specs/` to use. Do NOT create a new top-level module folder under `specs/` without explicit user approval.
+2. **What feature area** is affected.
+3. **What behaviors** are being added, changed, or must be preserved.
+
+Do NOT advance to Step 2 until all three items above are resolved.
 
 ### Step 2: Check for Existing Specs
 
-Search `pandahrms-spec/specs/` for existing specs related to the affected feature area.
+Search `pandahrms-spec/specs/<module>/` (or, for non-Pandahrms projects, the project's own spec directory determined under "Skip Condition: Non-Pandahrms Project") for existing `.feature` files related to the affected feature area.
 
-- **Specs exist and cover the change** — review them, update if the change modifies expected behavior. Move to Step 4.
-- **Specs exist but don't cover this area** — write additional scenarios for the new/changed behavior
-- **No specs exist** — write them from scratch
+- **Specs exist and FULLY cover the change with no behavior modification** — announce: "Existing specs already cover this change. No updates required." Skip Step 3 and Step 4. Go directly to Step 5 and present the existing relevant `.feature` files verbatim for the user to confirm coverage. If the user confirms, exit the skill without committing (Step 6 is skipped). If the user reports a gap, return to Step 3.
+- **Specs exist and cover the change but the change modifies expected behavior** — proceed through Step 3, then update those scenarios in Step 4. Do NOT skip Step 3.
+- **Specs exist but don't cover this feature area** — proceed through Step 3, then write additional scenarios for the new/changed behavior in Step 4.
+- **No specs exist** — proceed through Step 3, then write specs from scratch in Step 4.
 
 ### Step 3: Study Existing Conventions
 
-Before writing any spec, read at least one existing feature file from `pandahrms-spec/` to match the style. Key conventions:
+Before writing any spec, read existing feature files to match the style. Required selection rule:
+
+1. Read the most recently modified `.feature` file in `pandahrms-spec/specs/<module>/` for the target module (use `git -C <pandahrms-spec> log -1 --format=%H -- specs/<module>` or filesystem mtime to identify it).
+2. If `pandahrms-spec/specs/<module>/<feature-name>/` already exists, also read one `.feature` file from that directory.
+3. If no `.feature` file exists in the target module, read one `.feature` file from any other module under `specs/` to capture cross-module conventions. State which file you used as the style reference in your next message.
+
+Use the conventions you observe (tags, section headers, role names, scenario phrasing, Background structure) verbatim in the new spec. Do NOT invent alternative conventions.
+
+Key conventions to observe and follow:
 
 - **Spec root:** `<workspace>/pandahrms-spec/specs/`
 - **Directory structure:** `specs/<module>/<feature-name>/<feature-file>.feature`
 - **File naming:** `<entity>-<functional-area>.feature` (singular entity names, no date prefix)
 - **Split by concern:** Separate files for template management vs. lifecycle vs. responses
-- **Target:** Keep files under 200 lines where possible
+- **File length:** Each `.feature` file MUST NOT exceed 200 lines. If a draft would exceed 200 lines, split into multiple files using the rules under "File Splitting Strategy" before writing them to disk.
 
 ### Step 4: Write the Gherkin
+
+#### Mandatory Sub-Step Order
+
+Within Step 4, execute these sub-steps in this exact order. Do NOT parallelize, reorder, or jump back to a prior sub-step once advanced:
+
+1. Decide the file split using the "File Splitting Strategy" section below.
+2. For each file, write the Feature Header (with feature-level tags, the `As a / I want / So that` block, and the `Background` if needed).
+3. Write Section Headers (comment banners) in the required CRUD order: creation, listing, editing, deletion, special features.
+4. Within each section, write scenarios in CRUD order.
+5. Apply scenario-level tags as each scenario is written -- not afterward.
+6. Validate naming conventions, role consistency, and BDD compliance on the completed file.
 
 #### BDD Principles (Mandatory)
 
@@ -243,7 +308,7 @@ Group scenarios logically with comment headers:
 # =============================================================================
 ```
 
-Order sections logically: creation -> listing -> editing -> deletion -> special features.
+Section order MUST be exactly: creation, listing, editing, deletion, then special features. Do not reorder.
 
 #### Tags
 
@@ -368,10 +433,10 @@ Split features by **functional concerns/bounded contexts**, not by CRUD operatio
 - Related validation scenarios
 
 **Guidelines:**
-- Keep files under 200 lines
-- Prefer 3-4 files per feature over 1 large file or 10+ small files
-- Each file should be independently understandable
-- Group by: functional area, actor/role, or lifecycle phase
+- Each `.feature` file MUST NOT exceed 200 lines.
+- Target 3 to 4 files per feature. Do NOT produce a single file longer than 200 lines. Do NOT produce more than 6 files for a single feature.
+- Each file should be independently understandable.
+- Group by: functional area, actor/role, or lifecycle phase.
 
 **Naming convention:**
 - Format: `[entity]-[functional-area].feature`
@@ -387,41 +452,72 @@ Split features by **functional concerns/bounded contexts**, not by CRUD operatio
 
 ### Step 5: Review
 
-1. Present the complete spec (new or updated) to the user for review
-2. Highlight any assumptions made or gaps in understanding
-3. Wait for approval before committing
-4. **Only after approval:** proceed to implementation planning/coding
+1. Present the complete spec (new or updated) to the user for review.
+2. Highlight any assumptions made or gaps in understanding.
+3. Wait for explicit approval from the user before advancing.
+4. If the user requests changes, return to Step 4 and apply ONLY the requested changes -- do not rewrite unaffected scenarios, do not add new scenarios that were not requested, do not refactor unrelated specs. Re-present and wait for approval again. Loop this revise-and-re-present cycle until the user explicitly approves.
+5. Do NOT commit, write to disk in the spec repository, or proceed to Step 6 without explicit approval.
+6. **Only after approval:** proceed to Step 6 (commit). Step 5 ends at approval; "implementation planning/coding" is handled by downstream skills, not this one.
 
 ### Step 6: Commit
 
 After approval:
 
+**Pre-commit safety check (both project types).** Before staging, run `git -C <spec-repo-path> status --porcelain`. If the working tree contains files unrelated to this skill's output, list them to the user via AskUserQuestion and ask whether to:
+1. Proceed (stage only this skill's `.feature` files; leave the others untouched)
+2. Stash the unrelated changes first
+3. Abort and let the user clean up
+
+Do NOT auto-stash and do NOT include unrelated files in the commit.
+
 **For Pandahrms projects:**
-1. Write files to the correct location in `pandahrms-spec/`
-2. Commit to the `pandahrms-spec` repository
-3. Use commit message format:
+1. Write files to the correct location in `pandahrms-spec/specs/<module>/<feature-name>/`.
+2. Stage only the `.feature` files this skill produced.
+3. Commit to the `pandahrms-spec` repository.
+4. Use commit message format:
    - New specs: `feat(module): add spec for feature-name`
    - Updated specs: `feat(module): update spec for feature-name`
    - Bug fix specs: `fix(module): add spec covering bug-name`
 
 **For non-Pandahrms projects:**
-1. Write files to the project's own spec directory (e.g., `specs/` or `features/`)
-2. Commit within the current project repository
-3. Use the same commit message format as above
+1. Write files to the project's own spec directory (e.g., `.project/specs/`, `docs/specs/`, `specs/`, or `features/`) as resolved by the Skip Condition rules.
+2. Stage only the `.feature` files this skill produced.
+3. Commit within the current project repository.
+4. Use the same commit message format as above.
 
-## Checklist
+**Forbidden in Step 6:**
+- Do NOT push, force-push, or fetch.
+- Do NOT create or switch branches.
+- Do NOT open pull requests.
+- Do NOT amend prior commits.
+- Do NOT run any git command beyond `status`, `add` (of the specific `.feature` files), `commit`, and (where used for the pre-commit safety check) `diff`.
+
+### Exit
+
+After Step 6 commit completes (or after an approved no-update exit per Step 2), STOP.
+
+- The only files this skill writes are `.feature` files in the spec repository (`pandahrms-spec` for Pandahrms projects, or the project-local fallback for non-Pandahrms projects). It does NOT write code, tests, migrations, scaffolding, configuration, or documentation files anywhere else.
+- Do NOT auto-invoke `pandahrms:spec-review`, `pandahrms:plan`, `pandahrms:execute`, `pandahrms:athena-review`, `pandahrms:hermes-commit`, or any other downstream skill in the diagram above.
+- Return control to the calling skill (`pandahrms:forge` or `pandahrms:atlas`) if invoked from a pipeline. If invoked directly, return control to the user and stop. The skill's responsibility ends at the spec commit (or at confirmed no-update exit).
+
+## Pre-Exit Checklist
+
+Before exiting the skill, verify each item below is complete. If any item is unchecked, return to the relevant step and resolve it. Do NOT exit with unchecked items.
 
 - [ ] Understood the change (feature, bug fix, or refactor)
-- [ ] Checked pandahrms-spec for existing specs in the affected area
-- [ ] Identified correct module and feature name
-- [ ] Studied at least one existing .feature file for style
+- [ ] Checked the spec repository for existing specs in the affected area (pandahrms-spec for Pandahrms projects; project-local spec dir otherwise)
+- [ ] Identified correct module and feature name (or, if module is not in the standard list, obtained explicit user approval for the chosen module folder)
+- [ ] Studied existing `.feature` files per the Step 3 selection rule
 - [ ] Feature header has tags, description (As a/I want/So that), and Background
 - [ ] Scenarios grouped with comment headers
+- [ ] Section order is creation, listing, editing, deletion, special features (no reordering)
 - [ ] Tags applied at feature and scenario level
 - [ ] Validation scenarios included with `@validation` tag
 - [ ] BDD compliant: no UI language, behavior-focused, business outcomes in Then steps
+- [ ] No hard-coded validation message strings or input-coercion behaviors
 - [ ] Data tables used for structured input
-- [ ] Files split by concern (under 200 lines each)
+- [ ] Each `.feature` file is at most 200 lines, with at most 6 files per feature
 - [ ] Consistent role names used (HR administrator, employee, reviewer, manager)
-- [ ] Presented to user for review and approved
-- [ ] Committed to pandahrms-spec after approval
+- [ ] Presented to user for review and explicitly approved
+- [ ] Pre-commit safety check ran on the spec repository working tree
+- [ ] Committed to the spec repository after approval (no push, no PR, no branch creation)

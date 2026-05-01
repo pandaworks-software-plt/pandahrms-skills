@@ -11,14 +11,34 @@ Write a comprehensive implementation plan that an enthusiastic junior engineer w
 
 **Announce at start:** "I'm using Pandahrms plan to turn the design into an implementation plan."
 
-**Save plans to:** `docs/pandahrms/plans/YYYY-MM-DD-<feature-name>.md`
-- User preferences for plan location override this default
+**Save plans to:** `docs/pandahrms/plans/YYYY-MM-DD-<feature-name>.md` using today's date. Use a different path ONLY when the project's `CLAUDE.md` declares a different `plans/` location, in which case use that. Do not infer paths from any other source.
 
-**Context assumption:** This skill is invoked AFTER design (and usually spec-writing + QA review) has completed. The design doc lives at `docs/pandahrms/designs/<...>.md` and -- when business behavior is in scope -- spec scenarios live in `pandahrms-spec/features/<area>/*.feature`.
+## Execution Order
+
+Run these steps strictly in order. Do not parallelize, reorder, or skip any step.
+
+1. Verify Prerequisites (next section). If any check fails, follow that section's remedy and stop.
+2. Run the Scope Check.
+3. Emit the Plan Document Header (see "Plan Document Header" section).
+4. Emit the File Structure block (see "File Structure" section). You MUST emit this block before writing any `### Task N:` heading.
+5. Emit every `### Task N:` block with required references and Red-Green steps. Insert Manual Gates between tasks per the placement rule in "Manual Gates".
+6. Run the 8-item Self-Review checklist top to bottom; fix issues inline per its sequencing rule.
+7. Save the plan to its path with the Write tool. Do NOT print the plan inline to the user. Do NOT skip the Write call.
+8. Print the Hand Off announcement and end the turn. Do NOT begin implementing any task. Do NOT modify any source files. Do NOT run any tests.
+
+## Prerequisites
+
+Verify ALL of the following before emitting any plan content. If any check fails, STOP and follow the listed remedy.
+
+1. **Design doc exists.** A design doc MUST live at `docs/pandahrms/designs/<feature-name>.md`. If it does not, output `No design doc found at docs/pandahrms/designs/. Run pandahrms:design first.` and stop.
+2. **Design doc is approved.** Approval is signaled by either (a) the orchestrator (forge or atlas) routing this skill the design after its approval gate, or (b) a `Status: approved` line in the design doc's frontmatter or top section. If neither signal is present, output `Cannot confirm design approval. Confirm explicitly before continuing.` and wait for an explicit user reply before continuing.
+3. **Design doc is complete.** The design doc MUST contain a Goal section, a Functional Requirements list, and a Tech Stack section. If any are missing, output `Design doc is incomplete. Missing sections: [list].` and stop. Do not invent content for missing sections.
+4. **Specs exist OR skip-specs path is declared.** If business behavior is in scope, spec files MUST exist under `pandahrms-spec/features/<area>/`. If neither is true, output `No specs found and skip-specs path not declared. Run pandahrms:spec-writing first or confirm UI-only / skip-specs path explicitly.` and stop.
+5. **Scope Profile is set.** The orchestrator sets `lightweight | standard | heavyweight` after design approval. If absent, default to `standard` and announce: `Scope Profile not set; defaulting to standard.`
 
 ## Scope Check
 
-If the spec or design covers multiple independent subsystems, it should have been broken down during design. If it wasn't, suggest splitting into separate plans -- one per subsystem. Each plan should produce working, testable software on its own.
+If the design covers multiple independent subsystems, STOP. Do not write any tasks. Output: `Design covers N subsystems: [list]. Cannot proceed -- ask the design author to split into separate plans, or reply confirming a single combined plan.` Wait for an explicit user reply before continuing. Each plan must produce working, testable software on its own.
 
 ## File Structure
 
@@ -27,7 +47,7 @@ Before defining tasks, map out which files will be created or modified and what 
 - Design units with clear boundaries and well-defined interfaces. Each file should have one clear responsibility.
 - You reason best about code you can hold in context at once, and your edits are more reliable when files are focused. Prefer smaller, focused files over large ones that do too much.
 - Files that change together should live together. Split by responsibility, not by technical layer.
-- In existing codebases, follow established patterns. If the codebase uses large files, don't unilaterally restructure -- but if a file you're modifying has grown unwieldy, including a split in the plan is reasonable.
+- In existing codebases, follow established patterns. If the codebase uses large files, don't unilaterally restructure. If a file you would modify exceeds 400 lines AND your changes touch a distinct responsibility from the rest of the file, add a `Split-File` task that extracts the new responsibility into its own file. Otherwise, do not propose a split.
 
 This structure informs the task decomposition. Each task should produce self-contained changes that make sense independently.
 
@@ -38,7 +58,7 @@ Each step is one action (2-5 minutes):
 - "Run it to make sure it fails" -- step
 - "Implement the minimal code to make the test pass" -- step
 - "Run the tests and make sure they pass" -- step
-- "Commit" -- step
+- "Stage changes (`git add ...`)" -- step. Do NOT include `git commit` -- see "No Commits in Plan Steps".
 
 ## Task Decomposition Heuristics
 
@@ -85,6 +105,8 @@ Some steps are not implementer work -- they are operator commands that the user 
 - Deploying a service so swagger is live before FE work begins
 
 These should NOT be numbered tasks in the plan. They appear as **Manual Gate** entries between tasks, marked with the command and a one-line "why this gate exists" note. Atlas reads gates and pauses execution to surface them to the user; once the user confirms completion, atlas resumes with the next task.
+
+**Placement rule:** Place each Manual Gate immediately after the last task whose output the gate consumes, and immediately before the first task that depends on the gate. Example: the `pnpm openapi-ts` gate goes immediately after the BE endpoint task and immediately before the first FE task that imports the regenerated type. A Manual Gate MUST NOT appear before any task it does not gate, and MUST NOT be bunched at the top or bottom of the plan.
 
 **Manual Gate format:**
 
@@ -189,14 +211,17 @@ If duplication appeared with `approveGoal`, extract a shared `mutateApprovalStat
 Run: `git add tests/services/goal-approval.test.ts src/services/goal-approval.ts`
 ````
 
+The final step of every task MUST be `Stage changes` and MUST NOT include `git commit`, `git push`, `git tag`, `git rebase`, or any other history-mutating command. Self-Review item 8 enforces this.
+
 ## Required References
 
 Each task that touches production code or specs MUST carry:
 
 1. **Spec ref** -- one or more Gherkin scenarios the task satisfies. Omit only when no specs exist for the area (UI-only or skip-specs path). If specs exist for the area but you cannot link a task to one, the plan is incomplete -- update the spec or rewrite the task.
+   - If an in-scope spec scenario describes a manual operator action with no production code (e.g. "Admin runs DB script", "DBA applies migration"), mark it as a Manual Gate, NOT a task. Do not create a task with placeholder code for manual procedures.
 2. **Test ref** OR **Verification** -- TDD is the workflow default; one of the two MUST be present on every production-code task:
    - **Test ref** -- the test file path and the new/changed test case name(s). Required for any task that does NOT match a [No-Test-Pattern Category](#no-test-pattern-categories).
-   - **Verification** -- only allowed for tasks in the No-Test-Pattern Categories below. State the category in parens, then describe how the task is actually verified (e.g. `Verification: (EF mapping) -- no unit-test pattern in this codebase; verified via integration test of the consuming endpoint + runtime`). Tasks using a Verification slot do NOT run a Red-Green-Refactor cycle and skip the RED/GREEN markers in implementer reports.
+   - **Verification** -- only allowed for tasks in the No-Test-Pattern Categories below. The Verification slot accepts ONLY these category labels in parentheses: `(EF mapping)`, `(EF migration)`, `(read DTO + projection)`, `(API regen)`, `(pure config)`. Any other label is invalid and forces the task to use a Test ref. State the category in parens, then describe how the task is actually verified (e.g. `Verification: (EF mapping) -- no unit-test pattern in this codebase; verified via integration test of the consuming endpoint + runtime`). Tasks using a Verification slot do NOT run a Red-Green-Refactor cycle and skip the RED/GREEN markers in implementer reports.
 3. **Red-before-Green ordering** -- when a Test ref is used, the failing-test step always precedes the implementation step. No production code without a failing test. (Verification-slot tasks are exempt -- they have no test to write.)
 4. **Depends on** -- explicit task IDs, or `none`. Independent tasks let atlas parallel-dispatch and cut wall-clock time.
 
@@ -224,12 +249,18 @@ Every step must contain the actual content an engineer needs. These are **plan f
 - Steps that describe what to do without showing how (code blocks required for code steps)
 - References to types, functions, or methods not defined in any task
 
-When two tasks share similar code, prefer one of these over verbatim duplication:
+When two tasks share similar code, choose between repeating the code or referencing an earlier task using these concrete rules:
 
-- **Reference an earlier task** when execution is sequential and the engineer reads top-to-bottom: `"Same shape as Task 3 Step 3, but with field 'archivedAt' instead of 'approvedAt'."`
-- **Repeat the code** when the engineer (or subagent) may execute the task in isolation, when the differences are subtle, or when the file lives far from the referenced task.
+- **Repeat the code in full** when ANY of these is true:
+  - The task's `Depends on:` is `none` (it can be parallel-dispatched).
+  - The referenced task is more than 3 tasks earlier in the plan.
+  - The two tasks live in different files.
+- **Reference an earlier task** ONLY when ALL of these are true:
+  - The dependent task is the immediately following task in the plan.
+  - It lives in the same file as the referenced task.
+  - The difference is a single named field, argument, or value, statable in one sentence.
 
-Default to repeating the code when in doubt -- atlas dispatches independent tasks to fresh subagents that read the plan with no prior context.
+Format for a valid reference: `"Same shape as Task 3 Step 3, but with field 'archivedAt' instead of 'approvedAt'."` Atlas dispatches independent tasks to fresh subagents that read the plan with no prior context, so repetition is safer than reference whenever the rules above don't unambiguously authorize a reference.
 
 ## No Commits in Plan Steps
 
@@ -241,30 +272,41 @@ Never write `git commit -m "..."` into a plan. The user runs `/hermes-commit` af
 
 ## Self-Review
 
-After writing the complete plan, look at the design doc + spec files with fresh eyes and check the plan against them. This is a checklist you run inline -- not a subagent dispatch.
+After writing the complete plan, re-read the design doc and every in-scope spec file in full. Do NOT rely on memory. Then run the 8-item checklist below in order, top to bottom. This is an inline checklist -- not a subagent dispatch.
 
-1. **Spec coverage** -- skim each in-scope spec scenario. Can you point to a task that implements it? List any gaps.
-2. **Design coverage** -- skim each functional requirement in the design doc. Can you point to a task that delivers it? List any gaps.
-3. **Test ref or Verification completeness** -- every production-code task carries either a `Test ref:` or a `Verification:` (only when the task is in a [No-Test-Pattern Category](#no-test-pattern-categories)). List any tasks missing both. A task with `Verification:` whose category does NOT appear in the table is also a gap -- either move it to a real test ref or discuss adding the category with the user.
+**Sequencing rule.** For each item: (a) write the gap list to a scratch block at the bottom of the plan titled `<!-- Self-Review Scratch -->`; (b) fix every listed gap inline by editing the relevant task; (c) once all 8 items have been processed and every gap fixed, delete the scratch block. Do NOT save the plan with the scratch block still present.
+
+**Boundary rule.** Self-Review may only edit the plan. Do NOT edit the design doc or any `.feature` file from this skill. If a gap exposes a defect in the design or spec that cannot be closed by editing the plan, see the unresolvable-gap rule below.
+
+1. **Spec coverage** -- read each in-scope spec scenario in full. For each scenario, write the task ID that implements it. If no task implements a scenario, list it as a gap.
+2. **Design coverage** -- read each functional requirement in the design doc in full. For each requirement, write the task ID that delivers it. If none, list it as a gap.
+3. **Test ref or Verification completeness** -- every production-code task carries either a `Test ref:` or a `Verification:` (only when the task is in a [No-Test-Pattern Category](#no-test-pattern-categories)). List any tasks missing both. A task with `Verification:` whose category label is NOT one of `(EF mapping)`, `(EF migration)`, `(read DTO + projection)`, `(API regen)`, `(pure config)` is also a gap -- either move it to a real test ref or discuss adding the category with the user.
 4. **Red-before-Green** -- every production-code task with a `Test ref:` has a failing-test step before any implementation step. Flag any task that puts implementation first. (Tasks using `Verification:` are exempt -- they do not run a TDD loop.)
-5. **Placeholder scan** -- search the plan for the red-flag patterns from "No Placeholders" above. Fix them.
-6. **Type consistency** -- do the types, method signatures, and property names you used in later tasks match what you defined in earlier tasks? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a bug.
-7. **Dependency markers** -- every task has a `Depends on:` line, even if it's `none`. Atlas reads these to parallel-dispatch.
-8. **No commit steps** -- search for `git commit` in the plan. Remove any matches.
+5. **Placeholder scan** -- search the plan for the red-flag patterns from "No Placeholders" above. List every match.
+6. **Type consistency** -- do the types, method signatures, and property names you used in later tasks match what you defined in earlier tasks? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a gap.
+7. **Dependency markers** -- every task has a `Depends on:` line, even if it's `none`. List any task missing the line.
+8. **No commit steps** -- search for `git commit`, `git push`, `git tag`, and `git rebase` in the plan. List every match.
 
-Fix issues inline. No need to re-review -- just fix and move on. If you find a spec requirement with no task, add the task.
+**Closing the review.**
+- If a Self-Review gap can be closed by editing the plan (adding a missing task, fixing a placeholder, renaming for consistency, adding a missing `Depends on:`, removing a forbidden git command), fix it inline.
+- If a Self-Review gap cannot be closed because the design or spec is itself incomplete or contradictory, STOP. Do NOT save the plan. Output: `Self-Review found <N> unresolvable gap(s): [list]. Plan not saved.` and wait for the user.
+- After every gap is fixed inline AND the scratch block is deleted, proceed to step 7 of the Execution Order (save the plan with the Write tool). Do NOT run Self-Review a second time. Do NOT begin implementation.
 
 ## Hand Off
 
-After the plan is saved and self-reviewed, announce:
+The plan MUST already be saved to its path with the Write tool (Execution Order step 7) before this section runs. Do NOT print the plan inline as a chat response in lieu of saving.
+
+After the plan is saved and Self-Review is complete, announce:
 
 > "Plan complete and saved to `<path>`. Atlas will run Plan ↔ Spec cross-review next, then dispatch tasks to pandahrms:execute."
 
 Do NOT ask the user to choose between inline and subagent execution. Atlas always uses pandahrms:execute with parallel dispatch.
 
-When invoked outside atlas (rare), announce:
+When invoked outside atlas (rare), announce instead:
 
 > "Plan complete and saved to `<path>`. Run pandahrms:execute to implement, or hand the file to atlas via `/atlas <path>` for the full pipeline."
+
+**End of skill.** After printing the announcement, end your turn. Do NOT begin implementing any task. Do NOT modify any source files. Do NOT run any tests. Do NOT invoke pandahrms:execute, /hermes-commit, or any follow-up skill from this skill.
 
 ## Red Flags
 
@@ -298,6 +340,8 @@ When invoked outside atlas (rare), announce:
 
 ## When NOT to Use
 
-- Before design is approved (use `pandahrms:design` first)
-- For trivial single-file fixes that don't need a full plan (do the fix directly with TDD)
-- Non-Pandahrms projects (use `superpowers:writing-plans` directly)
+Refuse and abort with the listed message when ANY of the following are true:
+
+- **Design not approved.** No design doc exists at `docs/pandahrms/designs/`, or the design's approval cannot be confirmed per Prerequisites item 2. Output: `Design not approved. Run pandahrms:design first.` and stop.
+- **Trivial single-file fix.** The change touches a single file with at most 30 modified lines, no new public API, and no new spec scenarios. Output: `Change is too small for a full plan. Do the fix directly with TDD.` and stop.
+- **Non-Pandahrms project.** No `pandahrms-spec/` directory exists in the workspace AND no `docs/pandahrms/designs/` directory exists. Output: `Plan skill is Pandahrms-only. Use superpowers:writing-plans for non-Pandahrms projects.` and stop.

@@ -1,17 +1,23 @@
 ---
 name: execute
-description: Triggers when an approved Pandahrms plan needs to be implemented task-by-task. Replaces superpowers:subagent-driven-development. Dispatches a fresh implementer subagent per task (single-stage review by default, opt-in second-stage review for tasks tagged Risk: high). Parallel-dispatches tasks marked Depends on: none. Supports three Codex execution modes when codex is available -- full, partial-parallel, none. Implementers stage changes but never commit -- /hermes-commit owns the commit step. Drops superpowers' mandatory two-stage review and the final whole-codebase reviewer (athena-review covers that post-execution).
+description: Triggers when atlas/forge invokes execute with a plan file path, OR when the user explicitly invokes /pandahrms:execute on an existing plan file. Does NOT trigger from phrases like "execute the plan", "implement this", or "build it" -- those route through forge/atlas first, which decides whether to invoke execute. Dispatches a fresh implementer subagent per task (single-stage review by default, opt-in second-stage review for tasks tagged Risk: high). Parallel-dispatches tasks marked Depends on: none. Supports three Codex execution modes when codex is available -- full, partial-parallel, none. Implementers stage changes but never commit -- /hermes-commit owns the commit step. Drops superpowers' mandatory two-stage review and the final whole-codebase reviewer (athena-review covers that post-execution). When invoked directly without an orchestrator, the skill MUST verify the plan file's frontmatter contains `status: approved` (or equivalent) before dispatching; if missing, stop and ask the user.
 ---
 
 # Pandahrms Execute
 
 ## Overview
 
-Implement a plan task-by-task by dispatching a fresh implementer subagent per task. Single-stage review by default (the implementer self-reports compliance, atlas spot-checks). Tasks tagged `**Risk:** high` opt into a second-stage spec-compliance reviewer subagent. Tasks marked `Depends on: none` dispatch in parallel batches.
+Implement a plan task-by-task by dispatching a fresh implementer subagent per task. Single-stage review by default: the implementer self-reports compliance via the structured `Status:` line in its report, and the orchestrator validates the report's required fields (Status, TDD log with RED/GREEN or VERIFICATION markers, Test runtime, Files staged) before marking the task complete. There is no separate review subagent unless the task is tagged `**Risk:** high`. Tasks tagged `**Risk:** high` opt into a second-stage spec-compliance reviewer subagent. Tasks marked `Depends on: none` dispatch in parallel batches.
 
 This skill replaces `superpowers:subagent-driven-development` for Pandahrms work. It deliberately drops the v5 mandatory two-stage review on every task -- that change is the largest contributor to slow per-task throughput. We pay that cost only when the plan tags a task as high-risk.
 
-**Announce at start:** "I'm using Pandahrms execute to dispatch implementer subagents."
+## Step 0 — Announcement (before any tool call)
+
+Output exactly this text before any tool call:
+
+`I'm using Pandahrms execute to dispatch implementer subagents.`
+
+Then proceed to Step 1 (Read plan).
 
 <HARD-GATE>
 NO COMMITS. Every implementer subagent dispatch prompt MUST instruct the subagent to **stage changes only** (`git add`) and never run `git commit`. The user tests first, then runs `/hermes-commit` to plan and execute atomic commits across the full set of changes.
@@ -29,11 +35,12 @@ If Codex is available locally (orchestrator already detected `codex_available: t
 
 ### Detect mode
 
-Before dispatching the first batch, check the plan file's `## Atlas Progress` (or `## Forge Progress`) section for a `Codex execution mode:` line. Three possibilities:
+Before dispatching the first batch, check the plan file's `## Atlas Progress` (or `## Forge Progress`) section for a `Codex execution mode:` line. Possibilities:
 
-1. **Line exists** -- read the value (`full`, `partial-parallel`, or `none`) and use it. No question.
-2. **Line missing AND codex_available is true** -- ask the user via AskUserQuestion (see below), then persist the answer.
-3. **codex_available is false** -- mode is implicitly `none`. Skip the question and proceed.
+1. **Line exists with a valid value** -- read the value. If it is exactly `full`, `partial-parallel`, or `none`, use it. No question.
+2. **Line exists with an invalid value** (typo, unknown variant) -- treat it as missing. Re-ask the user via AskUserQuestion and overwrite the line with the answer.
+3. **Line missing AND codex_available is true** -- ask the user via AskUserQuestion (see below), then persist the answer.
+4. **codex_available is false** -- mode is implicitly `none`. Skip the question and proceed.
 
 ### The mode question
 
@@ -121,15 +128,21 @@ digraph execute {
 
 ### 1. Load plan, resolve codex mode, group tasks
 
-1. Read the plan file
-2. Extract every task with its full text, files, spec ref, test ref, `Depends on:` markers, and `Risk:` tag (if any)
-3. **Resolve codex mode** -- check the orchestrator's progress section for `Codex execution mode:`. If missing AND `codex_available` is true, ask the user (see [Codex Execution Mode](#codex-execution-mode)) and persist the answer. If codex_available is false, mode is `none`.
-4. Build batches by dependency level:
+1. **Verify Pandahrms project context** -- before reading the plan, verify the working directory is a Pandahrms project (the project root contains a `Pandahrms.*` solution file, a `pandahrms-*` package name in `package.json`, or matches a Pandahrms project listed in CLAUDE.md). If not, stop and tell the user to use `superpowers:subagent-driven-development` instead.
+2. **Verify approval (standalone invocation only)** -- if the skill was invoked directly by the user (not from atlas/forge), the plan file's frontmatter MUST contain `status: approved` (or equivalent). If missing, stop and ask the user to confirm approval before proceeding. When invoked by atlas/forge, skip this check (the orchestrator already gated approval).
+3. Read the plan file
+4. Extract every task with its full text, files, spec ref, test ref, `Depends on:` markers, and `Risk:` tag (if any). If the plan has zero tasks, stop and report `BLOCKED -- plan contains no tasks` to the orchestrator (or the user, if standalone).
+5. **Detect codex availability** -- if the orchestrator passed `codex_available`, use that value. Otherwise run `command -v codex`: if it returns a path, `codex_available = true`; else `false`.
+6. **Resolve codex mode** -- read the plan's progress section for `Codex execution mode:`. If present and valid (`full`, `partial-parallel`, `none`), use it. If present but invalid, treat as missing. If missing AND `codex_available` is true, ask the user (see [Codex Execution Mode](#codex-execution-mode)) and persist the answer. If missing AND `codex_available` is false, set `mode = none` without asking.
+7. **Persist mode answer** -- if you collected a new mode answer, append `Codex execution mode: <value>` to the plan's `## Atlas Progress` (or `## Forge Progress`) section. If the plan has no progress section at all, create one as `## Atlas Progress` immediately after the frontmatter, with the `Codex execution mode:` line as its first entry. Do NOT silently skip persistence.
+8. Build batches by dependency level:
    - **Batch 0** = tasks with `Depends on: none`
    - **Batch N** = tasks whose `Depends on:` IDs are all in batches < N
-5. Create a TodoWrite entry per task
+9. Create a TodoWrite entry per task
 
 ### 2. Dispatch each batch in parallel
+
+**Sequential -- do not parallelize.** Each numbered sub-step below runs sequentially in the order listed. Do NOT parallelize sub-steps -- only the dispatches inside sub-step 5 run in parallel, and only via multiple tool calls in a single message.
 
 For each batch (smallest batch number first):
 
@@ -146,16 +159,30 @@ For each batch (smallest batch number first):
 8. Collect each subagent's report. Extract the optional `Test runtime: <s>` field from each TDD log entry if the subagent reported it.
 9. **Persist the per-task timing row** to the plan file's `### Step 6 Task Timing` table (see [Step 6 Timing Breakdown](#step-6-timing-breakdown) for format). Update once per batch, not per task.
 
-If a subagent fails (build error, test failure, merge conflict, non-zero exit), stop dispatching further batches and hand off to atlas's [Subagent Failure Handling](../atlas/SKILL.md#subagent-failure-handling) (or the equivalent in whatever orchestrator invoked you). Do NOT silently retry, skip, or guess -- the orchestrator decides. The timing row for the failed task records `Wall-clock: <duration>` and `Status: <failure status>`.
+If a subagent fails (build error, test failure, merge conflict, non-zero exit), stop dispatching further batches. Do NOT silently retry, skip, or guess. Hand off based on invocation context:
+
+- **Invoked by atlas:** read `../atlas/SKILL.md#subagent-failure-handling` and follow it.
+- **Invoked by forge:** read `../forge/SKILL.md` for its failure section; if missing, fall to standalone behavior.
+- **Standalone:** print a structured failure report (failed task ID, batch number, status returned, blocker details) and ask the user via AskUserQuestion how to proceed (Retry / Skip task / Abort run). Do NOT decide on the user's behalf.
+
+The timing row for the failed task records `Wall-clock: <duration>` and `Status: <failure status>`.
 
 ### 3. Conditional second-stage review
 
 For each task in the completed batch, check if the plan tagged it `**Risk:** high`:
 
 - **No high-risk tasks** -- mark the batch complete and proceed to the next batch.
-- **One or more high-risk tasks** -- dispatch a spec-compliance reviewer subagent for each high-risk task (see [Spec Reviewer Prompt Template](#spec-reviewer-prompt-template)). Reviewer routes through `codex:codex-rescue` when `codex_available` is true (regardless of the implementer's dispatcher), else through Agent. If the reviewer flags gaps, re-dispatch the original implementer with the gap report; loop until the reviewer approves.
+- **One or more high-risk tasks** -- dispatch a spec-compliance reviewer subagent for each high-risk task (see [Spec Reviewer Prompt Template](#spec-reviewer-prompt-template)). Reviewer routes through `codex:codex-rescue` when `codex_available` is true (regardless of the implementer's dispatcher), else through Agent. Apply [Reviewer Verdict Handling](#reviewer-verdict-handling) to the returned report.
 
 The default is single-stage. The plan author decides which tasks pay the second-stage cost.
+
+#### Reviewer Verdict Handling
+
+On reviewer return:
+
+- **All scenarios Pass** -- mark task complete, proceed to next batch.
+- **One or more Gap, zero Conflict** -- re-dispatch the implementer with the gap evidence. Cap at 2 re-dispatches (3 implementer attempts total). If the third reviewer pass still flags Gap, stop dispatching and hand off to the orchestrator's failure handler with `Status: BLOCKED -- reviewer failed to approve after 3 implementer attempts` and the gap report attached.
+- **One or more Conflict** -- stop dispatching. Conflicts indicate plan/spec disagreement that the implementer cannot resolve. Hand off to the orchestrator's failure handler with the conflict evidence; do NOT re-dispatch the implementer.
 
 ### 4. Mark complete
 
@@ -163,9 +190,13 @@ When all tasks have returned successfully and any required reviews have approved
 
 1. Update each task's checkbox in the plan file from `- [ ]` to `- [x]`
 2. Mark all TodoWrite entries complete
-3. Announce: `"All N tasks executed. Changes are staged but uncommitted. Atlas will run /simplify next."`
+3. Announce based on invocation context:
+   - **Invoked by atlas/forge:** `"All N tasks executed. Changes are staged but uncommitted. Returning to atlas for /simplify and the user-test step."`
+   - **Standalone invocation (direct user invocation, no orchestrator):** `"All N tasks executed. Changes are staged but uncommitted. Recommended next steps: run /simplify, then test the changes manually, then run /hermes-commit. I will not invoke these automatically -- they are yours to run."`
 
-Atlas owns the post-execution flow (simplify, ask user to test, /hermes-commit). Don't invoke them yourself.
+Track which path applies via the orchestrator's invocation arguments. Do NOT invoke `/simplify`, `athena-review`, or `/hermes-commit` yourself in either case. Atlas owns the post-execution flow when present; the user owns it when standalone.
+
+**After the completion announcement, the skill terminates.** Do NOT produce additional analysis, summaries, retrospectives, or unsolicited recommendations. The next user message (or the orchestrator's next step) is the only thing that should advance the conversation.
 
 ## Parallel Dispatch Mechanics
 
@@ -174,6 +205,8 @@ Tasks marked `Depends on: none` (or whose dependencies are all in earlier comple
 Sequential `Agent` calls -- even within the same response -- run one after another. To parallelize, every `Agent` invocation goes in the same message.
 
 Cap parallelism at **5 subagents per batch**. If a batch has more than 5 independent tasks, split it into chunks of 5 and dispatch chunks sequentially -- still using parallel dispatch within each chunk.
+
+Never merge tasks from different dependency batches into the same parallel dispatch -- even if both batches are small. Batch N must fully complete (all subagents returned, all reviews approved if applicable) before any Batch N+1 task dispatches. The 5-task cap is a per-batch upper bound, not a target to fill.
 
 ### Display vocabulary
 
@@ -203,7 +236,7 @@ The orchestrator records Step 6 wall-clock as a single number (first dispatch ->
 |-------|--------|-----|
 | `batch_prep_seconds` | orchestrator | `dispatched_at - batch_prep_start` |
 | `batch_wall_clock` | orchestrator | `returned_at - dispatched_at` (same for every task in the batch) |
-| `idle_wait_seconds` | derived | for parallel batches: `batch_wall_clock - max(per-task active time)`. Since we don't know per-task active time directly, approximate: if a batch has 3 tasks and 2 of them clearly finished early (their reports include early file writes vs the late task's writes), idle-wait = duration the early-finishers waited. When in doubt, leave `--`. |
+| `idle_wait_seconds` | derived | for parallel batches: `batch_wall_clock - max(per-task active time)`. Since we don't know per-task active time directly, approximate: if a batch has 3 tasks and 2 of them clearly finished early (their reports include early file writes vs the late task's writes), idle-wait = duration the early-finishers waited. Leave `--` if any of these apply: (a) the value depends on per-task active time which the parallel batch obscured, (b) you would have to estimate within ±50% accuracy, (c) the batch had only one task so idle-wait is N/A. Otherwise compute and record the value. |
 
 ### Where to store
 
@@ -237,13 +270,29 @@ Append a `### Step 6 Task Timing` block beneath the Atlas Progress table, after 
 - **Idle-wait time** (sum across batches) -- wall-clock lost to fast tasks waiting for slow tasks in the same batch. If high, the batch composition is uneven (mix a 30s task with a 3m task and you waste 2.5m on the fast one).
 - **Risk: high tax** -- compare wall-clock of `risk_high=yes` tasks to standard tasks. The second-stage review adds wall-clock; this surfaces how much.
 
-### Don't bikeshed the buckets
+### Recording rules
 
-The point is data, not precision. If a value is hard to capture exactly, leave `--` rather than fabricate. The orchestrator's job is to record what's easy to know (dispatched_at, returned_at, dispatcher, type) and let the subagent self-report what only it knows (test runtime). Estimates that aren't directly measurable (idle-wait, dispatch-prep below 5s) can be left out of small-batch runs without losing benchmarking value.
+The point is data, not precision. If a value is hard to capture exactly, leave `--` rather than fabricate. The orchestrator's job is to record what's easy to know (dispatched_at, returned_at, dispatcher, type) and let the subagent self-report what only it knows (test runtime).
+
+Always record `batch_prep_seconds` and `batch_wall_clock`. Record `idle_wait_seconds` only when the batch has 2+ tasks AND a per-task active-time signal is available from subagent reports; otherwise leave `--`. Skipping `dispatch_prep` entirely is only allowed for single-task batches.
+
+## Placeholder Resolution
+
+Before dispatch, resolve every `{...}` placeholder in the prompt templates below. Required sources:
+
+- `{worktree_or_repo_path}` -- the absolute path the orchestrator passed in. If absent, use the current working directory captured via `pwd`.
+- `{plan_path}` -- the absolute path of the plan file you read in step 1.
+- `{N}`, `{task name}`, `{task files block from the plan}`, `{task spec ref, or "no spec ref (UI-only / skip-specs path)"}`, `{task test ref}`, `{full step-by-step block from the plan, including code blocks}` -- extracted from the plan task being dispatched.
+- `{spec_refs}` -- the `Spec ref:` line(s) on the task. If the task has no spec ref, substitute `no spec ref (UI-only / skip-specs path)`.
+- `{staged_files}` -- for the spec reviewer prompt only, the `Files staged:` list from the implementer's returned report.
+
+If any placeholder cannot be resolved, do NOT dispatch with literal `{...}` text in the prompt. Stop and report `BLOCKED -- missing placeholder <name>` to the orchestrator.
 
 ## Implementer Prompt Template
 
 Every implementer dispatch uses this structure. Substitute placeholders before sending.
+
+The implementer prompt MUST contain only the single task being executed. Do NOT include adjacent tasks, batch summaries, or unrelated plan sections in the prompt body -- even when "for context" seems helpful. Cross-task context is the controller's responsibility, not the implementer's.
 
 ```
 [Execution Standards Prefix block here -- see below]
@@ -301,7 +350,7 @@ Then provide:
     - `GREEN -- <test name> passing`
   - **Verification-slot tasks** (No-Test-Pattern Categories only) -- one entry naming the category and command output:
     - `VERIFICATION -- <category>: <command output summary>`
-  A `Status: DONE` task report missing the appropriate entries is out of policy -- the controller treats it as failing the TDD/verification check and re-dispatches.
+  A `Status: DONE` task report missing the appropriate entries is out of policy. The controller re-dispatches the same implementer with this added instruction at the top of its prompt: "Your previous report was rejected because it omitted the required <RED/GREEN | VERIFICATION> markers in the TDD log. Re-run the work and produce a report that includes them verbatim." Cap at 2 re-dispatches per task; after the third malformed report, escalate to the orchestrator as `BLOCKED -- implementer failed to produce TDD markers after 3 attempts`.
 - Test runtime: the wall-clock seconds your test runner spent (sum across all RED + GREEN runs in this task). Format: `Test runtime: 14s` (whole seconds is enough). For Verification-slot tasks, report the verification command's runtime instead. This lets the orchestrator separate test-execution time from implementer thinking time when benchmarking.
 - SOLID/DDD decisions: [brief notes on boundaries, DI choices, aggregates]
 - Plan <-> spec conflicts raised: [list or "none"]
@@ -319,7 +368,7 @@ When an implementer subagent returns:
 |--------|-------------------|
 | `DONE` | Mark batch task complete; proceed to second-stage review (if `Risk: high`) or next batch. |
 | `DONE_WITH_CONCERNS` | Surface the concerns to the user before marking the task complete. The user decides: accept (mark complete), re-dispatch with guidance, or escalate. |
-| `NEEDS_CONTEXT` | Re-dispatch the same implementer with the missing context filled in. If the missing context isn't available, escalate to the user via [Subagent Failure Handling](#when-to-stop-and-ask-the-orchestrator). Do NOT guess. |
+| `NEEDS_CONTEXT` | Re-dispatch the same implementer with the missing context filled in. Cap at 2 re-dispatches per task (3 attempts total). After the third `NEEDS_CONTEXT` return, stop dispatching this task and report `BLOCKED -- repeated NEEDS_CONTEXT after 3 attempts` to the orchestrator. If the missing context isn't available before reaching the cap, escalate to the user via [Subagent Failure Handling](#when-to-stop-and-ask-the-orchestrator). Do NOT guess. |
 | `BLOCKED` | Stop dispatching further batches. Hand off to the orchestrator's failure handler with the blocker details. |
 
 ## Spec Reviewer Prompt Template
@@ -388,7 +437,11 @@ what to build.
    c. Write minimal code to pass.
    d. Run the test again and confirm it passes. **Announce: `GREEN --
       <test name> passing`** in your task report.
-   e. Refactor if needed; tests must stay green.
+   e. Refactor only the code you wrote in steps c-d. Do NOT refactor
+      surrounding code outside the task's scope. After refactoring,
+      re-run the test from step b and confirm it still passes. If you
+      make no changes in step e, that is acceptable -- note `no refactor
+      needed` in the TDD log.
 
    The RED and GREEN call-outs are required output for any task with a
    `Test ref:`. A task report that skips them is treated as failing the
@@ -465,5 +518,5 @@ The orchestrator (atlas, or whoever invoked you) decides whether to retry, skip,
 ## When NOT to Use
 
 - Plans without dependency markers or test refs (send back to `pandahrms:plan` to fix first)
-- Tightly-coupled tasks where each builds on the previous in subtle ways (manual execution may be safer)
+- Tightly-coupled tasks where each builds on the previous in subtle ways: do NOT use this skill. Stop and tell the user the plan is unsuitable for subagent-driven execution and recommend manual implementation.
 - Non-Pandahrms projects (use `superpowers:subagent-driven-development` directly)
