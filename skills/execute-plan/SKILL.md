@@ -1,9 +1,9 @@
 ---
 name: execute-plan
-description: Triggers when atlas/forge invokes execute with a plan file path, OR when the user explicitly invokes /pandahrms:execute-plan on an existing plan file. Does NOT trigger from phrases like "execute the plan", "implement this", or "build it" -- those route through forge/atlas first, which decides whether to invoke execute. Dispatches a fresh implementer subagent per task (single-stage review by default, opt-in second-stage review for tasks tagged Risk: high). Parallel-dispatches tasks marked Depends on: none. Supports three Codex execution modes when codex is available -- full, partial-parallel, none. Implementers stage changes but never commit -- /hermes-commit owns the commit step. Drops superpowers' mandatory two-stage review and the final whole-codebase reviewer (athena-review covers that post-execution). When invoked directly without an orchestrator, the skill MUST verify the plan file's frontmatter contains `status: approved` (or equivalent) before dispatching; if missing, stop and ask the user.
+description: Triggers when atlas-pipeline-orchestrator/forge-pipeline-orchestrator invokes execute-plan with a plan file path, OR when the user explicitly invokes /pandahrms:execute-plan on an existing plan file. Does NOT trigger from phrases like "execute the plan", "implement this", or "build it" -- those route through forge-pipeline-orchestrator/atlas-pipeline-orchestrator first, which decides whether to invoke execute-plan. Dispatches a fresh implementer subagent per task (single-stage review by default, opt-in second-stage review for tasks tagged Risk: high). Parallel-dispatches tasks marked Depends on: none. Supports three Codex execution modes when codex is available -- full, partial-parallel, none. Implementers stage changes but never commit -- /hermes-commit owns the commit step. Drops superpowers' mandatory two-stage review and the final whole-codebase reviewer (athena-code-review covers that post-execution). When invoked directly without an orchestrator, the skill MUST verify the plan file's frontmatter contains `status: approved` (or equivalent) before dispatching; if missing, stop and ask the user.
 ---
 
-# Pandahrms Execute
+# Pandahrms Execute Plan
 
 ## Overview
 
@@ -15,7 +15,7 @@ This skill replaces `superpowers:subagent-driven-development` for Pandahrms work
 
 Output exactly this text before any tool call:
 
-`I'm using Pandahrms execute to dispatch implementer subagents.`
+`I'm using Pandahrms execute-plan to dispatch implementer subagents.`
 
 Then proceed to Step 1 (Read plan).
 
@@ -68,7 +68,7 @@ For each task in a batch, choose the dispatcher based on the mode:
 | `partial-parallel` | Agent | codex:codex-rescue |
 | `full` | codex:codex-rescue | codex:codex-rescue |
 
-The implementer prompt body is identical regardless of dispatcher -- only the dispatch tool changes. **Do NOT prefix codex implementation prompts with `READ-ONLY REVIEW`** -- that prefix is for review-only dispatches (atlas's QA review and Plan-Spec cross-review). Implementation prompts let codex write.
+The implementer prompt body is identical regardless of dispatcher -- only the dispatch tool changes. **Do NOT prefix codex implementation prompts with `READ-ONLY REVIEW`** -- that prefix is for review-only dispatches (atlas-pipeline-orchestrator's QA review and Plan-Spec cross-review). Implementation prompts let codex write.
 
 ### Mixing dispatchers in a parallel batch
 
@@ -129,7 +129,7 @@ digraph execute {
 ### 1. Load plan, resolve codex mode, group tasks
 
 1. **Verify Pandahrms project context** -- before reading the plan, verify the working directory is a Pandahrms project (the project root contains a `Pandahrms.*` solution file, a `pandahrms-*` package name in `package.json`, or matches a Pandahrms project listed in CLAUDE.md). If not, stop and tell the user to use `superpowers:subagent-driven-development` instead.
-2. **Verify approval (standalone invocation only)** -- if the skill was invoked directly by the user (not from atlas/forge), the plan file's frontmatter MUST contain `status: approved` (or equivalent). If missing, stop and ask the user to confirm approval before proceeding. When invoked by atlas/forge, skip this check (the orchestrator already gated approval).
+2. **Verify approval (standalone invocation only)** -- if the skill was invoked directly by the user (not from atlas-pipeline-orchestrator/forge-pipeline-orchestrator), the plan file's frontmatter MUST contain `status: approved` (or equivalent). If missing, stop and ask the user to confirm approval before proceeding. When invoked by atlas-pipeline-orchestrator/forge-pipeline-orchestrator, skip this check (the orchestrator already gated approval).
 3. Read the plan file
 4. Extract every task with its full text, files, spec ref, test ref, `Depends on:` markers, and `Risk:` tag (if any). If the plan has zero tasks, stop and report `BLOCKED -- plan contains no tasks` to the orchestrator (or the user, if standalone).
 5. **Detect codex availability** -- if the orchestrator passed `codex_available`, use that value. Otherwise run `command -v codex`: if it returns a path, `codex_available = true`; else `false`.
@@ -191,10 +191,10 @@ When all tasks have returned successfully and any required reviews have approved
 1. Update each task's checkbox in the plan file from `- [ ]` to `- [x]`
 2. Mark all TodoWrite entries complete
 3. Announce based on invocation context:
-   - **Invoked by atlas/forge:** `"All N tasks executed. Changes are staged but uncommitted. Returning to atlas for /simplify and the user-test step."`
+   - **Invoked by atlas-pipeline-orchestrator/forge-pipeline-orchestrator:** `"All N tasks executed. Changes are staged but uncommitted. Returning to atlas-pipeline-orchestrator for /simplify and the user-test step."`
    - **Standalone invocation (direct user invocation, no orchestrator):** `"All N tasks executed. Changes are staged but uncommitted. Recommended next steps: run /simplify, then test the changes manually, then run /hermes-commit. I will not invoke these automatically -- they are yours to run."`
 
-Track which path applies via the orchestrator's invocation arguments. Do NOT invoke `/simplify`, `athena-review`, or `/hermes-commit` yourself in either case. Atlas owns the post-execution flow when present; the user owns it when standalone.
+Track which path applies via the orchestrator's invocation arguments. Do NOT invoke `/simplify`, `athena-code-review`, or `/hermes-commit` yourself in either case. Atlas-pipeline-orchestrator owns the post-execution flow when present; the user owns it when standalone.
 
 **After the completion announcement, the skill terminates.** Do NOT produce additional analysis, summaries, retrospectives, or unsolicited recommendations. The next user message (or the orchestrator's next step) is the only thing that should advance the conversation.
 
@@ -489,7 +489,7 @@ Stop dispatching and report up immediately when:
 - The plan has structural gaps preventing execution (missing files for a task, broken spec reference, etc.)
 - A subagent's verification fails repeatedly across re-dispatches
 
-The orchestrator (atlas, or whoever invoked you) decides whether to retry, skip, or abort. Don't decide on your own.
+The orchestrator (atlas-pipeline-orchestrator, or whoever invoked you) decides whether to retry, skip, or abort. Don't decide on your own.
 
 ## Red Flags
 
@@ -501,11 +501,11 @@ The orchestrator (atlas, or whoever invoked you) decides whether to retry, skip,
 | "I'll silently retry a failed subagent" | Stop and report. The orchestrator decides retry vs skip vs abort. |
 | "I'll skip the standards prefix to keep prompts short" | Required on every dispatch. Skipping it means TDD/SOLID/DDD aren't enforced. |
 | "I'll dispatch 12 tasks in parallel since they're all independent" | Cap at 5 per batch. Cap counts Agent + codex dispatches together. Larger batches overwhelm the harness and produce stragglers. |
-| "I'll add a final whole-codebase reviewer subagent at the end" | No. Atlas runs `/simplify` and athena-review post-execution. Don't duplicate. |
-| "I'll hand off to finishing-a-development-branch when done" | No. Atlas owns the user-test + /hermes-commit step. Just announce completion. |
-| "The plan task has no test ref but I'll just implement it" | Stop and report -- the plan is missing required references. Atlas decides whether to fix the plan or proceed. |
+| "I'll add a final whole-codebase reviewer subagent at the end" | No. Atlas-pipeline-orchestrator runs `/simplify` and athena-code-review post-execution. Don't duplicate. |
+| "I'll hand off to finishing-a-development-branch when done" | No. Atlas-pipeline-orchestrator owns the user-test + /hermes-commit step. Just announce completion. |
+| "The plan task has no test ref but I'll just implement it" | Stop and report -- the plan is missing required references. Atlas-pipeline-orchestrator decides whether to fix the plan or proceed. |
 | "Codex is available so I'll just route everything to codex" | Ask the user the mode question. `none` is the recommended default; `full` is opt-in for risky-heavy plans. Don't pick on their behalf. |
-| "I'll prefix the codex implementer dispatch with READ-ONLY REVIEW" | No. The read-only prefix is for atlas's QA review and Plan-Spec cross-review only. Implementation prompts let codex write. |
+| "I'll prefix the codex implementer dispatch with READ-ONLY REVIEW" | No. The read-only prefix is for atlas-pipeline-orchestrator's QA review and Plan-Spec cross-review only. Implementation prompts let codex write. |
 | "Codex mode is `partial-parallel` but I'll dispatch the codex tasks in a separate message to be safe" | Same batch, same message. Mixing Agent + codex in one parallel batch is the whole point of `partial-parallel`. |
 | "I'll re-ask the codex mode question on every batch" | Ask once. Persist the answer to the orchestrator's progress section. Resumed runs read it back. |
 | "I'll call the dispatch groupings 'Wave' (or 'Round' / 'Phase') in the user-facing plan" | No. The vocabulary is **Batch**, used everywhere. Synonyms cause confusion when the user reads the skill text. See [Display vocabulary](#display-vocabulary). |
@@ -513,7 +513,7 @@ The orchestrator (atlas, or whoever invoked you) decides whether to retry, skip,
 ## When to Use
 
 - After `pandahrms:plan-writing` produces a plan with bite-sized tasks, spec/test refs, and dependency markers
-- Invoked by atlas in step 6, or directly when given a complete plan file path
+- Invoked by atlas-pipeline-orchestrator in step 6, or directly when given a complete plan file path
 
 ## When NOT to Use
 

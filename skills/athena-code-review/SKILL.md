@@ -3,7 +3,7 @@ name: athena-code-review
 description: Triggers on mentions of code review of working-tree changes -- "review my changes", "check my changes", "review the diff", "review before commit", or "lint check on my changes". Does NOT trigger on "review this PR", "review pull request", "ultrareview", or the global "/review" command -- those are separate workflows. If the user is ambiguous between working-tree review and PR review, ask which one they mean. Reads all changed files, reviews against the checklist, fixes issues, and runs /simplify. Does NOT commit. Run this before /hermes-commit.
 ---
 
-# Athena Review (Code Review)
+# Athena Code Review
 
 ## Overview
 
@@ -305,7 +305,7 @@ If the user's answer does not match the offered options, re-ask the same questio
 
 ## Phase 4: Security Review (/aegis-security-review)
 
-Athena's Phase 2 catches the obvious security issues (injection, missing `[Authorize]`, hardcoded secrets, unvalidated input, leaked fields). Aegis is the deeper pass: OWASP Top 10, tenant isolation, PII handling, audit-trail completeness, and dependency scanning.
+Athena Code Review's Phase 2 catches the obvious security issues (injection, missing `[Authorize]`, hardcoded secrets, unvalidated input, leaked fields). Aegis Security Review is the deeper pass: OWASP Top 10, tenant isolation, PII handling, audit-trail completeness, and dependency scanning.
 
 ### Skip Conditions
 
@@ -342,19 +342,19 @@ Use `AskUserQuestion` to confirm:
 > "Changes include security-sensitive surface ([summary of what was detected]). Run /aegis-security-review for a deeper OWASP + Pandahrms security audit?"
 
 Options:
-- **Run /aegis-security-review** -> invoke the `aegis` skill against the working tree. Aegis will report findings, optionally apply approved fixes, and return control here.
+- **Run /aegis-security-review** -> invoke the `aegis-security-review` skill against the working tree. Aegis Security Review will report findings, optionally apply approved fixes, and return control here.
 - **Skip** -> note the skip in the review summary and proceed to Phase 5.
 - If the answer is off-list, re-ask once. If still off-list, stop the skill.
 
-When aegis returns, treat any approved fixes as already applied (aegis does not commit). Do not re-ask about committing -- control returns here, not to aegis's own commit prompt. If aegis exits with an error or times out, see "Sub-Skill Failure Handling" below.
+When aegis-security-review returns, treat any approved fixes as already applied (aegis-security-review does not commit). Do not re-ask about committing -- control returns here, not to aegis-security-review's own commit prompt. If aegis-security-review exits with an error or times out, see "Sub-Skill Failure Handling" below.
 
 ### Step 3: Record Outcome
 
-Capture the aegis outcome for the Phase 7 summary:
+Capture the aegis-security-review outcome for the Phase 7 summary:
 - **Skipped** -- no security surface, or user declined
-- **Clean** -- aegis ran, zero findings
-- **Fixes applied** -- aegis ran, N findings, M fixed
-- **Findings acknowledged** -- aegis ran, findings reported, user chose not to fix
+- **Clean** -- aegis-security-review ran, zero findings
+- **Fixes applied** -- aegis-security-review ran, N findings, M fixed
+- **Findings acknowledged** -- aegis-security-review ran, findings reported, user chose not to fix
 
 Then proceed to Phase 5.
 
@@ -445,7 +445,7 @@ Then use `AskUserQuestion` to ask:
 
 > "Code review complete. Would you like to proceed to /hermes-commit, or test first?"
 
-- If user says **commit** -> invoke the `/hermes-commit` skill. When `/hermes-commit` returns control, **the Athena skill is complete**. Do not produce any further output, do not re-summarize, do not offer next steps. Hermes owns the post-commit user dialogue.
+- If user says **commit** -> invoke the `/hermes-commit` skill. When `/hermes-commit` returns control, **the athena-code-review skill is complete**. Do not produce any further output, do not re-summarize, do not offer next steps. Hermes owns the post-commit user dialogue.
 - If user says **test** -> end the flow with: "Sounds good. Run /hermes-commit when you're ready."
 - If the answer is off-list, re-ask once. If still off-list, stop the skill.
 
@@ -486,11 +486,11 @@ Then use `AskUserQuestion` to ask:
 | Editing AND asking in the same turn | After AskUserQuestion in Phase 3, STOP. No Edit calls until the user approves. |
 | "Tidying up" files opened only for context | Only touch files in `git status` plus DI-registration wiring file |
 | Drafting `.feature` content as a courtesy | Spec writes go through `/spec-writing` only; never inline |
-| Running tests/builds/migrations to "verify" | Out of scope; Athena reads only |
+| Running tests/builds/migrations to "verify" | Out of scope; athena-code-review reads only |
 
 ## Out of Scope
 
-Athena does NOT produce any of the following. If any would be useful, mention it as a one-line suggestion in the Phase 7 summary and let the user decide whether to invoke a separate skill:
+Athena Code Review does NOT produce any of the following. If any would be useful, mention it as a one-line suggestion in the Phase 7 summary and let the user decide whether to invoke a separate skill:
 
 - Commit messages, PR descriptions, changelogs
 - Migration plans, test scaffolds, new documentation files
@@ -500,7 +500,7 @@ Athena does NOT produce any of the following. If any would be useful, mention it
 
 ## Sub-Skill Failure Handling
 
-This applies whenever Athena invokes `/simplify`, `/aegis-security-review`, `/spec-writing`, or `/hermes-commit`:
+This applies whenever athena-code-review invokes `/simplify`, `/aegis-security-review`, `/spec-writing`, or `/hermes-commit`:
 
 - If the sub-skill exits with an error or times out, record the failure as `<skill>: failed - <reason>` in the Phase 7 summary and continue to the next phase. Do NOT retry the sub-skill in this run.
-- If the sub-skill returns control with its own pending question, treat that question as belonging to the sub-skill -- surface it verbatim to the user, then resume Athena once the user has answered through the sub-skill.
+- If the sub-skill returns control with its own pending question, treat that question as belonging to the sub-skill -- surface it verbatim to the user, then resume athena-code-review once the user has answered through the sub-skill.

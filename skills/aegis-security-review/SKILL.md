@@ -3,20 +3,20 @@ name: aegis-security-review
 description: Triggers when the user requests a security review of code or working-tree changes -- phrasings such as "/aegis-security-review", "run aegis", "do a security review", "audit this for vulnerabilities", "OWASP pass on this branch", "check this PR for security issues", "auth audit", "authz audit", "pen test this". Does NOT trigger on incidental mentions of security topics (CVE articles, threat-model discussion) without an action verb directed at the working tree. Audits auth, authz, input validation, injection, secrets, PII exposure, audit trails, and tenant isolation in working tree changes or a specified feature area. Reports findings and fixes approved issues. Does NOT commit, stage, push, or invoke any other skill except via an explicit user choice in Phase 8.
 ---
 
-# Aegis - Security Review
+# Aegis Security Review
 
 ## Overview
 
-Aegis is a focused security audit of the code under review. It scans working tree changes (or a specified feature area) for security vulnerabilities using the OWASP Top 10, Pandahrms-specific threat patterns (tenant isolation, audit trails, PII handling), and the standards in `~/.claude/rules/Security.md`. It reports findings grouped by severity, optionally fixes approved issues, and hands off to `/hermes-commit`. Aegis never commits on its own.
+Aegis Security Review is a focused security audit of the code under review. It scans working tree changes (or a specified feature area) for security vulnerabilities using the OWASP Top 10, Pandahrms-specific threat patterns (tenant isolation, audit trails, PII handling), and the standards in `~/.claude/rules/Security.md`. It reports findings grouped by severity, optionally fixes approved issues, and hands off to `/hermes-commit`. Aegis Security Review never commits on its own.
 
 ## Hard Prohibitions
 
-Aegis MUST NOT do any of the following at any phase:
+Aegis Security Review MUST NOT do any of the following at any phase:
 
 - Run `git commit`, `git commit --amend`, `git push`, `git rebase`, `git reset --hard`, `git stash`, `git add`, or any other history-altering, staging, or remote-publishing command. Fixes are written to the working tree only; staging is the user's responsibility (or `/hermes-commit`'s).
 - Invoke `pandahrms:hermes-commit` or any other skill except through the explicit user choice in Phase 8.
 - Send working-tree contents, diffs, file paths, or finding details to any external service (WebFetch, WebSearch, MCP servers, paste services, gists). The only allowed network calls are dependency-audit invocations of the project's own package-manager CLI (`dotnet`, `pnpm`, `npm`).
-- Rotate, re-issue, or relocate secrets when fixing a leaked-credential finding. Aegis only removes the leaked value from the source file and reports the leak; rotation is a user responsibility.
+- Rotate, re-issue, or relocate secrets when fixing a leaked-credential finding. Aegis Security Review only removes the leaked value from the source file and reports the leak; rotation is a user responsibility.
 - Modify `appsettings.Production.json`, KeyVault references, GitHub Actions secrets, or any production configuration store as a "fix."
 - Apply a security fix without explicit user approval recorded in Phase 7.
 - Write a `Where:` reference (file:line) for a line that has not been opened with the Read tool in this run.
@@ -33,7 +33,7 @@ Aegis MUST NOT do any of the following at any phase:
 
 ## When NOT to Use
 
-Skip aegis ONLY when **every** condition below holds. If any one fails, run aegis in full.
+Skip aegis-security-review ONLY when **every** condition below holds. If any one fails, run aegis-security-review in full.
 
 - The diff contains no `dangerouslySetInnerHTML`, no `@Html.Raw`, no template/raw-HTML interpolation.
 - The diff contains no `localStorage`, `sessionStorage`, or cookie writes.
@@ -46,7 +46,7 @@ Run `git diff` and grep for the tokens above before declaring a change out of sc
 
 ## Workflow
 
-Phases run **strictly sequentially** in the order Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 -> Phase 5 -> Phase 6 -> Phase 7 -> Phase 8. Do not begin a phase until the previous phase has emitted its required output. Aegis does not dispatch parallel subagents; all work happens in the main thread.
+Phases run **strictly sequentially** in the order Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 -> Phase 5 -> Phase 6 -> Phase 7 -> Phase 8. Do not begin a phase until the previous phase has emitted its required output. Aegis Security Review does not dispatch parallel subagents; all work happens in the main thread.
 
 ```dot
 digraph aegis {
@@ -143,7 +143,7 @@ Detect every project-type signal that appears in the in-scope file list. Run the
 
 ### No-signal fallback
 
-If **no** project-type signal matches in scope, halt and use `AskUserQuestion` to confirm whether to (a) abort aegis as out-of-scope, or (b) proceed using a user-specified checklist set. Do not infer a checklist from the absence of signals, and do not silently default to .NET.
+If **no** project-type signal matches in scope, halt and use `AskUserQuestion` to confirm whether to (a) abort aegis-security-review as out-of-scope, or (b) proceed using a user-specified checklist set. Do not infer a checklist from the absence of signals, and do not silently default to .NET.
 
 ## Phase 2: Threat Pass
 
@@ -339,7 +339,7 @@ Every `Where:` reference must come from a file actually opened by the Read tool 
 
 If Critical or High findings exist, use `AskUserQuestion` to ask:
 
-> "Aegis found [N Critical / M High] issues. Fix them now, or report and let you handle them?"
+> "Aegis Security Review found [N Critical / M High] issues. Fix them now, or report and let you handle them?"
 
 Options:
 - **Fix now** -- apply remediations for approved findings.
@@ -349,7 +349,7 @@ Never silently apply a security fix without user approval. Security fixes can ch
 
 ### What "fix" means in Phase 7
 
-A "fix" is the **minimum code change** that closes the specific finding. In Phase 7, Aegis MUST NOT:
+A "fix" is the **minimum code change** that closes the specific finding. In Phase 7, Aegis Security Review MUST NOT:
 
 - Refactor unrelated code or rename symbols.
 - Add new tests or test files (the user owns test coverage decisions for security fixes).
@@ -380,10 +380,10 @@ Then use `AskUserQuestion` to ask:
 
 > "Security review complete. Would you like to proceed to /hermes-commit, or test first?"
 
-- **Commit** -- invoke `pandahrms:hermes-commit` via the Skill tool, then end the aegis turn immediately upon dispatch. Do not produce additional output, additional findings, or extra commentary after the dispatch.
+- **Commit** -- invoke `pandahrms:hermes-commit` via the Skill tool, then end the aegis-security-review turn immediately upon dispatch. Do not produce additional output, additional findings, or extra commentary after the dispatch.
 - **Test first** -- emit exactly the single line "Sounds good. Run /hermes-commit when you're ready." and end the turn. Do not add any further text.
 
-After Phase 8 ends, aegis is complete. Do not continue executing aegis behavior (no further audits, no follow-up advice, no additional checks) in the same turn.
+After Phase 8 ends, aegis-security-review is complete. Do not continue executing aegis-security-review behavior (no further audits, no follow-up advice, no additional checks) in the same turn.
 
 ## Red Flags - STOP
 

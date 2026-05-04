@@ -32,9 +32,9 @@ This skill runs after specs are written and approved, before proceeding to imple
 
 ### Invocation Context Detection
 
-Detect "invoked from forge" by checking whether the current conversation already shows an active `pandahrms:forge-pipeline-orchestrator` Skill invocation. If present, treat as forge-invoked. If not present, treat as standalone.
+Detect "invoked from forge-pipeline-orchestrator" by checking whether the current conversation already shows an active `pandahrms:forge-pipeline-orchestrator` Skill invocation. If present, treat as forge-pipeline-orchestrator-invoked. If not present, treat as standalone.
 
-When standalone, every instruction in this skill that says "proceed to the next forge step" or "return control to forge" is replaced with "STOP and report status to the user". Do not invoke `pandahrms:forge-pipeline-orchestrator` to continue.
+When standalone, every instruction in this skill that says "proceed to the next forge-pipeline-orchestrator step" or "return control to forge-pipeline-orchestrator" is replaced with "STOP and report status to the user". Do not invoke `pandahrms:forge-pipeline-orchestrator` to continue.
 
 ## Prerequisites
 
@@ -74,13 +74,13 @@ This check runs after Step 1 has resolved the spec directory.
 
 Skip this skill if EITHER condition holds, subject to the listed verification:
 
-- **Condition A -- User chose "Skip specs":** The most recent assistant message in this conversation contains the literal string `Skip specs` as the user's chosen forge option. If true, skip without further verification.
+- **Condition A -- User chose "Skip specs":** The most recent assistant message in this conversation contains the literal string `Skip specs` as the user's chosen forge-pipeline-orchestrator option. If true, skip without further verification.
 - **Condition B -- Zero spec files:** The resolved feature directory from Step 1 contains zero `.feature` files. Verify with `ls <resolved-path>/**/*.feature`. If the directory does not exist, treat as zero files. Before applying skip on Condition B alone, confirm with the user via AskUserQuestion that the resolved spec directory (printed as an absolute path) is correct. Do not skip the skill on Condition B until the user confirms there are intentionally no specs.
 
 If skipped:
 
 - Announce: "Skipping spec-review -- no specs were written for this feature."
-- If invoked from forge: return control to forge for the next step.
+- If invoked from forge-pipeline-orchestrator: return control to forge-pipeline-orchestrator for the next step.
 - If invoked standalone: STOP.
 
 Then proceed to Skill Exit.
@@ -202,7 +202,7 @@ The skill is complete when one of the following has happened:
 - (d) The user chose `Update design to match specs` in Step 6 (STOP after instructing the user).
 - (e) An early exit per the Prerequisites or Skip Condition rules.
 
-After exit, return control to the caller (forge if invoked from forge, otherwise the user). Do not invoke any other skill from within this skill.
+After exit, return control to the caller (forge-pipeline-orchestrator if invoked from forge-pipeline-orchestrator, otherwise the user). Do not invoke any other skill from within this skill.
 
 ## Checklist
 

@@ -1,17 +1,17 @@
 ---
 name: design-refinement
-description: Triggers on (a) feature work, behavioral changes, refactors, or bug fixes that touch more than one file OR change a public interface, OR (b) when forge invokes the design step. Does NOT trigger on typos, single-line config changes, dependency bumps, formatting fixes, or any change that does not alter behavior. Replaces superpowers:brainstorming for Pandahrms projects -- one-question-at-a-time refinement, mandatory test+spec context loading, scope decomposition, sectioned design with mid-design approval. Drops the Visual Companion offer and the post-spec user-review gate (forge step 5 already covers Plan ↔ Spec cross-review).
+description: Triggers on (a) feature work, behavioral changes, refactors, or bug fixes that touch more than one file OR change a public interface, OR (b) when forge-pipeline-orchestrator invokes the design step. Does NOT trigger on typos, single-line config changes, dependency bumps, formatting fixes, or any change that does not alter behavior. Replaces superpowers:brainstorming for Pandahrms projects -- one-question-at-a-time refinement, mandatory test+spec context loading, scope decomposition, sectioned design with mid-design approval. Drops the Visual Companion offer and the post-spec user-review gate (forge-pipeline-orchestrator step 5 already covers Plan ↔ Spec cross-review).
 ---
 
-# Pandahrms Design
+# Pandahrms Design Refinement
 
 ## Overview
 
 Turn a rough idea into a fully formed design through collaborative dialogue. Load existing test + spec context first so the design respects current behavior contracts. Refine the idea one question at a time, propose 2-3 approaches with trade-offs, present the design in sections with approval, then save the design doc uncommitted for the user to review.
 
-This skill is invoked by forge in step 1, and can be invoked directly when refining a design outside the forge pipeline.
+This skill is invoked by forge-pipeline-orchestrator in step 1, and can be invoked directly when refining a design outside the forge-pipeline-orchestrator pipeline.
 
-**Announce at start:** "I'm using Pandahrms design to refine this into a spec."
+**Announce at start:** "I'm using Pandahrms design-refinement to refine this into a spec."
 
 <HARD-GATE>
 Do NOT invoke any implementation skill, write any code, scaffold any project, or take any implementation action until you have presented a design and the user has approved it. This applies to EVERY project regardless of perceived simplicity.
@@ -30,9 +30,9 @@ Run substeps 1-5 strictly sequentially. Do NOT issue Read/Grep/Glob calls for sp
 4. **Read related tests** -- every unit/integration test file in the affected codebase (`*.test.ts`, `*.spec.ts`, `*Tests.cs`, `*_test.go`, etc.). If none exist, note "no existing tests".
 5. **Summarize and confirm** -- emit one short message: `"Loaded N spec scenarios and M test files for this area (pandahrms-spec on branch <name>). Key behaviors covered: [1-2 line summary]."` Then call AskUserQuestion with: `{ 'Scope is correct, refine the idea', 'Scope is wrong -- I will correct it', 'Add more files/specs to the load' }`. Proceed to refinement only on the first option. Free-text replies like "ok", "sure", "go on" do NOT count as confirmation -- restate the AskUserQuestion call instead.
 
-Treat this skill as forge-invoked if and only if forge has announced "Step 1: Design" in the current conversation OR the prior assistant turn explicitly invoked this skill from a forge step. Otherwise treat as standalone.
+Treat this skill as forge-pipeline-orchestrator-invoked if and only if forge-pipeline-orchestrator has announced "Step 1: Design" in the current conversation OR the prior assistant turn explicitly invoked this skill from a forge-pipeline-orchestrator step. Otherwise treat as standalone.
 
-When forge-invoked, the orchestrator may have already loaded this context -- still confirm by stating what was loaded (including the spec branch) before asking the first refinement question. When standalone, run substeps 1-5 in full.
+When forge-pipeline-orchestrator-invoked, the orchestrator may have already loaded this context -- still confirm by stating what was loaded (including the spec branch) before asking the first refinement question. When standalone, run substeps 1-5 in full.
 </HARD-GATE>
 
 ## Spec Branch Alignment
@@ -67,13 +67,13 @@ Every project goes through this process. A todo list, a single-function utility,
 
 Create a task for each item and complete them in order.
 
-1. **Load test + spec context** -- per the HARD-GATE above (or confirm forge already did)
+1. **Load test + spec context** -- per the HARD-GATE above (or confirm forge-pipeline-orchestrator already did)
 2. **Scope check** -- if the request describes multiple independent subsystems, decompose first; do not refine details of a project that needs to be split
 3. **Ask clarifying questions** -- one at a time, multiple-choice preferred, focused on purpose / constraints / success criteria
 4. **Propose 2-3 approaches** -- with trade-offs and your recommendation
 5. **Present design** -- in sections scaled to complexity, get user approval after each section, covering spec impact / test impact / implementation
 6. **Write design doc** -- save to `docs/pandahrms/designs/YYYY-MM-DD-<topic>-design.md`. Do NOT commit -- leave uncommitted for the user to review.
-7. **Hand off** -- announce that design is complete; return control to forge (or to whatever the user requests next). Do NOT invoke any downstream skill in the same turn. End the turn after the handoff message.
+7. **Hand off** -- announce that design is complete; return control to forge-pipeline-orchestrator (or to whatever the user requests next). Do NOT invoke any downstream skill in the same turn. End the turn after the handoff message.
 
 ## Process Flow
 
@@ -132,7 +132,7 @@ Ask exactly one question per AskUserQuestion call. The only exception is the exp
 - You're in section-approval mode (presenting a design section -- one approval at a time).
 - Approach selection (2-3 approaches with trade-offs) -- this gets its own dedicated AskUserQuestion since it shapes everything downstream.
 
-**Section approval gates** for `lightweight` Scope Profile (set after Step 1 in atlas/forge): a single end-of-section approval is enough; do not gate per-section. For `standard` or `heavyweight`, keep the per-section approval flow. If invoked standalone (not from atlas/forge), no Scope Profile exists -- treat the design as `standard` and gate per-section. Lightweight gating applies ONLY when atlas/forge has set Scope Profile = lightweight in the conversation; do not infer lightweight from project size or vibe.
+**Section approval gates** for `lightweight` Scope Profile (set after Step 1 in atlas-pipeline-orchestrator/forge-pipeline-orchestrator): a single end-of-section approval is enough; do not gate per-section. For `standard` or `heavyweight`, keep the per-section approval flow. If invoked standalone (not from atlas-pipeline-orchestrator/forge-pipeline-orchestrator), no Scope Profile exists -- treat the design as `standard` and gate per-section. Lightweight gating applies ONLY when atlas-pipeline-orchestrator/forge-pipeline-orchestrator has set Scope Profile = lightweight in the conversation; do not infer lightweight from project size or vibe.
 
 **Exploring approaches:**
 
@@ -185,9 +185,9 @@ Self-review is exactly the four ordered passes above. Apply all fixes during eac
 
 **Hand off:**
 
-- When invoked from forge, return to forge's checklist (forge will route to spec-writing next)
+- When invoked from forge-pipeline-orchestrator, return to forge-pipeline-orchestrator's checklist (forge-pipeline-orchestrator will route to spec-writing next)
 - When invoked standalone, announce: "Design complete and saved to `<path>`. Ready to write specs or move to planning when you are."
-- Do NOT invoke spec-writing, plan, execute, or any other downstream skill in the same turn as the handoff. Emit only the handoff announcement and stop. The next skill is invoked by forge or by an explicit user message.
+- Do NOT invoke spec-writing, plan-writing, execute-plan, or any other downstream skill in the same turn as the handoff. Emit only the handoff announcement and stop. The next skill is invoked by forge-pipeline-orchestrator or by an explicit user message.
 - After emitting the handoff message, the assistant turn MUST end. Do NOT add follow-up analysis, do NOT call any further tool, do NOT pre-empt the next skill. The handoff message is the LAST content of the turn.
 
 ## Key Principles
@@ -215,7 +215,7 @@ Self-review is exactly the four ordered passes above. Apply all fixes during eac
 | "I'll propose one approach since it's obviously right" | Always 2-3 approaches with trade-offs. The "obvious" one is often wrong on rereading. |
 | "I'll jump to implementation since the user described what they want" | HARD-GATE. No implementation action until a design is presented and approved. |
 | "I'll offer a visual companion in case it's useful" | Not in this skill. Visual companion is a superpowers feature, dropped here for round-trip efficiency. |
-| "I'll re-ask the user to review the saved spec" | No. Forge step 5 (Plan ↔ Spec cross-review) covers that. Don't add a redundant gate here. |
+| "I'll re-ask the user to review the saved spec" | No. Forge-pipeline-orchestrator step 5 (Plan ↔ Spec cross-review) covers that. Don't add a redundant gate here. |
 
 ## Forbidden Outputs
 
@@ -225,7 +225,7 @@ This skill MUST NOT produce, write, or stage any of the following:
 - Test files
 - EF migration files
 - Spec / `.feature` files (those belong to spec-writing)
-- Implementation plan files (those belong to plan)
+- Implementation plan files (those belong to plan-writing)
 - Git commits or stashes
 - Code blocks longer than 20 lines inside the design doc (use prose + interface signatures instead)
 
@@ -233,7 +233,7 @@ This skill MUST NOT produce, write, or stage any of the following:
 
 - Any development work in a Pandahrms project that needs design before code
 - Features, bug fixes, refactors, behavioral changes
-- Invoked by forge (most common path) or directly by the user
+- Invoked by forge-pipeline-orchestrator (most common path) or directly by the user
 
 ## When NOT to Use
 

@@ -1,15 +1,15 @@
 ---
 name: plan-writing
-description: Triggers when an approved design and (optionally) Gherkin specs need to be turned into a bite-sized implementation plan in a Pandahrms project. Replaces superpowers:writing-plans. Each task carries exact file paths, complete code, a Red-before-Green TDD step pair, a spec scenario reference (when specs exist), a test file/case reference, and a dependency marker so atlas can parallel-dispatch. Drops superpowers' duplication mandate ("repeat the code in every task") and the inline-vs-subagent execution choice -- atlas always uses pandahrms:execute-plan.
+description: Triggers when an approved design and (optionally) Gherkin specs need to be turned into a bite-sized implementation plan in a Pandahrms project. Replaces superpowers:writing-plans. Each task carries exact file paths, complete code, a Red-before-Green TDD step pair, a spec scenario reference (when specs exist), a test file/case reference, and a dependency marker so atlas-pipeline-orchestrator can parallel-dispatch. Drops superpowers' duplication mandate ("repeat the code in every task") and the inline-vs-subagent execution choice -- atlas-pipeline-orchestrator always uses pandahrms:execute-plan.
 ---
 
-# Pandahrms Plan
+# Pandahrms Plan Writing
 
 ## Overview
 
 Write a comprehensive implementation plan that an enthusiastic junior engineer with no project context could execute end-to-end. Each task has exact file paths, complete code, and verification steps. Plans are bite-sized (2-5 min per step), Red-Green-Refactor by default, and frequent-commit. DRY, YAGNI, TDD.
 
-**Announce at start:** "I'm using Pandahrms plan to turn the design into an implementation plan."
+**Announce at start:** "I'm using Pandahrms plan-writing to turn the design into an implementation plan."
 
 **Save plans to:** `docs/pandahrms/plans/YYYY-MM-DD-<feature-name>.md` using today's date. Use a different path ONLY when the project's `CLAUDE.md` declares a different `plans/` location, in which case use that. Do not infer paths from any other source.
 
@@ -31,7 +31,7 @@ Run these steps strictly in order. Do not parallelize, reorder, or skip any step
 Verify ALL of the following before emitting any plan content. If any check fails, STOP and follow the listed remedy.
 
 1. **Design doc exists.** A design doc MUST live at `docs/pandahrms/designs/<feature-name>.md`. If it does not, output `No design doc found at docs/pandahrms/designs/. Run pandahrms:design-refinement first.` and stop.
-2. **Design doc is approved.** Approval is signaled by either (a) the orchestrator (forge or atlas) routing this skill the design after its approval gate, or (b) a `Status: approved` line in the design doc's frontmatter or top section. If neither signal is present, output `Cannot confirm design approval. Confirm explicitly before continuing.` and wait for an explicit user reply before continuing.
+2. **Design doc is approved.** Approval is signaled by either (a) the orchestrator (forge-pipeline-orchestrator or atlas-pipeline-orchestrator) routing this skill the design after its approval gate, or (b) a `Status: approved` line in the design doc's frontmatter or top section. If neither signal is present, output `Cannot confirm design approval. Confirm explicitly before continuing.` and wait for an explicit user reply before continuing.
 3. **Design doc is complete.** The design doc MUST contain a Goal section, a Functional Requirements list, and a Tech Stack section. If any are missing, output `Design doc is incomplete. Missing sections: [list].` and stop. Do not invent content for missing sections.
 4. **Specs exist OR skip-specs path is declared.** If business behavior is in scope, spec files MUST exist under `pandahrms-spec/features/<area>/`. If neither is true, output `No specs found and skip-specs path not declared. Run pandahrms:spec-writing first or confirm UI-only / skip-specs path explicitly.` and stop.
 5. **Scope Profile is set.** The orchestrator sets `lightweight | standard | heavyweight` after design approval. If absent, default to `standard` and announce: `Scope Profile not set; defaulting to standard.`
@@ -62,7 +62,7 @@ Each step is one action (2-5 minutes):
 
 ## Task Decomposition Heuristics
 
-The orchestrator (atlas/forge) sets a Scope Profile after design approval. Use it to right-size the plan:
+The orchestrator (atlas-pipeline-orchestrator/forge-pipeline-orchestrator) sets a Scope Profile after design approval. Use it to right-size the plan:
 
 | Scope Profile | Target task count | Decomposition rule |
 |---------------|-------------------|---------------------|
@@ -104,7 +104,7 @@ Some steps are not implementer work -- they are operator commands that the user 
 - `dotnet ef database update` against a local DB
 - Deploying a service so swagger is live before FE work begins
 
-These should NOT be numbered tasks in the plan. They appear as **Manual Gate** entries between tasks, marked with the command and a one-line "why this gate exists" note. Atlas reads gates and pauses execution to surface them to the user; once the user confirms completion, atlas resumes with the next task.
+These should NOT be numbered tasks in the plan. They appear as **Manual Gate** entries between tasks, marked with the command and a one-line "why this gate exists" note. Atlas-pipeline-orchestrator reads gates and pauses execution to surface them to the user; once the user confirms completion, atlas-pipeline-orchestrator resumes with the next task.
 
 **Placement rule:** Place each Manual Gate immediately after the last task whose output the gate consumes, and immediately before the first task that depends on the gate. Example: the `pnpm openapi-ts` gate goes immediately after the BE endpoint task and immediately before the first FE task that imports the regenerated type. A Manual Gate MUST NOT appear before any task it does not gate, and MUST NOT be bunched at the top or bottom of the plan.
 
@@ -153,7 +153,7 @@ Each task carries four required references when business behavior is in scope:
 - **Files** -- exact create/modify/test paths
 - **Spec ref** -- the Gherkin scenario(s) the task implements (omit only when no specs exist)
 - **Test ref** -- the test file and case names the task adds or modifies
-- **Depends on** -- task IDs this one waits for, or `none` if independent (atlas uses this to parallel-dispatch)
+- **Depends on** -- task IDs this one waits for, or `none` if independent (atlas-pipeline-orchestrator uses this to parallel-dispatch)
 
 ````markdown
 ### Task N: [Component Name]
@@ -206,7 +206,7 @@ Expected: PASS
 
 If duplication appeared with `approveGoal`, extract a shared `mutateApprovalState(goalId, patch)` helper. Re-run the test after each refactor step. Skip this step if no refactor opportunity exists.
 
-- [ ] **Step 6: Stage changes (do NOT commit -- atlas defers commits to /hermes-commit)**
+- [ ] **Step 6: Stage changes (do NOT commit -- atlas-pipeline-orchestrator defers commits to /hermes-commit)**
 
 Run: `git add tests/services/goal-approval.test.ts src/services/goal-approval.ts`
 ````
@@ -223,7 +223,7 @@ Each task that touches production code or specs MUST carry:
    - **Test ref** -- the test file path and the new/changed test case name(s). Required for any task that does NOT match a [No-Test-Pattern Category](#no-test-pattern-categories).
    - **Verification** -- only allowed for tasks in the No-Test-Pattern Categories below. The Verification slot accepts ONLY these category labels in parentheses: `(EF mapping)`, `(EF migration)`, `(read DTO + projection)`, `(API regen)`, `(pure config)`. Any other label is invalid and forces the task to use a Test ref. State the category in parens, then describe how the task is actually verified (e.g. `Verification: (EF mapping) -- no unit-test pattern in this codebase; verified via integration test of the consuming endpoint + runtime`). Tasks using a Verification slot do NOT run a Red-Green-Refactor cycle and skip the RED/GREEN markers in implementer reports.
 3. **Red-before-Green ordering** -- when a Test ref is used, the failing-test step always precedes the implementation step. No production code without a failing test. (Verification-slot tasks are exempt -- they have no test to write.)
-4. **Depends on** -- explicit task IDs, or `none`. Independent tasks let atlas parallel-dispatch and cut wall-clock time.
+4. **Depends on** -- explicit task IDs, or `none`. Independent tasks let atlas-pipeline-orchestrator parallel-dispatch and cut wall-clock time.
 
 ### No-Test-Pattern Categories
 
@@ -260,11 +260,11 @@ When two tasks share similar code, choose between repeating the code or referenc
   - It lives in the same file as the referenced task.
   - The difference is a single named field, argument, or value, statable in one sentence.
 
-Format for a valid reference: `"Same shape as Task 3 Step 3, but with field 'archivedAt' instead of 'approvedAt'."` Atlas dispatches independent tasks to fresh subagents that read the plan with no prior context, so repetition is safer than reference whenever the rules above don't unambiguously authorize a reference.
+Format for a valid reference: `"Same shape as Task 3 Step 3, but with field 'archivedAt' instead of 'approvedAt'."` Atlas-pipeline-orchestrator dispatches independent tasks to fresh subagents that read the plan with no prior context, so repetition is safer than reference whenever the rules above don't unambiguously authorize a reference.
 
 ## No Commits in Plan Steps
 
-The plan MUST NOT include a `git commit` step in any task. Atlas defers commits to `/hermes-commit` after the user has tested. Each task ends with:
+The plan MUST NOT include a `git commit` step in any task. Atlas-pipeline-orchestrator defers commits to `/hermes-commit` after the user has tested. Each task ends with:
 
 - **Stage changes** -- `git add <files>` only
 
@@ -298,13 +298,13 @@ The plan MUST already be saved to its path with the Write tool (Execution Order 
 
 After the plan is saved and Self-Review is complete, announce:
 
-> "Plan complete and saved to `<path>`. Atlas will run Plan ↔ Spec cross-review next, then dispatch tasks to pandahrms:execute-plan."
+> "Plan complete and saved to `<path>`. Atlas-pipeline-orchestrator will run Plan ↔ Spec cross-review next, then dispatch tasks to pandahrms:execute-plan."
 
-Do NOT ask the user to choose between inline and subagent execution. Atlas always uses pandahrms:execute-plan with parallel dispatch.
+Do NOT ask the user to choose between inline and subagent execution. Atlas-pipeline-orchestrator always uses pandahrms:execute-plan with parallel dispatch.
 
-When invoked outside atlas (rare), announce instead:
+When invoked outside atlas-pipeline-orchestrator (rare), announce instead:
 
-> "Plan complete and saved to `<path>`. Run pandahrms:execute-plan to implement, or hand the file to atlas via `/atlas-pipeline-orchestrator <path>` for the full pipeline."
+> "Plan complete and saved to `<path>`. Run pandahrms:execute-plan to implement, or hand the file to atlas-pipeline-orchestrator via `/atlas-pipeline-orchestrator <path>` for the full pipeline."
 
 **End of skill.** After printing the announcement, end your turn. Do NOT begin implementing any task. Do NOT modify any source files. Do NOT run any tests. Do NOT invoke pandahrms:execute-plan, /hermes-commit, or any follow-up skill from this skill.
 
@@ -314,14 +314,14 @@ When invoked outside atlas (rare), announce instead:
 |---------|---------|
 | "I'll write 'add validation here' to keep tasks short" | No placeholders. Show the actual validation code. |
 | "Tasks 4 and 6 are nearly identical, I'll just say 'similar to Task 4'" | Default to repeating the code. Reference earlier tasks only when execution is strictly sequential. |
-| "I'll add a `git commit` at the end of each task" | Never. Atlas + /hermes-commit own the commit step. Plans only stage changes. |
+| "I'll add a `git commit` at the end of each task" | Never. Atlas-pipeline-orchestrator + /hermes-commit own the commit step. Plans only stage changes. |
 | "This task touches production code but the test is 'obvious'" | Every production-code task carries either a Test ref or, if it falls in a recognized No-Test-Pattern Category (EF mapping, migration, read DTO + projection, API regen, pure config), a Verification slot. "Obvious" is not a category. |
 | "This EF mapping has a HasConversion lambda doing real work, but it's still 'just a mapping'" | No -- once there's behavior in the mapping, it needs a real Test ref against that behavior. The Verification slot is for mechanical mapping only. |
 | "I'll invent a new no-test-pattern category since this task feels mechanical" | The category list is closed. If you think a new one belongs there, surface the discussion to the user before using a Verification slot. |
 | "I'll skip the spec ref for this small task" | If specs exist for the area, every task has a spec ref. If no specs exist (UI-only / skip-specs), say so in the header. |
-| "I'll let the engineer figure out task dependencies" | Mark dependencies explicitly. Atlas parallel-dispatches based on this -- missing markers serialize the run. |
-| "I'll let writing-plans-style mandate decide whether to duplicate code" | Pandahrms plan picks pragmatically: reference earlier tasks when sequential, repeat code when parallel-dispatched. Default to repeating. |
-| "I'll ask the user to choose inline vs subagent at the end" | No. Atlas always uses pandahrms:execute-plan. Don't add the choice. |
+| "I'll let the engineer figure out task dependencies" | Mark dependencies explicitly. Atlas-pipeline-orchestrator parallel-dispatches based on this -- missing markers serialize the run. |
+| "I'll let writing-plans-style mandate decide whether to duplicate code" | Pandahrms plan-writing picks pragmatically: reference earlier tasks when sequential, repeat code when parallel-dispatched. Default to repeating. |
+| "I'll ask the user to choose inline vs subagent at the end" | No. Atlas-pipeline-orchestrator always uses pandahrms:execute-plan. Don't add the choice. |
 
 ## Remember
 
@@ -336,7 +336,7 @@ When invoked outside atlas (rare), announce instead:
 ## When to Use
 
 - After `pandahrms:design-refinement` and (optionally) `pandahrms:spec-writing` have completed
-- Invoked by atlas in step 4, or directly when the user hands you a design + spec set
+- Invoked by atlas-pipeline-orchestrator in step 4, or directly when the user hands you a design + spec set
 
 ## When NOT to Use
 

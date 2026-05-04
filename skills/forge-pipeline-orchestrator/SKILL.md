@@ -1,9 +1,9 @@
 ---
 name: forge-pipeline-orchestrator
-description: Triggers on any mention of starting new work, building a feature, adding functionality, fixing a bug, refactoring, brainstorming, designing, writing a plan, or executing an existing plan in a Pandahrms project. Use INSTEAD of superpowers:brainstorming for any development work that needs design and specs before implementation. Also triggers on "forge", "run the pipeline", or being handed a plan file.
+description: Triggers on any mention of starting new work, building a feature, adding functionality, fixing a bug, refactoring, brainstorming, designing, writing a plan, or executing an existing plan in a Pandahrms project. Use INSTEAD of superpowers:brainstorming for any development work that needs design and specs before implementation. Also triggers on "forge-pipeline-orchestrator", "forge", "run the pipeline", or being handed a plan file.
 ---
 
-# Pandahrms Forge
+# Pandahrms Forge Pipeline Orchestrator
 
 ## Overview
 
@@ -11,7 +11,7 @@ Unified pipeline for Pandahrms projects: brainstorm, spec writing, QA review, im
 
 **Use this skill INSTEAD of invoking `superpowers:brainstorming` directly** in any Pandahrms project.
 
-**Announce at start:** "I'm using Pandahrms forge to orchestrate design through execution."
+**Announce at start:** "I'm using Pandahrms forge-pipeline-orchestrator to orchestrate design through execution."
 
 ## Pipeline Selection (first action)
 
@@ -33,16 +33,16 @@ Use AskUserQuestion:
 question: "Which pipeline should run this work?"
 header: "Pipeline"
 options:
-  - label: "Forge (superpowers-based)"
+  - label: "Forge Pipeline Orchestrator (superpowers-based)"
     description: "Current behavior. Uses superpowers:brainstorming, superpowers:writing-plans, and superpowers:subagent-driven-development with mandatory two-stage review on every task. Highest review depth, slowest per-task throughput."
-  - label: "Atlas (no-superpowers, faster) (Recommended)"
+  - label: "Atlas Pipeline Orchestrator (no-superpowers, faster) (Recommended)"
     description: "Pandahrms-native pipeline. Uses pandahrms:design-refinement, pandahrms:plan-writing, pandahrms:execute-plan. Single-stage review by default; second-stage review only on tasks tagged Risk: high. Faster per-task throughput, equivalent design + planning rigor."
 ```
 
 ### After the answer
 
-- **"Forge"** -- announce "Continuing with Forge (superpowers-based pipeline)." Proceed to Fast Path / Resume Path / Codex Availability detection and the rest of this skill.
-- **"Atlas"** -- announce "Handing off to pandahrms:atlas-pipeline-orchestrator. Forge ends here." Invoke `pandahrms:atlas-pipeline-orchestrator` (passing along any plan file path or `--resume` flag the user provided) and STOP. Do not continue any of the steps below.
+- **"Forge Pipeline Orchestrator"** -- announce "Continuing with Forge Pipeline Orchestrator (superpowers-based pipeline)." Proceed to Fast Path / Resume Path / Codex Availability detection and the rest of this skill.
+- **"Atlas Pipeline Orchestrator"** -- announce "Handing off to pandahrms:atlas-pipeline-orchestrator. forge-pipeline-orchestrator ends here." Invoke `pandahrms:atlas-pipeline-orchestrator` (passing along any plan file path or `--resume` flag the user provided) and STOP. Do not continue any of the steps below.
 
 ## Fast Path (plan provided)
 
@@ -58,13 +58,13 @@ If invoked with a plan file path (e.g., `/forge-pipeline-orchestrator path/to/pl
 If invoked with `/forge-pipeline-orchestrator --resume`:
 
 1. Read the plan file's `## Forge Progress` section to determine which steps completed and their timing
-2. Announce: "Resuming forge from step N -- [step name]."
+2. Announce: "Resuming forge-pipeline-orchestrator from step N -- [step name]."
 3. Continue from the next incomplete step with full time tracking
-4. If no plan file exists or has no progress section, announce: "No forge state found -- starting fresh." and begin from step 1
+4. If no plan file exists or has no progress section, announce: "No forge-pipeline-orchestrator state found -- starting fresh." and begin from step 1
 
 ## Codex Availability
 
-At the very start of every forge run (before step 1, including Fast Path and Resume Path), detect whether Codex is available locally.
+At the very start of every forge-pipeline-orchestrator run (before step 1, including Fast Path and Resume Path), detect whether Codex is available locally.
 
 1. Run `command -v codex` via Bash. Empty stdout means unavailable.
 2. Store the result in conversation context as `codex_available` (true/false). Persist it into the plan file's `## Forge Progress` section once the plan exists, on a `Codex available: true|false` line, so resumed runs do not need to re-detect.
@@ -83,11 +83,11 @@ Announce at start: `"Codex detected -- routing QA review and Plan ↔ Spec cross
 <HARD-GATE>
 OVERRIDE: When the brainstorming skill completes and instructs you to "invoke writing-plans", do NOT invoke writing-plans. Instead, return to THIS skill and ask the user whether they want to write specs first.
 
-The brainstorming skill says: "The ONLY skill you invoke after brainstorming is writing-plans." In Pandahrms projects, this instruction is OVERRIDDEN by forge. You MUST ask the user before proceeding.
+The brainstorming skill says: "The ONLY skill you invoke after brainstorming is writing-plans." In Pandahrms projects, this instruction is OVERRIDDEN by forge-pipeline-orchestrator. You MUST ask the user before proceeding.
 </HARD-GATE>
 
 <HARD-GATE>
-OVERRIDE: At the end of `superpowers:writing-plans`, the skill asks the user to choose between "Subagent-Driven" and "Inline Execution". DO NOT present this choice. Auto-select subagent-driven and proceed first to step 5 (Plan ↔ Spec cross-review), then to step 6 (Execute). Forge requires subagent-driven execution — inline execution is not an option.
+OVERRIDE: At the end of `superpowers:writing-plans`, the skill asks the user to choose between "Subagent-Driven" and "Inline Execution". DO NOT present this choice. Auto-select subagent-driven and proceed first to step 5 (Plan ↔ Spec cross-review), then to step 6 (Execute). forge-pipeline-orchestrator requires subagent-driven execution — inline execution is not an option.
 
 Announce: "Plan complete. Running Plan ↔ Spec cross-review, then subagent-driven execution."
 </HARD-GATE>
@@ -109,13 +109,13 @@ AUTHORITY HIERARCHY:
 </HARD-GATE>
 
 <HARD-GATE>
-TDD + SDD AT DESIGN TIME: Before any brainstorming or planning, you MUST load existing tests and specs as context. Applies to **every** forge run -- new features, bug fixes, refactors. This gate is the full contract for Step 1 (`Load context and brainstorm the design`); the checklist entry just points back here.
+TDD + SDD AT DESIGN TIME: Before any brainstorming or planning, you MUST load existing tests and specs as context. Applies to **every** forge-pipeline-orchestrator run -- new features, bug fixes, refactors. This gate is the full contract for Step 1 (`Load context and brainstorm the design`); the checklist entry just points back here.
 
 1. **Identify the affected area** -- module/feature/file paths the change will touch. Ask the user if unclear.
 2. **Read related specs** -- every `.feature` file in `pandahrms-spec` for that area, using Grep/Glob. If none exist, note "no existing specs".
 3. **Read related tests** -- every unit/integration test file in the affected codebase (`*.test.ts`, `*.spec.ts`, `*Tests.cs`, `*_test.go`, etc.). If none exist, note "no existing tests".
 4. **Summarize for the user and pause** -- one short message: `"Loaded N spec scenarios and M test files for this area. Key behaviors covered: [1-2 line summary]."` Wait for the user to confirm scope before brainstorming.
-5. **Brainstorm test + spec changes FIRST, then implementation** -- invoke `superpowers:brainstorming`. The brainstorm output MUST address, in this order: (a) **spec impact** (which scenarios change/add/remove, with justification), (b) **test impact** (which test files/cases change/add, what each new test will assert in failing-test-first framing), then (c) **implementation approach**. Do NOT auto-commit the design doc -- leave it uncommitted for the user to review. When brainstorming says to "invoke writing-plans", STOP and return to the forge checklist.
+5. **Brainstorm test + spec changes FIRST, then implementation** -- invoke `superpowers:brainstorming`. The brainstorm output MUST address, in this order: (a) **spec impact** (which scenarios change/add/remove, with justification), (b) **test impact** (which test files/cases change/add, what each new test will assert in failing-test-first framing), then (c) **implementation approach**. Do NOT auto-commit the design doc -- leave it uncommitted for the user to review. When brainstorming says to "invoke writing-plans", STOP and return to the forge-pipeline-orchestrator checklist.
 6. **Plan tasks must reference both** -- every implementation task names the spec scenario(s) it satisfies AND the test file(s)/case(s) it touches.
 7. **Never write production code before the test exists** -- enforced at execution by `superpowers:test-driven-development`. The test plan is shaped here at design time.
 
@@ -207,7 +207,7 @@ You MUST create a task for each of these items and complete them in order. Apply
 
 ## Time Tracking
 
-Track **active work time** across the full forge run -- time spent by Claude doing work, excluding time waiting for user input or blocked on external factors. Display a summary when execution completes.
+Track **active work time** across the full forge-pipeline-orchestrator run -- time spent by Claude doing work, excluding time waiting for user input or blocked on external factors. Display a summary when execution completes.
 
 ### How to track
 
@@ -251,10 +251,10 @@ Use the plan file as the single source of truth for both progress tracking and t
 
 Use the Read and Write tools for all plan file I/O. Only use Bash for `date +%s`.
 
-**On forge start:**
+**On forge-pipeline-orchestrator start:**
 
 1. Run `date +%s` in Bash to get the epoch
-2. Hold the forge start time and step timestamps in conversation context until the plan file is created
+2. Hold the forge-pipeline-orchestrator start time and step timestamps in conversation context until the plan file is created
 
 **On plan creation (step 4):**
 
@@ -472,7 +472,7 @@ If `codex_available` is false, perform the review inline:
 - **Gaps found** -- present the report. Use AskUserQuestion to ask how to resolve:
   - **"Update the plan"** -- loop back to `superpowers:writing-plans` to add missing tasks, spec references, or test references. For fast-path plans, edit the plan file directly to add the missing references rather than re-running writing-plans.
   - **"Update the spec"** -- loop back to `pandahrms:spec-writing` to remove or adjust scenarios that aren't planned.
-  - **"Proceed anyway"** -- append the gap as a bullet to the `### Acknowledged Gaps` block beneath the Forge Progress table (create the block if it doesn't exist), then continue. Step 8 will surface every entry there to the user so they can verify the missing behavior manually or queue a follow-up forge run.
+  - **"Proceed anyway"** -- append the gap as a bullet to the `### Acknowledged Gaps` block beneath the Forge Progress table (create the block if it doesn't exist), then continue. Step 8 will surface every entry there to the user so they can verify the missing behavior manually or queue a follow-up forge-pipeline-orchestrator run.
 
 Do not proceed to execution while gaps remain unresolved unless the user explicitly acknowledges them.
 
@@ -519,7 +519,7 @@ what to build.
 
 | Thought | Reality |
 |---------|---------|
-| "Brainstorming said invoke writing-plans" | Forge overrides that for Pandahrms projects |
+| "Brainstorming said invoke writing-plans" | forge-pipeline-orchestrator overrides that for Pandahrms projects |
 | "I'll just brainstorm without reading existing tests/specs" | Step 1 mandates loading test + spec context FIRST. Designs without that grounding miss compatibility issues and produce retrofitted tests. |
 | "It's a bug fix, no need to discuss tests upfront" | Bug fixes especially need a failing test that would have caught the bug. Brainstorm must propose that test before the fix is designed. |
 | "I read the specs but skipped the existing tests" | Both are required. Tests encode the actual implemented behavior; specs encode the intended behavior. You need both to design correctly. |

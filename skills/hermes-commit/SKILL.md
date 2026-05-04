@@ -91,7 +91,7 @@ Stop at the first match.
 Distinguish two failure modes:
 
 - **Tool missing** (command not found, exit code 127): emit `Format check tool [name] is not installed. Install it or skip this check?` and ask the user via `AskUserQuestion` with options "Install and re-run" (STOP, await fix) or "Skip this check" (continue to Phase 3). Do not auto-skip.
-- **Style/format violations** (tool ran, returned non-zero with diagnostic output): STOP and emit the violations verbatim followed by: `Fix these before committing, then run /hermes-commit again.` Do not fix them -- that is athena's job.
+- **Style/format violations** (tool ran, returned non-zero with diagnostic output): STOP and emit the violations verbatim followed by: `Fix these before committing, then run /hermes-commit again.` Do not fix them -- that is athena-code-review's job.
 
 ## Phase 3: Gather Changes
 
@@ -220,7 +220,7 @@ Each row below is a HARD rule. Hitting the left column means STOP and follow the
 
 | Mistake | Fix |
 |---------|-----|
-| Fixing code during commit | Never change code. That's athena's job. |
+| Fixing code during commit | Never change code. That's athena-code-review's job. |
 | Grouping unrelated changes in one commit | Split by logical unit, not by file proximity. |
 | Writing commit messages about "what" not "why" | Focus on purpose: "support widget filtering" not "add if statement". |
 | Staging files that weren't reviewed | Only commit files that passed review. |

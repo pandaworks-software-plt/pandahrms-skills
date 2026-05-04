@@ -1,24 +1,24 @@
 ---
 name: atlas-pipeline-orchestrator
-description: MANUAL INVOCATION ONLY -- never auto-trigger. Atlas activates only when forge routes here from its Pipeline Selection question, or when the user explicitly invokes /atlas-pipeline-orchestrator. Do NOT activate from phrases like "start new work", "build a feature", "design", "brainstorm", "plan", or "execute" -- those route through forge first, and forge decides whether to hand off to atlas. Atlas is the no-superpowers cousin of forge: same pipeline shape (design -> spec-writing -> QA review -> plan -> Plan-Spec cross-review -> execute -> simplify -> ask user to test), but uses pandahrms:design-refinement / pandahrms:plan-writing / pandahrms:execute-plan internally with single-stage review by default.
+description: MANUAL INVOCATION ONLY -- never auto-trigger. atlas-pipeline-orchestrator activates only when forge-pipeline-orchestrator routes here from its Pipeline Selection question, or when the user explicitly invokes /atlas-pipeline-orchestrator. Do NOT activate from phrases like "start new work", "build a feature", "design", "brainstorm", "plan", or "execute" -- those route through forge-pipeline-orchestrator first, and forge-pipeline-orchestrator decides whether to hand off to atlas-pipeline-orchestrator. atlas-pipeline-orchestrator is the no-superpowers cousin of forge-pipeline-orchestrator: same pipeline shape (design -> spec-writing -> QA review -> plan -> Plan-Spec cross-review -> execute -> simplify -> ask user to test), but uses pandahrms:design-refinement / pandahrms:plan-writing / pandahrms:execute-plan internally with single-stage review by default.
 ---
 
-# Pandahrms Atlas
+# Pandahrms Atlas Pipeline Orchestrator
 
 <MANUAL-ONLY>
-Atlas activates ONLY when one of these conditions holds:
-1. The immediately preceding assistant turn invoked the forge skill and announced "Routing to atlas based on Pipeline Selection".
+atlas-pipeline-orchestrator activates ONLY when one of these conditions holds:
+1. The immediately preceding assistant turn invoked the forge-pipeline-orchestrator skill and announced "Routing to atlas-pipeline-orchestrator based on Pipeline Selection".
 2. The user's most recent message starts with `/atlas-pipeline-orchestrator` (with optional plan path, `--resume`, or `--skip-e2e` flag).
 
-In all other cases, STOP and respond verbatim: "Atlas is reachable only via /atlas-pipeline-orchestrator or via forge's Pipeline Selection. Run /forge-pipeline-orchestrator to start." Do NOT auto-activate from work-start triggers, brainstorming triggers, planning triggers, or execution triggers -- forge owns the entry point for all such phrases.
+In all other cases, STOP and respond verbatim: "Atlas Pipeline Orchestrator is reachable only via /atlas-pipeline-orchestrator or via forge-pipeline-orchestrator's Pipeline Selection. Run /forge-pipeline-orchestrator to start." Do NOT auto-activate from work-start triggers, brainstorming triggers, planning triggers, or execution triggers -- forge-pipeline-orchestrator owns the entry point for all such phrases.
 </MANUAL-ONLY>
 
 <SINGLE-INSTANCE>
-Only one atlas pipeline runs in a session at a time. Before starting, check whether a plan file exists with an `## Atlas Progress` section that has incomplete steps. If so, STOP and ask the user via AskUserQuestion: "An atlas run is already in progress for plan '<path>'. How would you like to proceed?" with options: "Resume existing run", "Abort existing and start fresh", "Cancel this invocation". Do not silently start a parallel run.
+Only one atlas-pipeline-orchestrator pipeline runs in a session at a time. Before starting, check whether a plan file exists with an `## Atlas Progress` section that has incomplete steps. If so, STOP and ask the user via AskUserQuestion: "An atlas-pipeline-orchestrator run is already in progress for plan '<path>'. How would you like to proceed?" with options: "Resume existing run", "Abort existing and start fresh", "Cancel this invocation". Do not silently start a parallel run.
 </SINGLE-INSTANCE>
 
 <STATE-FILES>
-Atlas state lives ONLY in:
+Atlas Pipeline Orchestrator state lives ONLY in:
 - The design doc at `docs/pandahrms/designs/<...>.md`
 - The plan file's `## Atlas Progress` section
 - Updated `.feature` spec files in `pandahrms-spec`
@@ -35,9 +35,9 @@ All AskUserQuestion option labels shown in this skill are CANONICAL. Use them ve
 
 Unified Pandahrms-native pipeline: design, spec writing, QA review, implementation planning, Plan <-> Spec cross-review, and subagent-driven execution -- all in a single session, with no superpowers dependency.
 
-Atlas is the no-superpowers cousin of `forge`. The pipeline shape is the same; the component skills swap from `superpowers:*` to `pandahrms:*`. The biggest practical difference is per-task throughput: atlas runs single-stage review by default and only opts into a second-stage spec-compliance reviewer for tasks the plan tags `**Risk:** high`. This was the v4->v5 superpowers change that produced the largest slowdown.
+Atlas Pipeline Orchestrator is the no-superpowers cousin of `forge-pipeline-orchestrator`. The pipeline shape is the same; the component skills swap from `superpowers:*` to `pandahrms:*`. The biggest practical difference is per-task throughput: atlas-pipeline-orchestrator runs single-stage review by default and only opts into a second-stage spec-compliance reviewer for tasks the plan tags `**Risk:** high`. This was the v4->v5 superpowers change that produced the largest slowdown.
 
-**Announce at start:** "I'm using Pandahrms atlas to orchestrate design through execution (no-superpowers mode). Routed here from forge."
+**Announce at start:** "I'm using Pandahrms atlas-pipeline-orchestrator to orchestrate design through execution (no-superpowers mode). Routed here from forge-pipeline-orchestrator."
 
 ## Fast Path (plan provided)
 
@@ -49,7 +49,7 @@ When `/atlas-pipeline-orchestrator` is invoked with a positional argument that i
 If validation passes, run Step 0 (Setup) FIRST, THEN announce "Executing existing plan -- running Plan <-> Spec cross-review, then execution.", THEN skip directly to step 5 (Plan <-> Spec cross-review), then step 6 (Execute plan).
 
 - Step 0 runs in full -- codex detection and time tracking init still happen, even on Fast Path.
-- On Fast Path entry, before Step 6 invokes pandahrms:execute-plan, atlas MUST re-prompt the user for codex execution mode via AskUserQuestion when `codex_available` is true, regardless of whether `Codex execution mode:` is already set in the Atlas Progress section. Stale modes from prior sessions are not inherited silently. Update the Atlas Progress section with the new value before dispatch.
+- On Fast Path entry, before Step 6 invokes pandahrms:execute-plan, atlas-pipeline-orchestrator MUST re-prompt the user for codex execution mode via AskUserQuestion when `codex_available` is true, regardless of whether `Codex execution mode:` is already set in the Atlas Progress section. Stale modes from prior sessions are not inherited silently. Update the Atlas Progress section with the new value before dispatch.
 - Still run step 5 to catch drift between the pre-existing plan and current specs.
 - After execution, still run step 7 (simplify), step 8 (Playwright e2e), and step 9 (ask user to test) with the Development Summary.
 
@@ -59,10 +59,10 @@ If invoked with `/atlas-pipeline-orchestrator --resume`:
 
 1. Read the plan file's `## Atlas Progress` section to determine which steps completed and their timing.
 2. Validate the section: it MUST have a parseable step table AND `Atlas started:` AND `Codex available:` lines. If any are missing or malformed, STOP and ask the user via AskUserQuestion: "Plan file's Atlas Progress section is malformed or unparseable. How would you like to proceed?" with options: "Start fresh (overwrite progress section)", "Abort so I can fix it manually". Do not auto-recover.
-3. Announce: "Resuming atlas from step N -- [step name]."
+3. Announce: "Resuming atlas-pipeline-orchestrator from step N -- [step name]."
 4. Continue from the next incomplete step with full time tracking.
-5. If no plan file exists, announce: "No atlas state found -- starting fresh." and begin from Step 0 (Setup), then Step 1.
-6. If a plan file exists but has no `## Atlas Progress` section, STOP and prompt via AskUserQuestion: "Plan file exists but has no atlas state. How would you like to proceed?" with canonical options: "Treat as Fast Path (start at Step 5)", "Start fresh (overwrite plan)", "Cancel". Do not silently fall through to Step 1.
+5. If no plan file exists, announce: "No atlas-pipeline-orchestrator state found -- starting fresh." and begin from Step 0 (Setup), then Step 1.
+6. If a plan file exists but has no `## Atlas Progress` section, STOP and prompt via AskUserQuestion: "Plan file exists but has no atlas-pipeline-orchestrator state. How would you like to proceed?" with canonical options: "Treat as Fast Path (start at Step 5)", "Start fresh (overwrite plan)", "Cancel". Do not silently fall through to Step 1.
 7. After resuming, run all remaining incomplete steps in order through Step 9 inclusive. Resume mode does NOT change which steps run -- only which step the run starts at. The Step 9 termination rules apply identically to resumed runs.
 
 ## Scope Profile
@@ -78,7 +78,7 @@ After the design is approved (end of Step 1), classify the work into a **Scope P
 |---------|---------------------------|------------------|
 | **lightweight** | • Touches <3 production source files (see [Production Source File](#production-source-file) for definition), AND<br>• No schema migration / EF migration, AND<br>• No auth, multi-tenant boundary, billing, payment, or PII change, AND<br>• No breaking API change (additive endpoints/fields are fine), AND<br>• Plan estimate <8 tasks | • QA review (Step 3) auto-skips even at >=3 new scenarios<br>• Plan-Spec cross-review (Step 5) runs in pragmatic mode (only business-logic tasks need Test refs flagged; wiring/property tasks are accepted)<br>• Simplify (Step 7) auto-skips unless Execute reported `DONE_WITH_CONCERNS` for any task<br>• Plan tightening: target 5-7 tasks, collapse strictly-sequential wiring, mechanical commands become Manual Gates not tasks<br>• Design (Step 1) MUST batch clarifying questions into a single AskUserQuestion call when 2-4 of them are causally independent (definition: the user's answer to question A does not change the wording, options, or applicability of question B). Otherwise ask sequentially. |
 | **standard** | Anything that doesn't match `lightweight` and doesn't match `heavyweight` | Default ceremony: every step runs as documented |
-| **heavyweight** | Any one matches:<br>• Touches auth, multi-tenant data, billing, payment, or PII<br>• Schema migration affecting >1 table or destructive (drop/rename column)<br>• Breaking API change<br>• Touches >10 production files | Adds: mandatory `Risk: high` tag review on every task in [pandahrms:execute-plan](../execute-plan/SKILL.md) (not just plan-author-tagged), and athena-review run BEFORE Step 8 (in addition to user-triggered post-test review) |
+| **heavyweight** | Any one matches:<br>• Touches auth, multi-tenant data, billing, payment, or PII<br>• Schema migration affecting >1 table or destructive (drop/rename column)<br>• Breaking API change<br>• Touches >10 production files | Adds: mandatory `Risk: high` tag review on every task in [pandahrms:execute-plan](../execute-plan/SKILL.md) (not just plan-author-tagged), and athena-code-review run BEFORE Step 8 (in addition to user-triggered post-test review) |
 
 ### How to set it
 
@@ -108,7 +108,7 @@ Development Summary [Scope: lightweight] (active work time, ...)
 
 ## Codex Availability
 
-At the very start of every atlas run (Step 0 / Setup, including Fast Path and Resume Path), detect whether Codex is available locally.
+At the very start of every atlas-pipeline-orchestrator run (Step 0 / Setup, including Fast Path and Resume Path), detect whether Codex is available locally.
 
 1. Run `command -v codex` via Bash. Treat as available ONLY if exit code is 0 AND stdout is non-empty AND the resolved path exists. In any other case (non-zero exit, empty stdout, missing path, Bash error), set `codex_available=false`. Do not retry detection.
 2. Store the result in conversation context as `codex_available` (true/false). Persist it into the plan file's `## Atlas Progress` section once the plan exists, on a `Codex available: true|false` line, so resumed runs do not need to re-detect.
@@ -141,9 +141,9 @@ AUTHORITY HIERARCHY:
 </HARD-GATE>
 
 <HARD-GATE>
-NO COMMITS DURING EXECUTION. Implementer subagents stage changes (`git add`) but never run `git commit`. The user tests first, then runs `/hermes-commit` to plan and execute atomic commits across the full set of changes. This rule lives in `pandahrms:execute-plan` -- atlas just trusts the component skill to enforce it.
+NO COMMITS DURING EXECUTION. Implementer subagents stage changes (`git add`) but never run `git commit`. The user tests first, then runs `/hermes-commit` to plan and execute atomic commits across the full set of changes. This rule lives in `pandahrms:execute-plan` -- atlas-pipeline-orchestrator just trusts the component skill to enforce it.
 
-GIT COMMAND ALLOWLIST. Implementer subagents and atlas itself may ONLY run these git verbs without user approval: `add`, `diff`, `status`, `log`, `show`, `ls-files`, `rev-parse`, `blame`. Any other git verb (`commit`, `push`, `checkout`, `restore`, `reset`, `stash`, `rebase`, `merge`, `branch`, `tag`, `clean`, `rm`, `mv`, `cherry-pick`, `revert`) requires explicit user approval via AskUserQuestion before invocation. Read-only inspections of git state are always permitted.
+GIT COMMAND ALLOWLIST. Implementer subagents and atlas-pipeline-orchestrator itself may ONLY run these git verbs without user approval: `add`, `diff`, `status`, `log`, `show`, `ls-files`, `rev-parse`, `blame`. Any other git verb (`commit`, `push`, `checkout`, `restore`, `reset`, `stash`, `rebase`, `merge`, `branch`, `tag`, `clean`, `rm`, `mv`, `cherry-pick`, `revert`) requires explicit user approval via AskUserQuestion before invocation. Read-only inspections of git state are always permitted.
 </HARD-GATE>
 
 ## Pipeline
@@ -203,7 +203,7 @@ digraph atlas_pipeline {
 
 You MUST create a task for each of these items and complete them in order. Apply [Time Tracking](#time-tracking) to every step -- record start/end times and pause during user prompts.
 
-0. **Setup** -- run [Codex Availability](#codex-availability) detection and Time Tracking initialization (see [Time Tracking > On atlas start](#time-tracking)). This MUST complete before Step 1 begins. Persist results to conversation context until the plan file is created.
+0. **Setup** -- run [Codex Availability](#codex-availability) detection and Time Tracking initialization (see [Time Tracking > On atlas-pipeline-orchestrator start](#time-tracking)). This MUST complete before Step 1 begins. Persist results to conversation context until the plan file is created.
 1. **Design** -- invoke `pandahrms:design-refinement`. The skill loads test + spec context, asks clarifying questions (one at a time by default; batched into a single AskUserQuestion when 2-4 questions are causally independent -- definition: the user's answer to question A does not change the wording, options, or applicability of question B. If even one pair fails this test, ask sequentially. See the [pandahrms:design-refinement batched-questions rule](../design-refinement/SKILL.md#question-pacing)), proposes 2-3 approaches, presents the design in sections, and saves an uncommitted design doc to `docs/pandahrms/designs/<...>.md` covering spec impact, test impact, and implementation approach. **Immediately after Step 1 approval, in this exact order:** (a) classify the work using [Scope Profile](#scope-profile), (b) announce the result verbatim per the format in Scope Profile > How to set it, (c) persist Scope Profile to conversation context (the plan file write happens at Step 4), (d) THEN proceed to Step 2.
 2. **Write or update specs?** -- two routing decisions in one place:
    - **UI-only auto-skip**: if the work changes ONLY: CSS/Tailwind classes, color tokens, layout primitives (flex/grid props), animation timings, breakpoint behavior, dark-mode tokens, or static copy in components -- AND does NOT change form validation logic, API calls, conditional rendering driven by data, role/permission checks, route guards, or any handler/effect logic -- announce "Skipping spec-writing -- UI-only change with no business behavior impact" and proceed to step 4 (QA auto-skipped too). If even one non-UI change is present, do NOT auto-skip; route through the AskUserQuestion below.
@@ -217,7 +217,7 @@ You MUST create a task for each of these items and complete them in order. Apply
 4. **Create implementation plan** -- invoke `pandahrms:plan-writing`. The skill produces a plan with:
    - **Spec ref** on every business-behavior task (when specs exist)
    - **Test ref** on every production-code task with Red-before-Green ordering
-   - **Depends on:** marker on every task (atlas reads this in step 6 to parallel-dispatch)
+   - **Depends on:** marker on every task (atlas-pipeline-orchestrator reads this in step 6 to parallel-dispatch)
    - **Risk:** tag on tasks that need second-stage review (auth, multi-tenant, billing, schema, PII)
    - **No commit steps** -- plans stage changes only; /hermes-commit owns commits
 5. **Plan <-> Spec cross-review** -- after the plan is written (or at Fast Path entry), verify three directions: (a) every plan task references a real spec scenario, (b) every in-scope spec scenario has at least one plan task, and (c) every plan task that touches production code names a test reference with Red-before-Green ordering. The (c) check is the only test-ref validator on Fast Path -- do not skip it. If gaps exist, fix them before execution. See [Plan-Spec Cross-Review](#plan-spec-cross-review) for skip conditions and resolution paths.
@@ -226,6 +226,7 @@ You MUST create a task for each of these items and complete them in order. Apply
    **Step 6 completion is reached when one of:** (a) all dispatched tasks return success or skipped status, OR (b) the user chooses "Abort atlas" in the failure-handling flow. Time tracking ends at that moment regardless of outcome.
 
    **Plan-file mutations allowed during Step 6:** (i) checking off completed tasks (`[ ]` -> `[x]`), (ii) updating the Atlas Progress table, (iii) appending the Step 6 Task Timing block, (iv) annotating individual failed task entries with their final status (`failed-skipped`, `failed-aborted`, `succeeded-after-retry-N`). Do NOT modify task definitions, dependencies, risk tags, spec refs, or test refs during execution. Any task-definition change requires looping back to `pandahrms:plan-writing` first.
+
 7. **Simplify (conditional)** -- once Step 6 has finished, decide whether to run `simplify` using these conditions in this exact precedence order (first match wins):
    - **Auto-skip** when Step 6 was aborted with no completed tasks. Announce: `"Skipping Simplify -- Step 6 aborted with no completed tasks."`
    - **Auto-skip** when Scope Profile is `lightweight` AND no implementer returned `Status: DONE_WITH_CONCERNS`. Announce: `"Skipping Simplify -- lightweight scope with no concerns flagged."`
@@ -236,13 +237,13 @@ You MUST create a task for each of these items and complete them in order. Apply
 8. **Playwright e2e (conditional)** -- if Playwright is configured for the working project, run an e2e pass on the changes from this session. See [Playwright E2E Step](#playwright-e2e-step) for the detection and execution rules. Skip silently when Playwright isn't installed.
 9. **Ask user to test** -- present the Development Summary. If the plan file's `## Atlas Progress` section has an `### Acknowledged Gaps` block (gaps the user chose to "Proceed anyway -- mark as known gap" during Step 5), surface each gap with: "**Acknowledged gaps to verify manually:** [gap list]." Then end with: "Please test your changes, then run /hermes-commit when ready."
 
-   **Atlas terminates the moment the closing line ('Please test your changes, then run /hermes-commit when ready.') is appended to the response.** Before that line is sent, atlas remains active and treats any user message as input to the in-progress step. After the closing line is sent, atlas is fully terminated.
+   **atlas-pipeline-orchestrator terminates the moment the closing line ('Please test your changes, then run /hermes-commit when ready.') is appended to the response.** Before that line is sent, atlas-pipeline-orchestrator remains active and treats any user message as input to the in-progress step. After the closing line is sent, atlas-pipeline-orchestrator is fully terminated.
 
    After termination, do NOT: invoke `/hermes-commit`, offer to `/schedule` any agent, propose follow-up work, summarize what was done a second time, suggest next steps, comment on the diff, or continue producing analysis. The next user message restarts evaluation from the system prompt; treat it as unrelated unless it begins with `/atlas-pipeline-orchestrator`, `/atlas-pipeline-orchestrator <plan-path>`, or `/atlas-pipeline-orchestrator --resume`.
 
 ## Time Tracking
 
-Track **active work time** across the full atlas run -- time spent by Claude doing work, excluding time waiting for user input or blocked on external factors. Display a summary when execution completes.
+Track **active work time** across the full atlas-pipeline-orchestrator run -- time spent by Claude doing work, excluding time waiting for user input or blocked on external factors. Display a summary when execution completes.
 
 ### How to track
 
@@ -292,10 +293,10 @@ Use the plan file as the single source of truth for both progress tracking and t
 
 Use the Read and Write tools for all plan file I/O. Only use Bash for `date +%s`.
 
-**On atlas start:**
+**On atlas-pipeline-orchestrator start:**
 
 1. Run `date +%s` in Bash to get the epoch
-2. Hold the atlas start time and step timestamps in conversation context until the plan file is created
+2. Hold the atlas-pipeline-orchestrator start time and step timestamps in conversation context until the plan file is created
 
 **On plan creation (step 4):**
 
@@ -332,7 +333,7 @@ Scope Profile: lightweight
 **On each step completion:**
 
 1. Run `date +%s` in Bash to get the timestamp
-2. Use the **Read** tool to load the plan file. **If the plan file is missing or unreadable, STOP and respond verbatim: "Plan file '<path>' is missing or unreadable. Atlas cannot continue without state. Restore the file or abort." Do NOT auto-recreate the plan file.**
+2. Use the **Read** tool to load the plan file. **If the plan file is missing or unreadable, STOP and respond verbatim: "Plan file '<path>' is missing or unreadable. atlas-pipeline-orchestrator cannot continue without state. Restore the file or abort." Do NOT auto-recreate the plan file.**
 3. Update the step's row in the Atlas Progress table (status and duration)
 4. Use the **Write** tool to save the plan file back
 
@@ -393,9 +394,9 @@ When a subagent returns `Status: BLOCKED`, `Status: NEEDS_CONTEXT`, or any non-s
    - **Plan or spec error** (typically `Status: BLOCKED` with conflict details) -- the plan and spec disagree, the spec is internally contradictory, or the plan references something that doesn't exist. Resolution: escalate to the user; loop back to `pandahrms:spec-writing` or `pandahrms:plan-writing` as appropriate.
 4. **Present the error and classification** -- show the failing subagent's name, task description, returned status, error output, your classification, and the current retry count for that task.
 5. **Ask the user** via AskUserQuestion: "Subagent '[task name]' returned [status] -- classified as [missing context / insufficient reasoning / task too large / plan or spec error]. How would you like to proceed?" with options matched to the classification (omit retry options if the 3-retry cap has been hit):
-   - **"Re-dispatch with added context"** (missing context) -- you provide the missing piece, atlas re-dispatches the same task and increments the retry counter.
-   - **"Re-dispatch with stronger model"** (insufficient reasoning) -- atlas re-dispatches via codex per the resolution rule above and increments the retry counter.
-   - **"Send back to plan/spec"** (task too large or plan/spec error) -- atlas pauses execute, loops back to the relevant skill, then resumes; this resets the retry counter for that task.
+   - **"Re-dispatch with added context"** (missing context) -- you provide the missing piece, atlas-pipeline-orchestrator re-dispatches the same task and increments the retry counter.
+   - **"Re-dispatch with stronger model"** (insufficient reasoning) -- atlas-pipeline-orchestrator re-dispatches via codex per the resolution rule above and increments the retry counter.
+   - **"Send back to plan/spec"** (task too large or plan/spec error) -- atlas-pipeline-orchestrator pauses execute, loops back to the relevant skill, then resumes; this resets the retry counter for that task.
    - **"Skip and continue"** -- note the failed task in the conversation and proceed with remaining tasks.
    - **"Abort atlas"** -- stop execution, display the Development Summary with the Execute step marked failed, and end with: "Atlas aborted. Completed tasks remain uncommitted. Run /hermes-commit when ready or discard with git restore."
 
@@ -593,7 +594,7 @@ Only fall back to AskUserQuestion when one of these conditions holds:
 
 1. **Irreconcilable conflict** -- a loop-back surfaces a conflict that cannot be resolved without user input (e.g. the design itself contradicts the new spec scenario the cross-review wants to add). Prompt verbatim: "Plan-Spec cross-review found an irreconcilable conflict: [describe]. How would you like to proceed?" with canonical options: "Update design to match", "Proceed anyway -- mark as known gap", "Abort atlas".
 
-   When the user selects "Proceed anyway -- mark as known gap", append a single bullet to the `### Acknowledged Gaps` block of the plan file's Atlas Progress section: `- [Step 5 conflict description] -- acknowledged at [ISO 8601 timestamp].` This is the ONLY trigger that populates the Acknowledged Gaps block. Atlas does NOT auto-acknowledge gaps under any other condition.
+   When the user selects "Proceed anyway -- mark as known gap", append a single bullet to the `### Acknowledged Gaps` block of the plan file's Atlas Progress section: `- [Step 5 conflict description] -- acknowledged at [ISO 8601 timestamp].` This is the ONLY trigger that populates the Acknowledged Gaps block. atlas-pipeline-orchestrator does NOT auto-acknowledge gaps under any other condition.
 
 2. **Unrecognized Verification category** -- a `Verification:` slot uses a category NOT in the [pandahrms:plan-writing No-Test-Pattern Categories](../plan-writing/SKILL.md#no-test-pattern-categories) table. Prompt verbatim: "Task '[name]' uses Verification category '[category]' which is not in the No-Test-Pattern table. How would you like to proceed?" with canonical options: "Add category to pandahrms:plan-writing", "Convert to real Test ref", "Accept once for this run".
 
@@ -609,7 +610,7 @@ Check for Playwright in this order. The first match wins; stop checking once one
 
 1. `playwright.config.ts`, `playwright.config.js`, or `playwright.config.mjs` exists at the working project's root.
 2. The project's `package.json` has `@playwright/test` (or `playwright`) under `dependencies` or `devDependencies`.
-3. At least one `mcp__playwright__*` tool call has succeeded (returned a non-error result) earlier in the CURRENT atlas conversation. Authorization in a prior session does not count.
+3. At least one `mcp__playwright__*` tool call has succeeded (returned a non-error result) earlier in the CURRENT atlas-pipeline-orchestrator conversation. Authorization in a prior session does not count.
 
 If none match, announce `"Skipping Playwright e2e -- not configured for this project."` and proceed to Step 9. Do not install Playwright on the user's behalf.
 
@@ -668,8 +669,8 @@ Skip Step 8 entirely (with announcement) when any of these hold:
 |---------|---------|
 | "I'll skip the design step since the user described what they want" | Step 1 is mandatory. pandahrms:design-refinement enforces approval before implementation. |
 | "It's a bug fix, no need to discuss tests upfront" | Bug fixes especially need a failing test that would have caught the bug. The design proposes that test before the fix. |
-| "I'll just invoke pandahrms:execute-plan on a plan that has no Depends on: markers" | Reject the plan and loop back to pandahrms:plan-writing. Missing markers serialize the run -- atlas can't parallel-dispatch. |
-| "I'll mark every task Risk: high to be safe" | The default single-stage review is the point of atlas. Tag only auth, multi-tenant, billing, schema, PII, or design-flagged risky tasks. |
+| "I'll just invoke pandahrms:execute-plan on a plan that has no Depends on: markers" | Reject the plan and loop back to pandahrms:plan-writing. Missing markers serialize the run -- atlas-pipeline-orchestrator can't parallel-dispatch. |
+| "I'll mark every task Risk: high to be safe" | The default single-stage review is the point of atlas-pipeline-orchestrator. Tag only auth, multi-tenant, billing, schema, PII, or design-flagged risky tasks. |
 | "I'll skip the QA review since specs look fine" | QA is conditional. Run it when Scope Profile is `standard` or `heavyweight` AND >=3 NEW scenarios were added; auto-skip for `lightweight` regardless. Don't skip a qualifying run on a hunch. |
 | "I'll skip the Scope Profile classification -- it's obvious" | No. Always announce the profile after Step 1 with the rationale. The profile gates QA, cross-review pragmatic mode, and Simplify -- silent classification means downstream behavior changes without an audit trail. |
 | "I'll keep the design questions strictly one-at-a-time even when they're clearly independent" | Default is one-at-a-time, but 2-4 causally-independent multiple-choice questions can batch into one AskUserQuestion. See pandahrms:design-refinement Question Pacing. |
@@ -690,14 +691,14 @@ Skip Step 8 entirely (with announcement) when any of these hold:
 
 ## When to Use
 
-- **Only** when forge's Pipeline Selection routes here (user picked "Atlas")
+- **Only** when forge-pipeline-orchestrator's Pipeline Selection routes here (user picked "Atlas Pipeline Orchestrator")
 - **Only** when the user explicitly invokes `/atlas-pipeline-orchestrator`, `/atlas-pipeline-orchestrator <plan-path>`, or `/atlas-pipeline-orchestrator --resume`
-- Otherwise: route the user to `forge` -- it owns the entry point for all design/plan/execute work in Pandahrms projects.
+- Otherwise: route the user to `forge-pipeline-orchestrator` -- it owns the entry point for all design/plan/execute work in Pandahrms projects.
 
 ## When NOT to Use
 
-- ANY auto-trigger from natural-language phrases ("start new work", "build feature", "brainstorm", "design", "write a plan", "execute"). Forge owns those triggers and decides whether to hand off here.
+- ANY auto-trigger from natural-language phrases ("start new work", "build feature", "brainstorm", "design", "write a plan", "execute"). forge-pipeline-orchestrator owns those triggers and decides whether to hand off here.
 - Quick fixes that don't need design (typos, config changes) -- handle directly without any orchestrator.
 - Non-Pandahrms projects (use `superpowers:brainstorming` directly).
 - Writing specs for existing functionality without a new design (use `pandahrms:spec-writing` directly).
-- When the user explicitly wants the superpowers-based pipeline (use `forge` instead).
+- When the user explicitly wants the superpowers-based pipeline (use `forge-pipeline-orchestrator` instead).

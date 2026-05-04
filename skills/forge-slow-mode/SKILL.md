@@ -3,7 +3,7 @@ name: forge-slow-mode
 description: EXPERIMENTAL -- manual invocation only. Invoke explicitly with `/pandahrms:forge-slow-mode` to run an iterative pipeline that breaks the work into atomic pieces (CRUD = 4 cycles minimum) and runs a full design→build→test→commit cycle on each piece, one at a time. Does NOT auto-trigger -- never activate from phrases like "slow mode", "one piece at a time", or general iterative-build requests. Only runs when the user explicitly types the slash command. For batch-build, use `pandahrms:forge-pipeline-orchestrator` instead.
 ---
 
-# Forge Slow Mode (Pandahrms -- Experimental)
+# forge-slow-mode (Pandahrms -- Experimental)
 
 > **Experimental skill.** This skill does not auto-trigger. Run it only when the user explicitly invokes `/pandahrms:forge-slow-mode`. Behavior may change between versions while it is being refined.
 

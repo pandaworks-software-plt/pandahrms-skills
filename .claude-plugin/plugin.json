@@ -1,7 +1,7 @@
 {
   "name": "pandahrms",
   "description": "Pandahrms-specific skills for Claude Code: forge-pipeline-orchestrator (superpowers-based) and atlas-pipeline-orchestrator (no-superpowers) entry points, design-refinement / plan-writing / execute-plan components, spec-writing, spec-review, bridge-file cross-project messaging, EF Core migrations, athena-code-review, aegis-security-review, commit workflow, and safe branching",
-  "version": "3.13.0",
+  "version": "3.13.1",
   "author": { "name": "Pandaworks" },
   "license": "UNLICENSED",
   "keywords": ["pandahrms", "skills", "gherkin", "specs", "setup", "bridge", "security", "aegis", "athena", "forge", "atlas"]
