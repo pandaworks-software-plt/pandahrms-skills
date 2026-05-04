@@ -35,7 +35,9 @@ pandahrms-skills/
 ## Versioning
 
 - Version is tracked in `.claude-plugin/plugin.json` under the `"version"` field
-- Follow semver: bump patch for fixes/tweaks, minor for new skills or significant changes, major for breaking changes
+- Follow semver: bump patch for fixes/tweaks, minor for new skills or significant changes
+- Stay on the current major (v3) by default. Use minor bumps even for changes that look breaking (e.g. skill renames, slash-command changes) -- those are absorbed via the minor channel here
+- Do NOT bump the major version unless the user explicitly asks for it
 - Bump version with every push to main
 
 ## Editing Skills
