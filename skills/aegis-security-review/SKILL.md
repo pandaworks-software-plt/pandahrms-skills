@@ -1,6 +1,6 @@
 ---
-name: aegis
-description: Triggers when the user requests a security review of code or working-tree changes -- phrasings such as "/aegis", "run aegis", "do a security review", "audit this for vulnerabilities", "OWASP pass on this branch", "check this PR for security issues", "auth audit", "authz audit", "pen test this". Does NOT trigger on incidental mentions of security topics (CVE articles, threat-model discussion) without an action verb directed at the working tree. Audits auth, authz, input validation, injection, secrets, PII exposure, audit trails, and tenant isolation in working tree changes or a specified feature area. Reports findings and fixes approved issues. Does NOT commit, stage, push, or invoke any other skill except via an explicit user choice in Phase 8.
+name: aegis-security-review
+description: Triggers when the user requests a security review of code or working-tree changes -- phrasings such as "/aegis-security-review", "run aegis", "do a security review", "audit this for vulnerabilities", "OWASP pass on this branch", "check this PR for security issues", "auth audit", "authz audit", "pen test this". Does NOT trigger on incidental mentions of security topics (CVE articles, threat-model discussion) without an action verb directed at the working tree. Audits auth, authz, input validation, injection, secrets, PII exposure, audit trails, and tenant isolation in working tree changes or a specified feature area. Reports findings and fixes approved issues. Does NOT commit, stage, push, or invoke any other skill except via an explicit user choice in Phase 8.
 ---
 
 # Aegis - Security Review
@@ -28,7 +28,7 @@ Aegis MUST NOT do any of the following at any phase:
 - Before merging a branch that touches authentication, authorization, API endpoints, or data persistence
 - After adding or modifying any endpoint that accepts user input, handles secrets, or returns sensitive data
 - When the user explicitly asks for a security review, pen-test pass, or OWASP audit
-- As a follow-up to `/athena-review` when the change surface is security-sensitive (auth flows, payment, PII, file upload, cross-tenant operations)
+- As a follow-up to `/athena-code-review` when the change surface is security-sensitive (auth flows, payment, PII, file upload, cross-tenant operations)
 - Before a release cut when changes include public-facing endpoints or schema migrations that touch sensitive columns
 
 ## When NOT to Use
@@ -50,7 +50,7 @@ Phases run **strictly sequentially** in the order Phase 0 -> Phase 1 -> Phase 2 
 
 ```dot
 digraph aegis {
-    "User triggers /aegis" [shape=doublecircle];
+    "User triggers /aegis-security-review" [shape=doublecircle];
     "Scope provided?" [shape=diamond];
     "Use working tree diff" [shape=box];
     "Use specified scope" [shape=box];
@@ -75,7 +75,7 @@ digraph aegis {
     "Run /hermes-commit" [shape=box, style=filled, fillcolor=lightgreen];
     "Done - user will test" [shape=doublecircle];
 
-    "User triggers /aegis" -> "Scope provided?";
+    "User triggers /aegis-security-review" -> "Scope provided?";
     "Scope provided?" -> "Use specified scope" [label="yes"];
     "Scope provided?" -> "Use working tree diff" [label="no"];
     "Use working tree diff" -> "Detect project type";
@@ -108,7 +108,7 @@ digraph aegis {
 
 ### 0.1 Resolve scope to a concrete file list
 
-- If the user supplied a literal path or glob (e.g. `/aegis src/auth`, `aegis on Pandahrms.Performance.Api/Controllers/LoginController.cs`), use exactly that path set.
+- If the user supplied a literal path or glob (e.g. `/aegis-security-review src/auth`, `aegis on Pandahrms.Performance.Api/Controllers/LoginController.cs`), use exactly that path set.
 - If the user supplied a natural-language scope (e.g. "the new login endpoint", "the export feature"), resolve it to a concrete file list using `git status`, `grep`, and `find`. When more than 5 files match, or when zero files match, use `AskUserQuestion` to confirm the resolved list before proceeding.
 - If no scope was supplied, default to the git working tree captured by:
   - `git status` (untracked and modified files)
@@ -116,7 +116,7 @@ digraph aegis {
 
 ### 0.2 Empty working tree halt
 
-If no scope was supplied AND `git status` shows a clean tree (no staged, unstaged, or untracked changes), halt immediately with the single line: "No changes to audit. Pass an explicit scope (e.g. `/aegis src/auth`) to audit specific files." Do not audit the entire repository as a fallback.
+If no scope was supplied AND `git status` shows a clean tree (no staged, unstaged, or untracked changes), halt immediately with the single line: "No changes to audit. Pass an explicit scope (e.g. `/aegis-security-review src/auth`) to audit specific files." Do not audit the entire repository as a fallback.
 
 ### 0.3 Read every in-scope file end-to-end
 

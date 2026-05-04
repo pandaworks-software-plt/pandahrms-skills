@@ -1,6 +1,6 @@
 ---
-name: execute
-description: Triggers when atlas/forge invokes execute with a plan file path, OR when the user explicitly invokes /pandahrms:execute on an existing plan file. Does NOT trigger from phrases like "execute the plan", "implement this", or "build it" -- those route through forge/atlas first, which decides whether to invoke execute. Dispatches a fresh implementer subagent per task (single-stage review by default, opt-in second-stage review for tasks tagged Risk: high). Parallel-dispatches tasks marked Depends on: none. Supports three Codex execution modes when codex is available -- full, partial-parallel, none. Implementers stage changes but never commit -- /hermes-commit owns the commit step. Drops superpowers' mandatory two-stage review and the final whole-codebase reviewer (athena-review covers that post-execution). When invoked directly without an orchestrator, the skill MUST verify the plan file's frontmatter contains `status: approved` (or equivalent) before dispatching; if missing, stop and ask the user.
+name: execute-plan
+description: Triggers when atlas/forge invokes execute with a plan file path, OR when the user explicitly invokes /pandahrms:execute-plan on an existing plan file. Does NOT trigger from phrases like "execute the plan", "implement this", or "build it" -- those route through forge/atlas first, which decides whether to invoke execute. Dispatches a fresh implementer subagent per task (single-stage review by default, opt-in second-stage review for tasks tagged Risk: high). Parallel-dispatches tasks marked Depends on: none. Supports three Codex execution modes when codex is available -- full, partial-parallel, none. Implementers stage changes but never commit -- /hermes-commit owns the commit step. Drops superpowers' mandatory two-stage review and the final whole-codebase reviewer (athena-review covers that post-execution). When invoked directly without an orchestrator, the skill MUST verify the plan file's frontmatter contains `status: approved` (or equivalent) before dispatching; if missing, stop and ask the user.
 ---
 
 # Pandahrms Execute
@@ -161,8 +161,8 @@ For each batch (smallest batch number first):
 
 If a subagent fails (build error, test failure, merge conflict, non-zero exit), stop dispatching further batches. Do NOT silently retry, skip, or guess. Hand off based on invocation context:
 
-- **Invoked by atlas:** read `../atlas/SKILL.md#subagent-failure-handling` and follow it.
-- **Invoked by forge:** read `../forge/SKILL.md` for its failure section; if missing, fall to standalone behavior.
+- **Invoked by atlas:** read `../atlas-pipeline-orchestrator/SKILL.md#subagent-failure-handling` and follow it.
+- **Invoked by forge:** read `../forge-pipeline-orchestrator/SKILL.md` for its failure section; if missing, fall to standalone behavior.
 - **Standalone:** print a structured failure report (failed task ID, batch number, status returned, blocker details) and ask the user via AskUserQuestion how to proceed (Retry / Skip task / Abort run). Do NOT decide on the user's behalf.
 
 The timing row for the failed task records `Wall-clock: <duration>` and `Status: <failure status>`.
@@ -512,11 +512,11 @@ The orchestrator (atlas, or whoever invoked you) decides whether to retry, skip,
 
 ## When to Use
 
-- After `pandahrms:plan` produces a plan with bite-sized tasks, spec/test refs, and dependency markers
+- After `pandahrms:plan-writing` produces a plan with bite-sized tasks, spec/test refs, and dependency markers
 - Invoked by atlas in step 6, or directly when given a complete plan file path
 
 ## When NOT to Use
 
-- Plans without dependency markers or test refs (send back to `pandahrms:plan` to fix first)
+- Plans without dependency markers or test refs (send back to `pandahrms:plan-writing` to fix first)
 - Tightly-coupled tasks where each builds on the previous in subtle ways: do NOT use this skill. Stop and tell the user the plan is unsuitable for subagent-driven execution and recommend manual implementation.
 - Non-Pandahrms projects (use `superpowers:subagent-driven-development` directly)

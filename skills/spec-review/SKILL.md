@@ -32,9 +32,9 @@ This skill runs after specs are written and approved, before proceeding to imple
 
 ### Invocation Context Detection
 
-Detect "invoked from forge" by checking whether the current conversation already shows an active `pandahrms:forge` Skill invocation. If present, treat as forge-invoked. If not present, treat as standalone.
+Detect "invoked from forge" by checking whether the current conversation already shows an active `pandahrms:forge-pipeline-orchestrator` Skill invocation. If present, treat as forge-invoked. If not present, treat as standalone.
 
-When standalone, every instruction in this skill that says "proceed to the next forge step" or "return control to forge" is replaced with "STOP and report status to the user". Do not invoke `pandahrms:forge` to continue.
+When standalone, every instruction in this skill that says "proceed to the next forge step" or "return control to forge" is replaced with "STOP and report status to the user". Do not invoke `pandahrms:forge-pipeline-orchestrator` to continue.
 
 ## Prerequisites
 

@@ -7,12 +7,12 @@ description: Triggers when the user explicitly requests a git commit of the curr
 
 ## Overview
 
-Verify that changes are reviewed and clean, then plan and execute atomic commits. This skill itself never modifies code. It may invoke `/athena-review` (which CAN modify code) only when the user picks the review option in Phase 1; in that case the skill terminates after `/athena-review` completes and the user must re-invoke `/hermes-commit` on the resulting clean state. If verification fails at any phase, this skill STOPS and tells the user what to fix -- it never auto-fixes.
+Verify that changes are reviewed and clean, then plan and execute atomic commits. This skill itself never modifies code. It may invoke `/athena-code-review` (which CAN modify code) only when the user picks the review option in Phase 1; in that case the skill terminates after `/athena-code-review` completes and the user must re-invoke `/hermes-commit` on the resulting clean state. If verification fails at any phase, this skill STOPS and tells the user what to fix -- it never auto-fixes.
 
 ## When to Use
 
 - When you're ready to commit after coding and reviewing
-- After running /athena-review and testing
+- After running /athena-code-review and testing
 
 ## Workflow
 
@@ -20,7 +20,7 @@ Verify that changes are reviewed and clean, then plan and execute atomic commits
 digraph commit {
     "User triggers /hermes-commit" [shape=doublecircle];
     "Ask: reviewed?" [shape=diamond];
-    "Run /athena-review" [shape=box, style=filled, fillcolor=lightyellow];
+    "Run /athena-code-review" [shape=box, style=filled, fillcolor=lightyellow];
     "STOP" [shape=octagon, style=filled, fillcolor=red, fontcolor=white];
     "Run format/lint check" [shape=box];
     "Errors?" [shape=diamond];
@@ -33,8 +33,8 @@ digraph commit {
     "Done" [shape=doublecircle];
 
     "User triggers /hermes-commit" -> "Ask: reviewed?";
-    "Ask: reviewed?" -> "Run /athena-review" [label="perform code review"];
-    "Run /athena-review" -> "STOP" [label="review done, remind to test then /hermes-commit again"];
+    "Ask: reviewed?" -> "Run /athena-code-review" [label="perform code review"];
+    "Run /athena-code-review" -> "STOP" [label="review done, remind to test then /hermes-commit again"];
     "Ask: reviewed?" -> "Run format/lint check" [label="skip code review"];
     "Run format/lint check" -> "Errors?" ;
     "Errors?" -> "Warn and STOP" [label="yes, tell user to fix"];
@@ -54,10 +54,10 @@ Phases execute strictly in order: Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 -> Ph
 
 ## Phase 1: Gate Check
 
-Use `AskUserQuestion` with the question "Has /athena-review been run on the current diff?" and exactly two options:
+Use `AskUserQuestion` with the question "Has /athena-code-review been run on the current diff?" and exactly two options:
 
 - **"Yes, review is complete"** -> proceed to Phase 2.
-- **"No, run review now"** -> invoke `/athena-review`, then STOP and emit verbatim: `Review complete. Test your changes, then run /hermes-commit again.` Do NOT continue to Phase 2 in the same session.
+- **"No, run review now"** -> invoke `/athena-code-review`, then STOP and emit verbatim: `Review complete. Test your changes, then run /hermes-commit again.` Do NOT continue to Phase 2 in the same session.
 
 ## Phase 2: Format/Lint Verification
 
@@ -204,7 +204,7 @@ Then STOP. Do not push, do not offer to push, do not propose follow-up work, do 
 
 Each item below is a HARD rule. Hitting any of them means STOP in the current response.
 
-- About to fix code during commit -> STOP. Tell user to run `/athena-review` and test first.
+- About to fix code during commit -> STOP. Tell user to run `/athena-code-review` and test first.
 - About to `git add -A` or `git add .` -> stage specific files only.
 - Committing `.env`, credentials, or secrets -> warn the user and STOP.
 - Commit message doesn't match the actual changes -> rewrite it.

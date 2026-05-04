@@ -1,6 +1,6 @@
 ---
 name: forge-slow-mode
-description: EXPERIMENTAL -- manual invocation only. Invoke explicitly with `/pandahrms:forge-slow-mode` to run an iterative pipeline that breaks the work into atomic pieces (CRUD = 4 cycles minimum) and runs a full design→build→test→commit cycle on each piece, one at a time. Does NOT auto-trigger -- never activate from phrases like "slow mode", "one piece at a time", or general iterative-build requests. Only runs when the user explicitly types the slash command. For batch-build, use `pandahrms:forge` instead.
+description: EXPERIMENTAL -- manual invocation only. Invoke explicitly with `/pandahrms:forge-slow-mode` to run an iterative pipeline that breaks the work into atomic pieces (CRUD = 4 cycles minimum) and runs a full design→build→test→commit cycle on each piece, one at a time. Does NOT auto-trigger -- never activate from phrases like "slow mode", "one piece at a time", or general iterative-build requests. Only runs when the user explicitly types the slash command. For batch-build, use `pandahrms:forge-pipeline-orchestrator` instead.
 ---
 
 # Forge Slow Mode (Pandahrms -- Experimental)
@@ -11,7 +11,7 @@ description: EXPERIMENTAL -- manual invocation only. Invoke explicitly with `/pa
 
 Iterative pipeline for any project. Breaks the work into atomic **pieces** and runs a full design → build → test → commit cycle for each piece in sequence. Never discusses multiple pieces at once.
 
-**Use this when** the user explicitly invokes the slash command and wants tight per-piece feedback. For batch-build (one big plan, then execute everything), use `pandahrms:forge` instead.
+**Use this when** the user explicitly invokes the slash command and wants tight per-piece feedback. For batch-build (one big plan, then execute everything), use `pandahrms:forge-pipeline-orchestrator` instead.
 
 **Announce at start:** `"I'm using forge-slow-mode (experimental) -- I will break this work into atomic pieces and run a full design→build→test→commit cycle on each piece, one at a time."`
 
@@ -396,8 +396,8 @@ End with: `"Slow-mode run complete. Each piece has been independently committed 
 
 | Thought | Reality |
 |---------|---------|
-| "The user said 'one piece at a time' so I should auto-trigger this skill" | NO. This skill is manual-only. Phrases like "slow mode" or "one piece at a time" do NOT auto-trigger it. The user must explicitly type `/pandahrms:forge-slow-mode`. If they didn't, use `pandahrms:forge` or ask which they want. |
-| "Slow mode is too slow, let me just batch the CRUD into one design pass" | That defeats the purpose. Slow mode exists because the user wants tight per-piece feedback. If they wanted batch, they'd have used `pandahrms:forge`. |
+| "The user said 'one piece at a time' so I should auto-trigger this skill" | NO. This skill is manual-only. Phrases like "slow mode" or "one piece at a time" do NOT auto-trigger it. The user must explicitly type `/pandahrms:forge-slow-mode`. If they didn't, use `pandahrms:forge-pipeline-orchestrator` or ask which they want. |
+| "Slow mode is too slow, let me just batch the CRUD into one design pass" | That defeats the purpose. Slow mode exists because the user wants tight per-piece feedback. If they wanted batch, they'd have used `pandahrms:forge-pipeline-orchestrator`. |
 | "I'll discuss all four CRUD pieces' fields up front to save round-trips" | No. One piece at a time. Field discussion happens INSIDE each piece's design step -- but as a single focused list per piece, not one field per round-trip. |
 | "BE and FE for this piece can run in parallel" | Never within a piece. BE → deploy → FE is sequential by construction. |
 | "Let me skip the per-piece commit and bundle them at the end" | Per-piece commits are the deliverable. Each piece is independently reviewable in git history. |
@@ -427,7 +427,7 @@ Once explicitly invoked, it fits:
 
 ## When NOT to Use
 
-- Any case where the user did NOT explicitly type the slash command -- default to `pandahrms:forge` instead
+- Any case where the user did NOT explicitly type the slash command -- default to `pandahrms:forge-pipeline-orchestrator` instead
 - Quick fixes that don't need brainstorming (typos, config changes)
-- Single-purpose features that have only one piece (one button, one endpoint, one helper) -- just use `pandahrms:forge`
-- Batch work where the user wants a single design pass and one big plan -- use `pandahrms:forge` instead
+- Single-purpose features that have only one piece (one button, one endpoint, one helper) -- just use `pandahrms:forge-pipeline-orchestrator`
+- Batch work where the user wants a single design pass and one big plan -- use `pandahrms:forge-pipeline-orchestrator` instead

@@ -1,6 +1,6 @@
 ---
-name: plan
-description: Triggers when an approved design and (optionally) Gherkin specs need to be turned into a bite-sized implementation plan in a Pandahrms project. Replaces superpowers:writing-plans. Each task carries exact file paths, complete code, a Red-before-Green TDD step pair, a spec scenario reference (when specs exist), a test file/case reference, and a dependency marker so atlas can parallel-dispatch. Drops superpowers' duplication mandate ("repeat the code in every task") and the inline-vs-subagent execution choice -- atlas always uses pandahrms:execute.
+name: plan-writing
+description: Triggers when an approved design and (optionally) Gherkin specs need to be turned into a bite-sized implementation plan in a Pandahrms project. Replaces superpowers:writing-plans. Each task carries exact file paths, complete code, a Red-before-Green TDD step pair, a spec scenario reference (when specs exist), a test file/case reference, and a dependency marker so atlas can parallel-dispatch. Drops superpowers' duplication mandate ("repeat the code in every task") and the inline-vs-subagent execution choice -- atlas always uses pandahrms:execute-plan.
 ---
 
 # Pandahrms Plan
@@ -30,7 +30,7 @@ Run these steps strictly in order. Do not parallelize, reorder, or skip any step
 
 Verify ALL of the following before emitting any plan content. If any check fails, STOP and follow the listed remedy.
 
-1. **Design doc exists.** A design doc MUST live at `docs/pandahrms/designs/<feature-name>.md`. If it does not, output `No design doc found at docs/pandahrms/designs/. Run pandahrms:design first.` and stop.
+1. **Design doc exists.** A design doc MUST live at `docs/pandahrms/designs/<feature-name>.md`. If it does not, output `No design doc found at docs/pandahrms/designs/. Run pandahrms:design-refinement first.` and stop.
 2. **Design doc is approved.** Approval is signaled by either (a) the orchestrator (forge or atlas) routing this skill the design after its approval gate, or (b) a `Status: approved` line in the design doc's frontmatter or top section. If neither signal is present, output `Cannot confirm design approval. Confirm explicitly before continuing.` and wait for an explicit user reply before continuing.
 3. **Design doc is complete.** The design doc MUST contain a Goal section, a Functional Requirements list, and a Tech Stack section. If any are missing, output `Design doc is incomplete. Missing sections: [list].` and stop. Do not invent content for missing sections.
 4. **Specs exist OR skip-specs path is declared.** If business behavior is in scope, spec files MUST exist under `pandahrms-spec/features/<area>/`. If neither is true, output `No specs found and skip-specs path not declared. Run pandahrms:spec-writing first or confirm UI-only / skip-specs path explicitly.` and stop.
@@ -131,7 +131,7 @@ Every plan MUST start with this header:
 ```markdown
 # [Feature Name] Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use pandahrms:execute to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use pandahrms:execute-plan to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** [One sentence describing what this builds]
 
@@ -298,15 +298,15 @@ The plan MUST already be saved to its path with the Write tool (Execution Order 
 
 After the plan is saved and Self-Review is complete, announce:
 
-> "Plan complete and saved to `<path>`. Atlas will run Plan ↔ Spec cross-review next, then dispatch tasks to pandahrms:execute."
+> "Plan complete and saved to `<path>`. Atlas will run Plan ↔ Spec cross-review next, then dispatch tasks to pandahrms:execute-plan."
 
-Do NOT ask the user to choose between inline and subagent execution. Atlas always uses pandahrms:execute with parallel dispatch.
+Do NOT ask the user to choose between inline and subagent execution. Atlas always uses pandahrms:execute-plan with parallel dispatch.
 
 When invoked outside atlas (rare), announce instead:
 
-> "Plan complete and saved to `<path>`. Run pandahrms:execute to implement, or hand the file to atlas via `/atlas <path>` for the full pipeline."
+> "Plan complete and saved to `<path>`. Run pandahrms:execute-plan to implement, or hand the file to atlas via `/atlas-pipeline-orchestrator <path>` for the full pipeline."
 
-**End of skill.** After printing the announcement, end your turn. Do NOT begin implementing any task. Do NOT modify any source files. Do NOT run any tests. Do NOT invoke pandahrms:execute, /hermes-commit, or any follow-up skill from this skill.
+**End of skill.** After printing the announcement, end your turn. Do NOT begin implementing any task. Do NOT modify any source files. Do NOT run any tests. Do NOT invoke pandahrms:execute-plan, /hermes-commit, or any follow-up skill from this skill.
 
 ## Red Flags
 
@@ -321,7 +321,7 @@ When invoked outside atlas (rare), announce instead:
 | "I'll skip the spec ref for this small task" | If specs exist for the area, every task has a spec ref. If no specs exist (UI-only / skip-specs), say so in the header. |
 | "I'll let the engineer figure out task dependencies" | Mark dependencies explicitly. Atlas parallel-dispatches based on this -- missing markers serialize the run. |
 | "I'll let writing-plans-style mandate decide whether to duplicate code" | Pandahrms plan picks pragmatically: reference earlier tasks when sequential, repeat code when parallel-dispatched. Default to repeating. |
-| "I'll ask the user to choose inline vs subagent at the end" | No. Atlas always uses pandahrms:execute. Don't add the choice. |
+| "I'll ask the user to choose inline vs subagent at the end" | No. Atlas always uses pandahrms:execute-plan. Don't add the choice. |
 
 ## Remember
 
@@ -335,13 +335,13 @@ When invoked outside atlas (rare), announce instead:
 
 ## When to Use
 
-- After `pandahrms:design` and (optionally) `pandahrms:spec-writing` have completed
+- After `pandahrms:design-refinement` and (optionally) `pandahrms:spec-writing` have completed
 - Invoked by atlas in step 4, or directly when the user hands you a design + spec set
 
 ## When NOT to Use
 
 Refuse and abort with the listed message when ANY of the following are true:
 
-- **Design not approved.** No design doc exists at `docs/pandahrms/designs/`, or the design's approval cannot be confirmed per Prerequisites item 2. Output: `Design not approved. Run pandahrms:design first.` and stop.
+- **Design not approved.** No design doc exists at `docs/pandahrms/designs/`, or the design's approval cannot be confirmed per Prerequisites item 2. Output: `Design not approved. Run pandahrms:design-refinement first.` and stop.
 - **Trivial single-file fix.** The change touches a single file with at most 30 modified lines, no new public API, and no new spec scenarios. Output: `Change is too small for a full plan. Do the fix directly with TDD.` and stop.
 - **Non-Pandahrms project.** No `pandahrms-spec/` directory exists in the workspace AND no `docs/pandahrms/designs/` directory exists. Output: `Plan skill is Pandahrms-only. Use superpowers:writing-plans for non-Pandahrms projects.` and stop.

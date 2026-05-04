@@ -1,5 +1,5 @@
 ---
-name: forge
+name: forge-pipeline-orchestrator
 description: Triggers on any mention of starting new work, building a feature, adding functionality, fixing a bug, refactoring, brainstorming, designing, writing a plan, or executing an existing plan in a Pandahrms project. Use INSTEAD of superpowers:brainstorming for any development work that needs design and specs before implementation. Also triggers on "forge", "run the pipeline", or being handed a plan file.
 ---
 
@@ -21,7 +21,7 @@ Before any other initialization (Fast Path detection, Resume Path detection, Cod
 
 Skip the question and select automatically when the choice is unambiguous:
 
-- **Fast Path with an existing plan file** -- read the plan and check its progress section header. If it has `## Atlas Progress`, hand off to `pandahrms:atlas` immediately. If it has `## Forge Progress`, continue with this skill. If neither is present, fall through to the question.
+- **Fast Path with an existing plan file** -- read the plan and check its progress section header. If it has `## Atlas Progress`, hand off to `pandahrms:atlas-pipeline-orchestrator` immediately. If it has `## Forge Progress`, continue with this skill. If neither is present, fall through to the question.
 - **Resume Path** -- the previous run already chose a pipeline. Read the existing progress section header (`## Atlas Progress` vs `## Forge Progress`) and resume on that pipeline. If both are missing or both are present, fall through to the question.
 - **Fresh start (no plan file)** -- always ask.
 
@@ -36,17 +36,17 @@ options:
   - label: "Forge (superpowers-based)"
     description: "Current behavior. Uses superpowers:brainstorming, superpowers:writing-plans, and superpowers:subagent-driven-development with mandatory two-stage review on every task. Highest review depth, slowest per-task throughput."
   - label: "Atlas (no-superpowers, faster) (Recommended)"
-    description: "Pandahrms-native pipeline. Uses pandahrms:design, pandahrms:plan, pandahrms:execute. Single-stage review by default; second-stage review only on tasks tagged Risk: high. Faster per-task throughput, equivalent design + planning rigor."
+    description: "Pandahrms-native pipeline. Uses pandahrms:design-refinement, pandahrms:plan-writing, pandahrms:execute-plan. Single-stage review by default; second-stage review only on tasks tagged Risk: high. Faster per-task throughput, equivalent design + planning rigor."
 ```
 
 ### After the answer
 
 - **"Forge"** -- announce "Continuing with Forge (superpowers-based pipeline)." Proceed to Fast Path / Resume Path / Codex Availability detection and the rest of this skill.
-- **"Atlas"** -- announce "Handing off to pandahrms:atlas. Forge ends here." Invoke `pandahrms:atlas` (passing along any plan file path or `--resume` flag the user provided) and STOP. Do not continue any of the steps below.
+- **"Atlas"** -- announce "Handing off to pandahrms:atlas-pipeline-orchestrator. Forge ends here." Invoke `pandahrms:atlas-pipeline-orchestrator` (passing along any plan file path or `--resume` flag the user provided) and STOP. Do not continue any of the steps below.
 
 ## Fast Path (plan provided)
 
-If invoked with a plan file path (e.g., `/forge path/to/plan.md`), skip steps 1-4 and start directly at step 5 (Plan ↔ Spec cross-review), then step 6 (Execute plan).
+If invoked with a plan file path (e.g., `/forge-pipeline-orchestrator path/to/plan.md`), skip steps 1-4 and start directly at step 5 (Plan ↔ Spec cross-review), then step 6 (Execute plan).
 
 - Initialize time tracking as normal
 - Announce: "Executing existing plan -- running Plan ↔ Spec cross-review, then execution."
@@ -55,7 +55,7 @@ If invoked with a plan file path (e.g., `/forge path/to/plan.md`), skip steps 1-
 
 ## Resume Path
 
-If invoked with `/forge --resume`:
+If invoked with `/forge-pipeline-orchestrator --resume`:
 
 1. Read the plan file's `## Forge Progress` section to determine which steps completed and their timing
 2. Announce: "Resuming forge from step N -- [step name]."

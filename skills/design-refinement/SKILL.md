@@ -1,5 +1,5 @@
 ---
-name: design
+name: design-refinement
 description: Triggers on (a) feature work, behavioral changes, refactors, or bug fixes that touch more than one file OR change a public interface, OR (b) when forge invokes the design step. Does NOT trigger on typos, single-line config changes, dependency bumps, formatting fixes, or any change that does not alter behavior. Replaces superpowers:brainstorming for Pandahrms projects -- one-question-at-a-time refinement, mandatory test+spec context loading, scope decomposition, sectioned design with mid-design approval. Drops the Visual Companion offer and the post-spec user-review gate (forge step 5 already covers Plan ↔ Spec cross-review).
 ---
 
@@ -239,5 +239,5 @@ This skill MUST NOT produce, write, or stage any of the following:
 
 - Quick fixes that don't need brainstorming (typos, config changes)
 - Pure spec writing for existing functionality (use `pandahrms:spec-writing` directly)
-- Plan execution (use `pandahrms:execute` -- planned, not yet built)
+- Plan execution (use `pandahrms:execute-plan` -- planned, not yet built)
 - Non-Pandahrms projects (use `superpowers:brainstorming` directly)

@@ -1,5 +1,5 @@
 ---
-name: athena-review
+name: athena-code-review
 description: Triggers on mentions of code review of working-tree changes -- "review my changes", "check my changes", "review the diff", "review before commit", or "lint check on my changes". Does NOT trigger on "review this PR", "review pull request", "ultrareview", or the global "/review" command -- those are separate workflows. If the user is ambiguous between working-tree review and PR review, ask which one they mean. Reads all changed files, reviews against the checklist, fixes issues, and runs /simplify. Does NOT commit. Run this before /hermes-commit.
 ---
 
@@ -40,7 +40,7 @@ digraph code_review {
     "User approves fixes?" [shape=diamond];
     "Apply major fixes" [shape=box];
     "Security-sensitive changes?" [shape=diamond, style=filled, fillcolor=lightpink];
-    "Run /aegis" [shape=box, style=filled, fillcolor=lightpink];
+    "Run /aegis-security-review" [shape=box, style=filled, fillcolor=lightpink];
     "UI-only changes?" [shape=diamond, style=filled, fillcolor=lightblue];
     "Check spec discrepancy" [shape=box, style=filled, fillcolor=lightblue];
     "Spec covers changes?" [shape=diamond, style=filled, fillcolor=lightblue];
@@ -79,9 +79,9 @@ digraph code_review {
     "User approves fixes?" -> "Apply major fixes" [label="yes"];
     "User approves fixes?" -> "Security-sensitive changes?" [label="skip"];
     "Apply major fixes" -> "Security-sensitive changes?";
-    "Security-sensitive changes?" -> "Run /aegis" [label="yes"];
+    "Security-sensitive changes?" -> "Run /aegis-security-review" [label="yes"];
     "Security-sensitive changes?" -> "UI-only changes?" [label="no"];
-    "Run /aegis" -> "UI-only changes?";
+    "Run /aegis-security-review" -> "UI-only changes?";
     "UI-only changes?" -> "Run /simplify" [label="yes, skip spec check"];
     "UI-only changes?" -> "Check spec discrepancy" [label="no"];
     "Check spec discrepancy" -> "Spec covers changes?";
@@ -303,7 +303,7 @@ Work from the merged finding set (Claude checklist + Codex second opinion, if di
 
 If the user's answer does not match the offered options, re-ask the same question once. If the second response is still off-list, stop the skill and let the user direct next steps.
 
-## Phase 4: Security Review (/aegis)
+## Phase 4: Security Review (/aegis-security-review)
 
 Athena's Phase 2 catches the obvious security issues (injection, missing `[Authorize]`, hardcoded secrets, unvalidated input, leaked fields). Aegis is the deeper pass: OWASP Top 10, tenant isolation, PII handling, audit-trail completeness, and dependency scanning.
 
@@ -335,14 +335,14 @@ From the diff already gathered in Phase 1, check for any of:
 
 If none apply, apply the skip condition above. Otherwise continue.
 
-### Step 2: Invoke /aegis
+### Step 2: Invoke /aegis-security-review
 
 Use `AskUserQuestion` to confirm:
 
-> "Changes include security-sensitive surface ([summary of what was detected]). Run /aegis for a deeper OWASP + Pandahrms security audit?"
+> "Changes include security-sensitive surface ([summary of what was detected]). Run /aegis-security-review for a deeper OWASP + Pandahrms security audit?"
 
 Options:
-- **Run /aegis** -> invoke the `aegis` skill against the working tree. Aegis will report findings, optionally apply approved fixes, and return control here.
+- **Run /aegis-security-review** -> invoke the `aegis` skill against the working tree. Aegis will report findings, optionally apply approved fixes, and return control here.
 - **Skip** -> note the skip in the review summary and proceed to Phase 5.
 - If the answer is off-list, re-ask once. If still off-list, stop the skill.
 
@@ -452,7 +452,7 @@ Then use `AskUserQuestion` to ask:
 ## Red Flags - STOP
 
 - Running `/spec-writing` without asking the user first - always use AskUserQuestion
-- Running `/aegis` without asking the user first - always use AskUserQuestion in Phase 4
+- Running `/aegis-security-review` without asking the user first - always use AskUserQuestion in Phase 4
 - Committing without asking the user first - always ask commit vs test in Phase 7
 - Auto-skipping review because "changes are small" without asking the user - Phase 0 ALWAYS asks via AskUserQuestion when small; never auto-skip
 - Reviewing only the diff, not the full file - always read full files
@@ -461,7 +461,7 @@ Then use `AskUserQuestion` to ask:
 - Waiting for Codex before starting Claude's own checklist - dispatch Codex in the same tool-call batch as the first Phase 2 read, so both reviews run in parallel
 - Blocking the review when Codex fails or times out - note the failure and proceed with Claude-only findings
 - Announcing "Codex not installed" when it isn't - silent skip only
-- Running tests, builds, migrations, dev servers, or any side-effecting commands during this skill - the only commands this skill runs are `git status`, `git diff`, `git diff --cached`, file reads, the matched linter scoped to changed files, and the sub-skill invocations defined in the phases (`/simplify`, `/aegis`, `/spec-writing`, `/hermes-commit`). Anything else requires explicit user instruction mid-flow.
+- Running tests, builds, migrations, dev servers, or any side-effecting commands during this skill - the only commands this skill runs are `git status`, `git diff`, `git diff --cached`, file reads, the matched linter scoped to changed files, and the sub-skill invocations defined in the phases (`/simplify`, `/aegis-security-review`, `/spec-writing`, `/hermes-commit`). Anything else requires explicit user instruction mid-flow.
 - Dispatching multiple Codex agents (per file, per category, per phase) - exactly ONE Codex agent for the entire diff
 - Editing files outside the `git status` changed set when applying fixes - only touch changed files plus the single file needed to wire up a finding (e.g., DI registration)
 - Writing `.feature` files yourself in Phase 5 - the only path to spec creation/update is `/spec-writing`
@@ -478,8 +478,8 @@ Then use `AskUserQuestion` to ask:
 | Committing without asking | Always ask user: /hermes-commit or test first? |
 | Blocking review when spec repo is missing | Report it and move on -- do not block the review |
 | Running spec check on UI-only changes | Skip Phase 5 for the precise UI-only definition in Phase 4 |
-| Running /aegis on UI-only or docs-only changes | Skip Phase 4 when no security-relevant surface exists |
-| Invoking /aegis without user confirmation | Always ask in Phase 4 before invoking |
+| Running /aegis-security-review on UI-only or docs-only changes | Skip Phase 4 when no security-relevant surface exists |
+| Invoking /aegis-security-review without user confirmation | Always ask in Phase 4 before invoking |
 | Running Claude's checklist first then Codex | Dispatch in parallel -- same tool-call batch as first Phase 2 read |
 | Announcing "Codex not installed" | Silent skip -- no user-facing message when absent |
 | Treating Codex output as authoritative | Advisory only -- dedupe, merge attribution, use higher severity when classifications differ |
@@ -500,7 +500,7 @@ Athena does NOT produce any of the following. If any would be useful, mention it
 
 ## Sub-Skill Failure Handling
 
-This applies whenever Athena invokes `/simplify`, `/aegis`, `/spec-writing`, or `/hermes-commit`:
+This applies whenever Athena invokes `/simplify`, `/aegis-security-review`, `/spec-writing`, or `/hermes-commit`:
 
 - If the sub-skill exits with an error or times out, record the failure as `<skill>: failed - <reason>` in the Phase 7 summary and continue to the next phase. Do NOT retry the sub-skill in this run.
 - If the sub-skill returns control with its own pending question, treat that question as belonging to the sub-skill -- surface it verbatim to the user, then resume Athena once the user has answered through the sub-skill.
