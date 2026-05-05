@@ -44,16 +44,18 @@ Before dispatching the first batch, check the plan file's `## Atlas Progress` (o
 
 ### The mode question
 
+The mode question is asked ONLY when invoked outside atlas-pipeline-orchestrator -- atlas pre-sets `Codex execution mode: full` at plan creation per its [role split policy](../atlas-pipeline-orchestrator/SKILL.md#codex-availability) and execute-plan reads it back without prompting. For standalone invocations and forge-pipeline-orchestrator runs, ask:
+
 ```
 question: "Codex is available locally. How would you like to use it for this execution run?"
 header: "Codex mode"
 options:
-  - label: "None (Recommended for short plans)"
-    description: "Every task dispatches via Agent. Fastest per-task, lowest cost. Default behavior."
+  - label: "Full Codex (Recommended)"
+    description: "Every implementer dispatches via codex:codex-rescue; Claude reviews codex's output. Highest implementation depth and matches the atlas role split (Codex implements, Claude audits)."
   - label: "Partial / parallel"
     description: "Tasks tagged `Risk: high` dispatch via codex:codex-rescue; standard-risk tasks via Agent. Both run in the same parallel batch -- mixed dispatchers, single batch."
-  - label: "Full Codex"
-    description: "Every implementer dispatches via codex:codex-rescue. Highest review depth, slowest per-task. Use when the entire plan touches risky areas."
+  - label: "None"
+    description: "Every task dispatches via Agent. Use when you want Claude to handle implementation directly (e.g., codex is misbehaving on this codebase, or you're benchmarking Agent-only)."
 ```
 
 After the user answers, append `Codex execution mode: <value>` to the orchestrator's progress section so resumed runs don't re-ask.
@@ -76,11 +78,11 @@ In `partial-parallel` mode, a single batch can contain both Agent and codex:code
 
 The 5-per-batch parallelism cap (see [Parallel Dispatch Mechanics](#parallel-dispatch-mechanics)) counts BOTH dispatcher types together. A batch of 3 Agent + 2 codex tasks is at the cap; a batch of 5 Agent + 1 codex tasks must split.
 
-### When second-stage review runs in codex mode
+### Second-stage review always runs on Claude
 
-The conditional second-stage spec-compliance reviewer (for `Risk: high` tasks) ALWAYS routes through `codex:codex-rescue` when `codex_available` is true, regardless of the implementer's dispatcher. Reviewer prompts use the read-only prefix.
+The conditional second-stage spec-compliance reviewer (for `Risk: high` tasks) ALWAYS routes through the local `Agent` tool (Claude), regardless of `codex_available` or the implementer's dispatcher. Reviewing Codex's implementation output is Claude's job in the atlas role split (see [atlas-pipeline-orchestrator > Codex Availability](../atlas-pipeline-orchestrator/SKILL.md#codex-availability)). Codex never reviews its own work.
 
-If `codex_available` is false, the second-stage reviewer runs via Agent.
+The reviewer prompt does NOT use the `READ-ONLY REVIEW` prefix -- that prefix existed only to keep codex from writing during review dispatches, and the second-stage reviewer no longer goes to codex.
 
 ## Process Flow
 
@@ -172,7 +174,7 @@ The timing row for the failed task records `Wall-clock: <duration>` and `Status:
 For each task in the completed batch, check if the plan tagged it `**Risk:** high`:
 
 - **No high-risk tasks** -- mark the batch complete and proceed to the next batch.
-- **One or more high-risk tasks** -- dispatch a spec-compliance reviewer subagent for each high-risk task (see [Spec Reviewer Prompt Template](#spec-reviewer-prompt-template)). Reviewer routes through `codex:codex-rescue` when `codex_available` is true (regardless of the implementer's dispatcher), else through Agent. Apply [Reviewer Verdict Handling](#reviewer-verdict-handling) to the returned report.
+- **One or more high-risk tasks** -- dispatch a spec-compliance reviewer subagent for each high-risk task (see [Spec Reviewer Prompt Template](#spec-reviewer-prompt-template)). Reviewer ALWAYS routes through the local `Agent` tool (Claude), regardless of `codex_available` or the implementer's dispatcher -- reviewing Codex's output is Claude's job. Apply [Reviewer Verdict Handling](#reviewer-verdict-handling) to the returned report.
 
 The default is single-stage. The plan author decides which tasks pay the second-stage cost.
 
@@ -504,8 +506,10 @@ The orchestrator (atlas-pipeline-orchestrator, or whoever invoked you) decides w
 | "I'll add a final whole-codebase reviewer subagent at the end" | No. Atlas-pipeline-orchestrator runs `/simplify` and athena-code-review post-execution. Don't duplicate. |
 | "I'll hand off to finishing-a-development-branch when done" | No. Atlas-pipeline-orchestrator owns the user-test + /hermes-commit step. Just announce completion. |
 | "The plan task has no test ref but I'll just implement it" | Stop and report -- the plan is missing required references. Atlas-pipeline-orchestrator decides whether to fix the plan or proceed. |
-| "Codex is available so I'll just route everything to codex" | Ask the user the mode question. `none` is the recommended default; `full` is opt-in for risky-heavy plans. Don't pick on their behalf. |
-| "I'll prefix the codex implementer dispatch with READ-ONLY REVIEW" | No. The read-only prefix is for atlas-pipeline-orchestrator's QA review and Plan-Spec cross-review only. Implementation prompts let codex write. |
+| "Codex is available -- I'll ask the user which mode they want even when atlas already set the line" | No. If the plan's `Codex execution mode:` line already holds `full`, `partial-parallel`, or `none`, use it without asking. Atlas pre-sets `full` per its role split policy. Only ask when invoked outside atlas (standalone or forge) and the line is missing. |
+| "Full mode is just an opt-in -- the recommended default is none" | Outdated. Under the atlas role split (Codex implements, Claude audits), `full` is the recommended default when codex is available. The mode question reflects that. |
+| "I'll route the second-stage spec-compliance reviewer for Risk: high tasks through codex" | No. Reviewing codex's output is Claude's job. The second-stage reviewer always uses Agent, regardless of codex availability or implementer dispatcher. |
+| "I'll prefix the codex implementer dispatch with READ-ONLY REVIEW" | No. The read-only prefix is for review-only dispatches. Implementation prompts let codex write. |
 | "Codex mode is `partial-parallel` but I'll dispatch the codex tasks in a separate message to be safe" | Same batch, same message. Mixing Agent + codex in one parallel batch is the whole point of `partial-parallel`. |
 | "I'll re-ask the codex mode question on every batch" | Ask once. Persist the answer to the orchestrator's progress section. Resumed runs read it back. |
 | "I'll call the dispatch groupings 'Wave' (or 'Round' / 'Phase') in the user-facing plan" | No. The vocabulary is **Batch**, used everywhere. Synonyms cause confusion when the user reads the skill text. See [Display vocabulary](#display-vocabulary). |

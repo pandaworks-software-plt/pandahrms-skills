@@ -37,6 +37,8 @@ Unified Pandahrms-native pipeline: design, spec writing, QA review, implementati
 
 Atlas Pipeline Orchestrator is the no-superpowers cousin of `forge-pipeline-orchestrator`. The pipeline shape is the same; the component skills swap from `superpowers:*` to `pandahrms:*`. The biggest practical difference is per-task throughput: atlas-pipeline-orchestrator runs single-stage review by default and only opts into a second-stage spec-compliance reviewer for tasks the plan tags `**Risk:** high`. This was the v4->v5 superpowers change that produced the largest slowdown.
 
+**Role split between Codex and Claude (active only when Codex is available locally):** when `codex_available` is `true`, **Codex implements** (Step 6 dispatches, fix re-dispatches) and **Claude plans and audits** (Steps 1, 2, 4 planning; Steps 3, 5, 7 review; Step 8 exploration; second-stage reviewer for `Risk: high`). Codex never reviews its own output. When Codex is unavailable, the split collapses and Claude handles every step including implementation. See [Codex Availability](#codex-availability) for the full policy and announcement strings.
+
 **Announce at start:** "I'm using Pandahrms atlas-pipeline-orchestrator to orchestrate design through execution (no-superpowers mode). Routed here from forge-pipeline-orchestrator."
 
 ## Fast Path (plan provided)
@@ -49,7 +51,12 @@ When `/atlas-pipeline-orchestrator` is invoked with a positional argument that i
 If validation passes, run Step 0 (Setup) FIRST, THEN announce "Executing existing plan -- running Plan <-> Spec cross-review, then execution.", THEN skip directly to step 5 (Plan <-> Spec cross-review), then step 6 (Execute plan).
 
 - Step 0 runs in full -- codex detection and time tracking init still happen, even on Fast Path.
-- On Fast Path entry, before Step 6 invokes pandahrms:execute-plan, atlas-pipeline-orchestrator MUST re-prompt the user for codex execution mode via AskUserQuestion when `codex_available` is true, regardless of whether `Codex execution mode:` is already set in the Atlas Progress section. Stale modes from prior sessions are not inherited silently. Update the Atlas Progress section with the new value before dispatch.
+- On Fast Path entry, before Step 6 invokes pandahrms:execute-plan, atlas-pipeline-orchestrator reconciles the `Codex execution mode:` line in the existing plan against current `codex_available`:
+  - If `codex_available` is true and the line is missing or set to `none`, overwrite it to `full` (the new policy default). Announce: `"Codex available -- setting execution mode to 'full' (atlas policy default)."`
+  - If `codex_available` is true and the line is already `full` or `partial-parallel`, leave it alone.
+  - If `codex_available` is false, force the line to `none` regardless of its previous value.
+
+  Do NOT prompt the user with AskUserQuestion to confirm. The user can override by editing the line manually before Step 6 starts.
 - Still run step 5 to catch drift between the pre-existing plan and current specs.
 - After execution, still run step 7 (simplify), step 8 (Playwright e2e), and step 9 (ask user to test) with the Development Summary.
 
@@ -113,22 +120,51 @@ At the very start of every atlas-pipeline-orchestrator run (Step 0 / Setup, incl
 1. Run `command -v codex` via Bash. Treat as available ONLY if exit code is 0 AND stdout is non-empty AND the resolved path exists. In any other case (non-zero exit, empty stdout, missing path, Bash error), set `codex_available=false`. Do not retry detection.
 2. Store the result in conversation context as `codex_available` (true/false). Persist it into the plan file's `## Atlas Progress` section once the plan exists, on a `Codex available: true|false` line, so resumed runs do not need to re-detect.
 
-When `codex_available` is true, dispatch these review-only steps to the `codex:codex-rescue` subagent for a second-opinion pass:
+### Role split (active ONLY when `codex_available` is true)
 
-- **Step 3** -- QA Review Agent (already auto-skips on lightweight scope -- so codex only runs here on standard/heavyweight)
-- **Step 5** -- Plan <-> Spec cross-review (gated on Scope Profile -- see below)
+The role split below applies if and only if `codex_available` is `true` at Step 0. When codex is unavailable, the split is **inactive** -- Claude handles every step, including Step 6 implementation and fix re-dispatches. Skip the rest of this subsection on no-codex runs.
 
-**Step 5 codex gating by Scope Profile:**
-- `lightweight` -- skip codex entirely. Run the cross-review inline via the local `Agent` tool. Do NOT skip the inline review itself; it always runs on lightweight to enforce the Plan -> Test direction (the only Fast Path test-ref validator). The independent-second-opinion benefit doesn't justify the codex round-trip on small features.
-- `standard` and `heavyweight` -- route through `codex:codex-rescue` as before.
+When codex IS available, this pipeline divides labor by capability, not by step number:
 
-These are analysis-only tasks. The dispatched prompt MUST begin with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.` so codex does not edit the working tree. Findings come back as the rescue subagent's stdout and are reconciled exactly as if the regular `Agent` tool had been used. The skip conditions for each step still apply -- detection only changes who runs the review, not whether it runs.
+| Layer | Owner | Steps |
+|-------|-------|-------|
+| **Implementation / fix** | Codex (`codex:codex-rescue`) | Step 6 implementer dispatch, Subagent Failure Handling re-dispatch on `insufficient reasoning`, any code-fix follow-up triggered by Step 7 Simplify findings |
+| **Planning** | Claude (local `Agent` tool) | Step 1 design, Step 2 spec-writing, Step 4 plan-writing |
+| **Auditing / review of Codex output** | Claude (local `Agent` tool) | Step 3 QA review, Step 5 Plan <-> Spec cross-review, Step 7 Simplify review pass, second-stage spec-compliance reviewer for `Risk: high` tasks |
+| **Exploration** | Claude (local `Agent` tool) | Step 8 Playwright e2e, ad-hoc codebase exploration during design/plan |
 
-When `codex_available` is false, fall back to the regular `Agent` tool with the prompts shown in each section.
+The principle: when Codex is available, Codex writes code and Claude plans, audits, and explores. Codex is never asked to review its own work, and Claude never writes production code in this pipeline.
 
-**If a `codex:codex-rescue` dispatch fails after Step 0 detection succeeded** (timeout, runtime error, non-zero exit, missing binary): do NOT retry codex. Set `codex_available=false` in conversation context for the remainder of this run, persist `Codex available: true (degraded to false at step N)` in the Atlas Progress section, and re-dispatch the failing review via the regular `Agent` tool. Do not stall waiting for codex recovery.
+**No-codex fallback:** when `codex_available` is `false`, the split collapses -- Claude does both planning/audit AND implementation. Announce the degradation explicitly so the user knows.
 
-Announce at start: `"Codex detected -- routing QA review and Plan <-> Spec cross-review to codex:codex-rescue."` or `"Codex not detected -- using local agents for reviews."`
+### Default Step 6 codex execution mode
+
+When `codex_available` is true, atlas-pipeline-orchestrator pre-sets the Step 6 [Codex Execution Mode](../execute-plan/SKILL.md#codex-execution-mode) to **`full`** -- every implementer dispatches via `codex:codex-rescue`. Atlas writes `Codex execution mode: full` into the plan file's `## Atlas Progress` section at plan creation (Step 4), and `pandahrms:execute-plan` reads it back without re-prompting.
+
+The user can override by editing the line to `partial-parallel` or `none` before Step 6 starts; atlas honors whatever value the line holds when execute-plan runs. Do NOT prompt the user with AskUserQuestion just to confirm the default -- silent default is the point.
+
+When `codex_available` is false, atlas writes `Codex execution mode: none`. There is no question to ask.
+
+### Reviews never route to codex (only relevant when codex is available)
+
+This rule only matters when `codex_available` is `true` -- on no-codex runs there is nothing to route anywhere. When codex IS available:
+
+- Step 3 (QA Review Agent), Step 5 (Plan <-> Spec cross-review), and Step 7 Simplify's review pass run via the local `Agent` tool -- not `codex:codex-rescue`. These are auditing tasks; Claude is the auditor.
+- The second-stage spec-compliance reviewer dispatched by `pandahrms:execute-plan` for `Risk: high` tasks also runs via Agent, even when codex implemented the task. Reviewing Codex's output is Claude's job; see `pandahrms:execute-plan` Reviewer Verdict Handling.
+- Do NOT use the `READ-ONLY REVIEW` prefix in atlas -- it was needed only to keep codex from modifying files during a review dispatch, and atlas no longer dispatches codex for reviews.
+
+### Implementation dispatches let Codex write
+
+Step 6 implementation prompts (sent to `codex:codex-rescue` from `pandahrms:execute-plan`) MUST NOT include the `READ-ONLY REVIEW` prefix. They let codex modify files. The read-only prefix is reserved for review-only dispatches -- and since atlas no longer routes reviews to codex, the prefix only appears in this pipeline if a future skill explicitly opts in.
+
+### Codex failure mid-run
+
+If a `codex:codex-rescue` dispatch fails after Step 0 detection succeeded (timeout, runtime error, non-zero exit, missing binary): do NOT retry codex. Set `codex_available=false` in conversation context for the remainder of this run, persist `Codex available: true (degraded to false at step N)` in the Atlas Progress section, and re-dispatch the failing implementer via the regular `Agent` tool (Claude takes over implementation). Also flip the `Codex execution mode:` line to `none` so subsequent batches don't try codex again. Do not stall waiting for codex recovery.
+
+### Start announcements
+
+- Codex available: `"Codex detected -- Step 6 implementations route to codex:codex-rescue (mode: full). Planning and reviews stay on Claude."`
+- Codex unavailable: `"Codex not detected -- Claude handles both implementation and reviews for this run."`
 
 <HARD-GATE>
 AUTHORITY HIERARCHY:
@@ -321,7 +357,7 @@ Append a `## Atlas Progress` section to the plan file. Backfill timing for which
 
 Atlas started: 1718000000
 Codex available: true
-Codex execution mode: none
+Codex execution mode: full
 Playwright e2e: auto-detect
 Scope Profile: lightweight
 
@@ -429,7 +465,7 @@ Announce the skip reason -- e.g. `"Skipping QA review -- no specs to review."` o
 
 ### Agent Dispatch
 
-If `codex_available` is true, dispatch via the `codex:codex-rescue` subagent. Otherwise dispatch via the regular `Agent` tool. In both cases, prefix the prompt with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.` followed by a blank line, then the body below.
+QA review is an audit task -- ALWAYS dispatch via the local `Agent` tool, regardless of `codex_available`. Reviews stay on Claude in this pipeline (see [Codex Availability > Reviews stay on Claude](#codex-availability)). Do NOT add a `READ-ONLY REVIEW` prefix -- that prefix existed for codex review dispatches, and atlas no longer routes reviews to codex.
 
 Replace the placeholders:
 - `{design_doc_path}` -- path to the approved design document
@@ -552,14 +588,9 @@ For `standard` and `heavyweight` profiles, all three directions run with full st
 
 ### How to Review
 
-**Dispatcher selection** (per [Codex Availability](#codex-availability) gating):
-- Scope Profile is `standard` or `heavyweight` AND `codex_available` is true: dispatch via `codex:codex-rescue` for the independent-second-opinion pass.
-- Scope Profile is `lightweight` (regardless of codex availability): run the review inline via local `Agent` tool. Skip codex entirely on small features -- the round-trip cost (~3-4m) outweighs the marginal value when pragmatic mode is in effect.
-- `codex_available` is false: run inline regardless.
+Plan <-> Spec cross-review is an audit task -- ALWAYS run inline via the local `Agent` tool, regardless of `codex_available` or Scope Profile. Reviews stay on Claude in this pipeline (see [Codex Availability > Reviews stay on Claude](#codex-availability)). Do NOT route to `codex:codex-rescue`; do NOT use the `READ-ONLY REVIEW` prefix.
 
-When dispatching to codex, prompt with the plan file path, the in-scope `.feature` file paths, the test file inventory from step 1, and the three checks below. Prefix the prompt with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.`. Treat the subagent's output as the review report.
-
-When running inline (lightweight or no-codex):
+Inline review steps:
 
 1. Read the plan file and extract every task's spec reference, test reference, and (where present) verification slot.
 2. Read every in-scope `.feature` file for the feature.
@@ -685,8 +716,10 @@ Skip Step 8 entirely (with announcement) when any of these hold:
 | "Cross-review found a task missing a test ref -- I'll flag it" | Check first whether it fits a No-Test-Pattern Category (EF mapping, migration, read DTO + projection, API regen, pure config). If yes, the resolution is to add a `Verification:` slot, not a Test ref. Only flag tasks that have neither a Test ref nor a valid Verification slot. |
 | "I'll list noisy 'no test by convention' findings in the cross-review report" | No. Tasks with a valid Verification slot are silently accepted. The cross-review report only contains real gaps that need fixing. |
 | "Cross-review found gaps -- I'll ask the user whether to fix them" | No. Real gaps with coverage value are auto-resolved by looping back to spec-writing or plan. The user is only asked when an irreconcilable conflict surfaces or when a Verification category isn't in the recognized list. |
-| "Codex is installed but I'll just dispatch the local agent" | If `codex_available` is true, route QA review and Plan <-> Spec cross-review through `codex:codex-rescue`. |
-| "I'll send the codex review prompt without the read-only prefix" | Codex defaults to `--write`. Every review dispatch MUST start with `READ-ONLY REVIEW. Do not modify files. Do not run --write. Return findings only.` so codex doesn't edit the working tree. |
+| "Codex is installed -- I'll route the QA review (or Plan-Spec cross-review) through codex too, for second-opinion depth" | No. Reviews stay on Claude in this pipeline. Codex implements; Claude audits. The whole point of the role split is that Codex never reviews its own output. |
+| "I'll prefix the QA review or Plan-Spec cross-review dispatch with READ-ONLY REVIEW" | No. The read-only prefix existed because codex defaults to `--write`. Atlas no longer dispatches reviews to codex, so the prefix is not used in atlas-driven dispatches. |
+| "Codex is available but I'll ask the user which mode they want before Step 6" | No -- atlas pre-sets `Codex execution mode: full` when codex is available. The user can edit the line manually to override; do not prompt. |
+| "I'll let Claude implement Step 6 tasks even though codex is available" | No. When codex is available, Step 6 implementations route to codex per the role split. Claude reviews codex's output, not produces production code. |
 | "I'll let an implementer commit since the plan says to commit" | Plans should not contain `git commit` steps. pandahrms:execute-plan strips them on dispatch. /hermes-commit owns commits. |
 
 ## When to Use
