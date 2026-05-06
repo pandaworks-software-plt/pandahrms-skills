@@ -1,13 +1,25 @@
 ---
 name: hermes-commit
-description: Triggers when the user explicitly requests a git commit of the current working tree -- phrases like "commit my changes", "git commit", "ready to commit", "/hermes-commit", or "make atomic commits". Does NOT trigger on "ship it" alone, on "commit to a decision", or on deploy/release language. Verifies code review was done, checks for lint/format errors, then plans and executes atomic commits. Does NOT push, tag, branch, or open PRs; does NOT modify code itself.
+description: Triggers when the user explicitly requests a git commit of the current working tree -- phrases like "commit my changes", "git commit", "ready to commit", "/hermes-commit", or "make atomic commits". Does NOT trigger on "ship it" alone, on "commit to a decision", or on deploy/release language. Verifies code review was done, then enforces a hard gate (0 test failures, 0 lint errors, 0 format errors -- even pre-existing or unrelated to the current session) by auto-fixing mechanical issues and stopping on the rest, then plans and executes atomic commits. Does NOT push, tag, branch, or open PRs.
 ---
 
 # Hermes (Commit)
 
 ## Overview
 
-Verify that changes are reviewed and clean, then plan and execute atomic commits. This skill itself never modifies code. It may invoke `/athena-code-review` (which CAN modify code) only when the user picks the review option in Phase 1; in that case the skill terminates after `/athena-code-review` completes and the user must re-invoke `/hermes-commit` on the resulting clean state. If verification fails at any phase, this skill STOPS and tells the user what to fix -- it never auto-fixes.
+Verify that changes are reviewed and clean, then plan and execute atomic commits.
+
+**Phase 2 is a HARD GATE.** Before any commit, the working tree must have:
+
+- 0 test failures
+- 0 lint errors
+- 0 format errors
+
+This applies **even when the failures are pre-existing or unrelated to the current session's changes**. There is no skip option for the gate itself; the only escape hatch is the explicit "Tool missing" branch.
+
+The skill auto-fixes mechanical violations by invoking the formatter and linter in write mode (`dotnet format`, `biome check --write`, `eslint --fix`, etc.); those fixes are pulled into the commit plan in Phase 4. For non-mechanical failures (failing tests, lint diagnostics that cannot be auto-fixed), the skill STOPS and tells the user what to fix -- it does not make judgment-call code edits itself, since logic changes during a commit step are unsafe.
+
+The skill may invoke `/athena-code-review` (which CAN modify code) only when the user picks the review option in Phase 1; in that case the skill terminates after `/athena-code-review` completes and the user must re-invoke `/hermes-commit` on the resulting clean state.
 
 ## When to Use
 
@@ -22,9 +34,11 @@ digraph commit {
     "Ask: reviewed?" [shape=diamond];
     "Run /athena-code-review" [shape=box, style=filled, fillcolor=lightyellow];
     "STOP" [shape=octagon, style=filled, fillcolor=red, fontcolor=white];
-    "Run format/lint check" [shape=box];
-    "Errors?" [shape=diamond];
-    "Warn and STOP" [shape=octagon, style=filled, fillcolor=orange];
+    "Auto-fix format" [shape=box];
+    "Auto-fix lint" [shape=box];
+    "Run tests" [shape=box];
+    "All gates pass?" [shape=diamond];
+    "Stop and report" [shape=octagon, style=filled, fillcolor=orange];
     "Gather changes" [shape=box];
     "Plan atomic commits" [shape=box];
     "Present commit plan" [shape=box];
@@ -35,10 +49,12 @@ digraph commit {
     "User triggers /hermes-commit" -> "Ask: reviewed?";
     "Ask: reviewed?" -> "Run /athena-code-review" [label="perform code review"];
     "Run /athena-code-review" -> "STOP" [label="review done, remind to test then /hermes-commit again"];
-    "Ask: reviewed?" -> "Run format/lint check" [label="skip code review"];
-    "Run format/lint check" -> "Errors?" ;
-    "Errors?" -> "Warn and STOP" [label="yes, tell user to fix"];
-    "Errors?" -> "Gather changes" [label="clean"];
+    "Ask: reviewed?" -> "Auto-fix format" [label="skip code review"];
+    "Auto-fix format" -> "Auto-fix lint";
+    "Auto-fix lint" -> "Run tests";
+    "Run tests" -> "All gates pass?";
+    "All gates pass?" -> "Stop and report" [label="no -- tell user to fix"];
+    "All gates pass?" -> "Gather changes" [label="yes"];
     "Gather changes" -> "Plan atomic commits";
     "Plan atomic commits" -> "Present commit plan";
     "Present commit plan" -> "User approves?";
@@ -50,7 +66,11 @@ digraph commit {
 
 ## Execution Order
 
-Phases execute strictly in order: Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 -> Phase 5 -> Phase 6. Do not begin a phase until the prior phase has fully completed. Within Phase 3, the four `git` commands listed run in parallel; that is the only parallelism allowed in this workflow.
+Phases execute strictly in order: Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 -> Phase 5 -> Phase 6. Do not begin a phase until the prior phase has fully completed.
+
+Within Phase 2, sub-steps run strictly in this order: Phase 2A (format auto-fix) -> Phase 2B (lint auto-fix) -> Phase 2C (test suite). Tests run last so they execute on the final post-fix code state.
+
+Within Phase 3, the four `git` commands listed run in parallel; that is the only parallelism allowed in this workflow.
 
 ## Phase 1: Gate Check
 
@@ -59,39 +79,83 @@ Use `AskUserQuestion` with the question "Has /athena-code-review been run on the
 - **"Yes, review is complete"** -> proceed to Phase 2.
 - **"No, run review now"** -> invoke `/athena-code-review`, then STOP and emit verbatim: `Review complete. Test your changes, then run /hermes-commit again.` Do NOT continue to Phase 2 in the same session.
 
-## Phase 2: Format/Lint Verification
+## Phase 2: Hard Gate (Format + Lint + Tests)
 
-Detect ALL project types present in the changed-files set (the files reported by `git status`):
+This phase is a **HARD GATE**. The skill cannot proceed past Phase 2 unless all three checks (format, lint, tests) report 0 errors and 0 failures. The gate applies **even when the failures are pre-existing or unrelated to the current session's changes** -- if the working tree is broken, the commit does not happen until the working tree is fixed.
 
-- If any changed file is under a directory containing `.csproj` or `.sln` -> run the .NET check on that project.
-- If any changed file is under a directory containing `package.json` -> run the JS/TS check.
-- Mixed repos: run BOTH. Aggregate errors. Stop if either reports errors.
-- If neither matches the changed files, emit verbatim: `No format/lint configuration recognized for this repo; proceeding to Phase 3 without format verification.` Then continue to Phase 3. Do not invent or guess at a lint command.
+There is no skip option for the gate itself. The only escape hatch is the explicit "Tool missing" branch in the Failure Handling section below; that branch only applies when a required tool is not installed.
 
-Always run in **verify-only mode** -- never auto-fix.
+### Detection
 
-### .NET projects (`.sln` or `.csproj` in workspace)
-- Run `dotnet format --verify-no-changes` on the solution/project.
-- This checks code style, formatting, and analyzer warnings.
-- Do NOT run JS/TS linters -- .NET projects do not use them.
+Detect ALL project types present in the workspace (not just the changed-files set -- the gate covers the whole working tree):
 
-### JavaScript/TypeScript projects
+- `.csproj` / `.sln` anywhere in the workspace -> run .NET checks.
+- `package.json` anywhere in the workspace -> run JS/TS checks.
+- Mixed repos: run BOTH for every sub-step. Aggregate results. STOP if any sub-step fails.
+- If neither matches, emit verbatim: `No format/lint/test configuration recognized for this repo; proceeding to Phase 3 without verification.` Then continue to Phase 3. Do not invent or guess at commands.
 
-Detection precedence (first match wins):
+### Phase 2A: Format Auto-Fix
 
-1. `biome.json` or `biome.jsonc` -> `pnpm biome check` (without `--write`).
-2. `eslint.config.*` (flat config) -> `pnpm lint`.
-3. `.eslintrc.*` (legacy config) -> `pnpm lint`.
-4. `package.json` `scripts.lint` present -> `pnpm lint`.
+Run the formatter in **write mode** to auto-fix mechanical formatting violations. Any files modified by this step will be picked up by Phase 3 and included in the commit plan in Phase 4.
 
-Stop at the first match.
+- **.NET**: `dotnet format` on the solution/project (no `--verify-no-changes` flag -- this is the write pass).
+- **JS/TS** (detection precedence, first match wins):
+  1. `biome.json` / `biome.jsonc` -> `pnpm biome format --write .`
+  2. `.prettierrc.*` or `prettier` key in `package.json` -> `pnpm prettier --write .`
+  3. Otherwise: skip the dedicated format step and rely on Phase 2B's linter to format.
 
-### Failure handling
+After the write pass, run the verification form to confirm 0 remaining issues:
 
-Distinguish two failure modes:
+- **.NET**: `dotnet format --verify-no-changes`
+- **JS/TS**: `pnpm biome format .` (verify) or `pnpm prettier --check .`
 
-- **Tool missing** (command not found, exit code 127): emit `Format check tool [name] is not installed. Install it or skip this check?` and ask the user via `AskUserQuestion` with options "Install and re-run" (STOP, await fix) or "Skip this check" (continue to Phase 3). Do not auto-skip.
-- **Style/format violations** (tool ran, returned non-zero with diagnostic output): STOP and emit the violations verbatim followed by: `Fix these before committing, then run /hermes-commit again.` Do not fix them -- that is athena-code-review's job.
+If verification still reports issues, STOP and emit the diagnostic output verbatim followed by:
+
+`Format errors remain after auto-fix. Fix these manually (or run /athena-code-review), then run /hermes-commit again.`
+
+### Phase 2B: Lint Auto-Fix
+
+Run the linter in **fix mode** to auto-fix mechanical lint violations, then run it in verify mode.
+
+- **.NET**: `dotnet format` already covers analyzer-driven lint warnings; no separate step.
+- **JS/TS** (detection precedence, first match wins):
+  1. `biome.json` / `biome.jsonc` -> `pnpm biome check --write .` then `pnpm biome check .` (verify).
+  2. `eslint.config.*` (flat config) -> `pnpm lint --fix` then `pnpm lint` (verify).
+  3. `.eslintrc.*` (legacy config) -> same as above.
+  4. `package.json` has a `lint:fix` script -> run that, then `pnpm lint`.
+  5. `package.json` has a `lint` script only -> run `pnpm lint` in verify mode (no auto-fix available).
+  6. None of the above -> skip lint sub-step.
+
+If the verify pass shows remaining errors (i.e. errors the linter could not auto-fix), STOP and emit the violations verbatim followed by:
+
+`Lint errors that cannot be auto-fixed remain. Fix these manually (or run /athena-code-review), then run /hermes-commit again.`
+
+Do not attempt manual code edits to make lint pass -- judgment-call code changes during a commit step are unsafe and that is athena-code-review's job.
+
+### Phase 2C: Test Suite
+
+Run the full test suite for every detected project type. Tests run **after** format/lint auto-fix so they execute on the final post-fix code state.
+
+- **.NET**: `dotnet test` on the solution.
+- **JS/TS**:
+  1. `package.json` has a `test` script -> `pnpm test`.
+  2. Otherwise detect framework directly: `vitest`, `jest`, `playwright` -> run the appropriate command (`pnpm vitest run`, `pnpm jest`, `pnpm playwright test`).
+  3. No tests detected -> skip this sub-step (do not block the gate when no tests exist).
+- **Mixed**: run both. Aggregate results.
+
+The gate is **0 failures and 0 errors**. Skipped/pending tests are allowed; failed and errored tests are not.
+
+If any test fails, STOP and emit a concise summary of the failing test names followed by:
+
+`Test failures detected (pre-existing or new). Fix these manually (or run /athena-code-review), then run /hermes-commit again.`
+
+Do not attempt manual code edits to make tests pass -- that is athena-code-review's job.
+
+### Failure Handling
+
+- **Tool missing** (command not found, exit code 127): emit `[tool name] is not installed. Install it or skip this sub-step?` and ask the user via `AskUserQuestion` with options "Install and re-run" (STOP, await fix) or "Skip this sub-step" (continue past this single sub-step only -- the rest of the gate still applies). Do not auto-skip.
+- **Auto-fix made changes**: that is expected. Note in the Phase 4 commit plan that pre-existing format/lint fixes are included.
+- **Verify-pass errors after auto-fix**: STOP per the sub-step instructions above. Do not retry, do not attempt manual edits, do not bypass.
 
 ## Phase 3: Gather Changes
 
@@ -204,11 +268,12 @@ Then STOP. Do not push, do not offer to push, do not propose follow-up work, do 
 
 Each item below is a HARD rule. Hitting any of them means STOP in the current response.
 
-- About to fix code during commit -> STOP. Tell user to run `/athena-code-review` and test first.
+- About to make a logic / judgment-call code edit during commit -> STOP. Mechanical auto-fix via the formatter or linter (`dotnet format`, `biome check --write`, `eslint --fix`) is allowed and expected; hand-editing source to silence a lint diagnostic or pass a test is NOT.
+- About to bypass the Phase 2 gate (skip tests, skip lint, skip format, "just this once") -> STOP. The gate is a HARD gate. The only branch that allows skipping a sub-step is the explicit Tool-missing branch.
 - About to `git add -A` or `git add .` -> stage specific files only.
 - Committing `.env`, credentials, or secrets -> warn the user and STOP.
 - Commit message doesn't match the actual changes -> rewrite it.
-- Format/lint errors detected -> STOP. Tell user to fix first.
+- Test failures, format errors, or lint errors remain after the Phase 2 auto-fix passes -> STOP. Tell the user to fix and re-invoke `/hermes-commit`.
 - Skipping the review gate -> always ask.
 - NEVER push, force-push, tag, create branches, or open PRs. This skill commits only. Stop after Phase 6's `git status` verification.
 - NEVER use `--amend`, `--no-verify`, `--no-gpg-sign`, or any flag that bypasses hooks/signing. If a hook fails, STOP and report the failure to the user; do not retry with bypass flags.
@@ -220,8 +285,9 @@ Each row below is a HARD rule. Hitting the left column means STOP and follow the
 
 | Mistake | Fix |
 |---------|-----|
-| Fixing code during commit | Never change code. That's athena-code-review's job. |
+| Hand-editing code to make tests/lint pass during commit | Never make logic changes. Mechanical auto-fix via formatter/linter is fine; anything else is athena-code-review's job. |
 | Grouping unrelated changes in one commit | Split by logical unit, not by file proximity. |
 | Writing commit messages about "what" not "why" | Focus on purpose: "support widget filtering" not "add if statement". |
 | Staging files that weren't reviewed | Only commit files that passed review. |
-| Skipping format/lint check | Always verify format/lint is clean before committing. |
+| Skipping any sub-step of the Phase 2 gate | The gate is hard. Run format auto-fix, lint auto-fix, AND tests every time. |
+| Treating pre-existing failures as out-of-scope | Pre-existing failures still block the commit. The gate does not care whose code broke it. |
