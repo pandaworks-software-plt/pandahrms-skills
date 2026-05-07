@@ -24,7 +24,7 @@ Run these steps strictly in order. Do not parallelize, reorder, or skip any step
 5. Emit every `### Task N:` block with required references and Red-Green steps. Insert Manual Gates between tasks per the placement rule in "Manual Gates".
 6. Run the 8-item Self-Review checklist top to bottom; fix issues inline per its sequencing rule.
 7. Save the plan to its path with the Write tool. Do NOT print the plan inline to the user. Do NOT skip the Write call.
-8. Print the Hand Off announcement and end the turn. Do NOT begin implementing any task. Do NOT modify any source files. Do NOT run any tests.
+8. Print the Hand Off announcement, then emit the Copyable Execute Instruction (fenced code block with `/pandahrms:execute-plan <path>`), then end the turn. Do NOT begin implementing any task. Do NOT modify any source files. Do NOT run any tests.
 
 ## Prerequisites
 
@@ -300,13 +300,37 @@ After the plan is saved and Self-Review is complete, announce:
 
 > "Plan complete and saved to `<path>`. Atlas-pipeline-orchestrator will run Plan ↔ Spec cross-review next, then dispatch tasks to pandahrms:execute-plan."
 
+Then emit the Copyable Execute Instruction (see below).
+
 Do NOT ask the user to choose between inline and subagent execution. Atlas-pipeline-orchestrator always uses pandahrms:execute-plan with parallel dispatch.
 
 When invoked outside atlas-pipeline-orchestrator (rare), announce instead:
 
 > "Plan complete and saved to `<path>`. Run pandahrms:execute-plan to implement, or hand the file to atlas-pipeline-orchestrator via `/atlas-pipeline-orchestrator <path>` for the full pipeline."
 
-**End of skill.** After printing the announcement, end your turn. Do NOT begin implementing any task. Do NOT modify any source files. Do NOT run any tests. Do NOT invoke pandahrms:execute-plan, /hermes-commit, or any follow-up skill from this skill.
+Then emit the Copyable Execute Instruction.
+
+### Copyable Execute Instruction
+
+After the announcement, emit a fenced code block containing the slash command the user can copy into a new session to start execution there. The user may also reply with `continue` in the current session to proceed with execution here. Use the exact format `/{execute-skill-name} {plan file path}` inside the fence -- one line, no surrounding prose.
+
+Default skill is `pandahrms:execute-plan`. The fenced block MUST be the last content of the turn:
+
+````
+To execute this plan in a new session, copy:
+
+```
+/pandahrms:execute-plan <path>
+```
+
+Or reply `continue` to execute in this session.
+````
+
+Substitute `<path>` with the absolute or workspace-relative path the plan was saved to (whichever you used in the Hand Off announcement -- be consistent). Do NOT add any text after this block.
+
+If the user's next message is exactly `continue` (case-insensitive, with or without surrounding whitespace), invoke `pandahrms:execute-plan` against the saved plan path in the current session. Any other reply is treated as new input -- do NOT auto-invoke execute-plan from ambiguous replies like "ok", "go", "yes".
+
+**End of skill.** After printing the Copyable Execute Instruction, end your turn. Do NOT begin implementing any task. Do NOT modify any source files. Do NOT run any tests. Do NOT invoke pandahrms:execute-plan, /hermes-commit, or any follow-up skill from this skill.
 
 ## Red Flags
 
