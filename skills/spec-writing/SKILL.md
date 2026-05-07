@@ -47,7 +47,7 @@ When skipping for UI-only work:
 - Do NOT read any `.feature` file.
 - Do NOT create or modify any `.feature` file.
 - Do NOT ask the user spec-related questions.
-- After emitting the announce-string, return control to the calling skill (pandahrms:forge-pipeline-orchestrator or pandahrms:atlas-pipeline-orchestrator). If invoked directly, return control to the user and stop. Do NOT auto-invoke pandahrms:spec-review or any downstream skill in the diagram below.
+- After emitting the announce-string, return control to the calling skill (pandahrms:atlas-pipeline-orchestrator). If invoked directly, return control to the user and stop. Do NOT auto-invoke pandahrms:spec-review or any downstream skill in the diagram below.
 
 **Examples of UI-only work (skip):**
 - Redesigning a page layout or component appearance
@@ -98,10 +98,10 @@ This applies to ALL changes: features, bug fixes, and refactors.
 Any work request in any Pandahrms project
     |
     v
-pandahrms:forge-pipeline-orchestrator (orchestrator: design through execution)
+pandahrms:atlas-pipeline-orchestrator (orchestrator: design through execution)
     |
     v
-superpowers:brainstorming (design doc)
+pandahrms:design-refinement (design doc)
     |
     v
 pandahrms:spec-writing (THIS SKILL - hard gate)
@@ -110,14 +110,14 @@ pandahrms:spec-writing (THIS SKILL - hard gate)
 pandahrms:spec-review (cross-check design vs specs)
     |
     v
-superpowers:writing-plans (implementation plan)
+pandahrms:plan-writing (implementation plan)
     |
     v
-superpowers:executing-plans --> pandahrms:athena-code-review --> spec cross-check
-    --> pandahrms:hermes-commit --> superpowers:finish-branch
+pandahrms:execute-plan --> /simplify --> pandahrms:athena-code-review (optional)
+    --> user tests --> pandahrms:hermes-commit
 ```
 
-**Note:** When invoked via `pandahrms:forge-pipeline-orchestrator`, brainstorming runs first and this skill runs after the design doc is approved. When invoked directly, this skill runs standalone.
+**Note:** When invoked via `pandahrms:atlas-pipeline-orchestrator`, design-refinement runs first and this skill runs after the design doc is approved. When invoked directly, this skill runs standalone.
 
 ## Prerequisite: Verify pandahrms-spec Project (Pandahrms Projects Only)
 
@@ -498,7 +498,7 @@ After Step 6 commit completes (or after an approved no-update exit per Step 2), 
 
 - The only files this skill writes are `.feature` files in the spec repository (`pandahrms-spec` for Pandahrms projects, or the project-local fallback for non-Pandahrms projects). It does NOT write code, tests, migrations, scaffolding, configuration, or documentation files anywhere else.
 - Do NOT auto-invoke `pandahrms:spec-review`, `pandahrms:plan-writing`, `pandahrms:execute-plan`, `pandahrms:athena-code-review`, `pandahrms:hermes-commit`, or any other downstream skill in the diagram above.
-- Return control to the calling skill (`pandahrms:forge-pipeline-orchestrator` or `pandahrms:atlas-pipeline-orchestrator`) if invoked from a pipeline. If invoked directly, return control to the user and stop. The skill's responsibility ends at the spec commit (or at confirmed no-update exit).
+- Return control to `pandahrms:atlas-pipeline-orchestrator` if invoked from a pipeline. If invoked directly, return control to the user and stop. The skill's responsibility ends at the spec commit (or at confirmed no-update exit).
 
 ## Pre-Exit Checklist
 

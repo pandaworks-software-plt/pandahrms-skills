@@ -1,13 +1,12 @@
 # pandahrms-skills
 
-Pandahrms-specific skills plugin for Claude Code. Provides domain skills that integrate with the [superpowers](https://github.com/obra/superpowers) plugin.
+Pandahrms-specific skills plugin for Claude Code.
 
 ## Skills
 
 | Skill | Slash Command | Description |
 |-------|---------------|-------------|
-| **forge-pipeline-orchestrator** | `/pandahrms:forge-pipeline-orchestrator` | Unified pipeline: brainstorm -> specs -> plan -> execute -> test |
-| **atlas-pipeline-orchestrator** | `/pandahrms:atlas-pipeline-orchestrator` | No-superpowers cousin of forge; manual-only entry via the slash command or forge handoff |
+| **atlas-pipeline-orchestrator** | `/pandahrms:atlas-pipeline-orchestrator` | Unified pipeline: design -> specs -> QA review -> plan -> Plan/Spec cross-review -> execute -> simplify -> test |
 | **design-refinement** | `/pandahrms:design-refinement` | Sectioned design refinement with mandatory test+spec context loading |
 | **plan-writing** | `/pandahrms:plan-writing` | Turn an approved design into a bite-sized implementation plan |
 | **execute-plan** | `/pandahrms:execute-plan` | Dispatch implementer subagents per plan task; supports codex modes |
@@ -19,25 +18,16 @@ Pandahrms-specific skills plugin for Claude Code. Provides domain skills that in
 | **branching** | `/pandahrms:branching` | Safe branch creation with upstream protection and folder-based naming |
 | **bridge-file** | `/pandahrms:bridge-file` | Structured protocol for debugging cross-project FE/BE issues |
 | **ef-migrations** | `/pandahrms:ef-migrations` | EF Core migration commands for Performance and Recruitment APIs |
-| **forge-slow-mode** | `/pandahrms:forge-slow-mode` | Experimental iterative pipeline; one atomic piece at a time |
 
 ## Installation
 
-### Prerequisites
-
-Requires [superpowers](https://github.com/obra/superpowers) plugin.
-
-### Steps
-
 1. Launch Claude Code
-2. Add the marketplaces:
+2. Add the marketplace:
    ```
-   /plugins marketplace add obra/superpowers-marketplace
    /plugins marketplace add pandaworks-software-plt/pandahrms-skills
    ```
-3. Install the plugins:
+3. Install the plugin:
    ```
-   /plugins install superpowers@superpowers-marketplace
    /plugins install pandahrms@pandahrms-skills
    ```
 
@@ -50,24 +40,24 @@ To update the plugin to the latest version:
 
 ## How it fits
 
-This plugin adds domain-specific skills to the superpowers development pipeline:
+`atlas-pipeline-orchestrator` is the single entry point for design-through-execution work in Pandahrms projects:
 
 ```
-Any work request --> pandahrms:forge-pipeline-orchestrator
-    --> superpowers:brainstorming (design)
+Any work request --> pandahrms:atlas-pipeline-orchestrator
+    --> pandahrms:design-refinement (design)
     --> pandahrms:spec-writing (Gherkin specs - hard gate)
-    --> pandahrms:spec-review (cross-check design vs specs)
-    --> superpowers:writing-plans (implementation plan)
-    --> superpowers:executing-plans (TDD)
-    --> pandahrms:athena-code-review
-        --> pandahrms:aegis-security-review (if security-sensitive)
-        --> /simplify --> spec cross-check
-    --> user tests --> pandahrms:hermes-commit --> superpowers:finish-branch
+    --> QA review (conditional)
+    --> pandahrms:plan-writing (implementation plan)
+    --> Plan <-> Spec cross-review
+    --> pandahrms:execute-plan (subagent-driven TDD)
+    --> /simplify
+    --> Playwright e2e (conditional)
+    --> user tests --> pandahrms:hermes-commit
 ```
 
-`forge-pipeline-orchestrator` is the single orchestrator from brainstorming through execution. It ensures `spec-writing` is never skipped after brainstorming, and that code review, security review (when applicable), simplification, and spec compliance are verified before the user tests.
+It ensures `spec-writing` is never skipped after design and that code review, security review (when applicable), simplification, and spec compliance are verified before the user tests.
 
-Additional standalone skills: `pandahrms:branching`, `pandahrms:bridge-file`, and `pandahrms:ef-migrations`.
+Additional standalone skills: `pandahrms:branching`, `pandahrms:bridge-file`, `pandahrms:athena-code-review`, `pandahrms:aegis-security-review`, `pandahrms:hermes-commit`, and `pandahrms:ef-migrations`.
 
 ## License
 

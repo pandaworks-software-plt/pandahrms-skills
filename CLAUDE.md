@@ -10,14 +10,13 @@ This is the **pandahrms-skills** repository -- a Claude Code plugin containing P
 pandahrms-skills/
 ├── .claude-plugin/plugin.json   # Plugin metadata and version
 ├── skills/                      # Claude Code skills (SKILL.md files)
-│   │  # Pipeline orchestrators (entry points)
-│   ├── forge-pipeline-orchestrator/   # Superpowers-based pipeline; first action asks user to pick forge or atlas
-│   ├── atlas-pipeline-orchestrator/   # No-superpowers pipeline; manual-only -- only forge or /atlas-pipeline-orchestrator can trigger
-│   │  # Pipeline components (used by atlas; forge uses superpowers equivalents)
-│   ├── design-refinement/             # Design refinement (replaces superpowers:brainstorming for atlas)
-│   ├── plan-writing/                  # Implementation plan writing (replaces superpowers:writing-plans for atlas)
-│   ├── execute-plan/                  # Subagent-driven execution with codex modes (replaces superpowers:subagent-driven-development for atlas)
-│   │  # Spec + review skills (used by both pipelines)
+│   │  # Pipeline orchestrator (entry point)
+│   ├── atlas-pipeline-orchestrator/   # Unified design -> spec -> plan -> execute pipeline
+│   │  # Pipeline components (used by atlas)
+│   ├── design-refinement/             # Design refinement with mandatory test+spec context loading
+│   ├── plan-writing/                  # Implementation plan writing
+│   ├── execute-plan/                  # Subagent-driven execution with codex modes
+│   │  # Spec + review skills
 │   ├── spec-writing/                  # Gherkin spec writing (hard gate before implementation)
 │   ├── spec-review/                   # Cross-check design docs against Gherkin specs
 │   ├── athena-code-review/            # Code review, fix issues, /simplify (no commits)
@@ -26,8 +25,7 @@ pandahrms-skills/
 │   │  # Standalone skills
 │   ├── branching/                     # Safe branch creation with upstream protection
 │   ├── bridge-file/                   # Communication between FE/BE Claude sessions
-│   ├── ef-migrations/                 # Entity Framework Core migrations
-│   └── forge-slow-mode/               # Experimental, manual-only iterative pipeline (one piece at a time)
+│   └── ef-migrations/                 # Entity Framework Core migrations
 ├── hooks/                       # Claude Code hooks (session-start, etc.)
 └── docs/                        # Plans and documentation
 ```

@@ -1,6 +1,6 @@
 ---
 name: plan-writing
-description: Triggers when an approved design and (optionally) Gherkin specs need to be turned into a bite-sized implementation plan in a Pandahrms project. Replaces superpowers:writing-plans. Each task carries exact file paths, complete code, a Red-before-Green TDD step pair, a spec scenario reference (when specs exist), a test file/case reference, and a dependency marker so atlas-pipeline-orchestrator can parallel-dispatch. Drops superpowers' duplication mandate ("repeat the code in every task") and the inline-vs-subagent execution choice -- atlas-pipeline-orchestrator always uses pandahrms:execute-plan.
+description: Triggers when an approved design and (optionally) Gherkin specs need to be turned into a bite-sized implementation plan. Each task carries exact file paths, complete code, a Red-before-Green TDD step pair, a spec scenario reference (when specs exist), a test file/case reference, and a dependency marker so atlas-pipeline-orchestrator can parallel-dispatch. Tasks reference shared code by file path rather than duplicating it inline; atlas-pipeline-orchestrator always uses pandahrms:execute-plan to run them.
 ---
 
 # Pandahrms Plan Writing
@@ -31,7 +31,7 @@ Run these steps strictly in order. Do not parallelize, reorder, or skip any step
 Verify ALL of the following before emitting any plan content. If any check fails, STOP and follow the listed remedy.
 
 1. **Design doc exists.** A design doc MUST live at `docs/pandahrms/designs/<feature-name>.md`. If it does not, output `No design doc found at docs/pandahrms/designs/. Run pandahrms:design-refinement first.` and stop.
-2. **Design doc is approved.** Approval is signaled by either (a) the orchestrator (forge-pipeline-orchestrator or atlas-pipeline-orchestrator) routing this skill the design after its approval gate, or (b) a `Status: approved` line in the design doc's frontmatter or top section. If neither signal is present, output `Cannot confirm design approval. Confirm explicitly before continuing.` and wait for an explicit user reply before continuing.
+2. **Design doc is approved.** Approval is signaled by either (a) atlas-pipeline-orchestrator routing this skill the design after its approval gate, or (b) a `Status: approved` line in the design doc's frontmatter or top section. If neither signal is present, output `Cannot confirm design approval. Confirm explicitly before continuing.` and wait for an explicit user reply before continuing.
 3. **Design doc is complete.** The design doc MUST contain a Goal section, a Functional Requirements list, and a Tech Stack section. If any are missing, output `Design doc is incomplete. Missing sections: [list].` and stop. Do not invent content for missing sections.
 4. **Specs exist OR skip-specs path is declared.** If business behavior is in scope, spec files MUST exist under `pandahrms-spec/features/<area>/`. If neither is true, output `No specs found and skip-specs path not declared. Run pandahrms:spec-writing first or confirm UI-only / skip-specs path explicitly.` and stop.
 5. **Scope Profile is set.** The orchestrator sets `lightweight | standard | heavyweight` after design approval. If absent, default to `standard` and announce: `Scope Profile not set; defaulting to standard.`
@@ -62,7 +62,7 @@ Each step is one action (2-5 minutes):
 
 ## Task Decomposition Heuristics
 
-The orchestrator (atlas-pipeline-orchestrator/forge-pipeline-orchestrator) sets a Scope Profile after design approval. Use it to right-size the plan:
+atlas-pipeline-orchestrator sets a Scope Profile after design approval. Use it to right-size the plan:
 
 | Scope Profile | Target task count | Decomposition rule |
 |---------------|-------------------|---------------------|
@@ -342,6 +342,5 @@ When invoked outside atlas-pipeline-orchestrator (rare), announce instead:
 
 Refuse and abort with the listed message when ANY of the following are true:
 
-- **Design not approved.** No design doc exists at `docs/pandahrms/designs/`, or the design's approval cannot be confirmed per Prerequisites item 2. Output: `Design not approved. Run pandahrms:design-refinement first.` and stop.
+- **Design not approved.** No design doc exists at the expected design path (default `docs/pandahrms/designs/` for Pandahrms projects, `docs/designs/` otherwise), or the design's approval cannot be confirmed per Prerequisites item 2. Output: `Design not approved. Run pandahrms:design-refinement first.` and stop.
 - **Trivial single-file fix.** The change touches a single file with at most 30 modified lines, no new public API, and no new spec scenarios. Output: `Change is too small for a full plan. Do the fix directly with TDD.` and stop.
-- **Non-Pandahrms project.** No `pandahrms-spec/` directory exists in the workspace AND no `docs/pandahrms/designs/` directory exists. Output: `Plan skill is Pandahrms-only. Use superpowers:writing-plans for non-Pandahrms projects.` and stop.

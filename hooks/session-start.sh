@@ -7,18 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-# Check if superpowers plugin is installed
 warning_message=""
-superpowers_found=false
-for dir in "${HOME}/.claude/plugins/cache"/*/superpowers/*/; do
-    if [ -d "$dir" ]; then
-        superpowers_found=true
-        break
-    fi
-done
-if [ "$superpowers_found" = false ]; then
-    warning_message="\n\n**WARNING:** The superpowers plugin is required but not installed. Launch Claude Code and run: /plugins marketplace add obra/superpowers"
-fi
 
 # Build skill list from skills directory
 skills_list=""

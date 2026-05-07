@@ -1,6 +1,6 @@
 ---
 name: execute-plan
-description: Triggers when atlas-pipeline-orchestrator/forge-pipeline-orchestrator invokes execute-plan with a plan file path, OR when the user explicitly invokes /pandahrms:execute-plan on an existing plan file. Does NOT trigger from phrases like "execute the plan", "implement this", or "build it" -- those route through forge-pipeline-orchestrator/atlas-pipeline-orchestrator first, which decides whether to invoke execute-plan. Dispatches a fresh implementer subagent per task (single-stage review by default, opt-in second-stage review for tasks tagged Risk: high). Parallel-dispatches tasks marked Depends on: none. Supports three Codex execution modes when codex is available -- full, partial-parallel, none. Implementers stage changes but never commit -- /hermes-commit owns the commit step. Drops superpowers' mandatory two-stage review and the final whole-codebase reviewer (athena-code-review covers that post-execution). When invoked directly without an orchestrator, the skill MUST verify the plan file's frontmatter contains `status: approved` (or equivalent) before dispatching; if missing, stop and ask the user.
+description: Triggers when atlas-pipeline-orchestrator invokes execute-plan with a plan file path, OR when the user explicitly invokes /pandahrms:execute-plan on an existing plan file. Does NOT trigger from phrases like "execute the plan", "implement this", or "build it" -- those route through atlas-pipeline-orchestrator first, which decides whether to invoke execute-plan. Dispatches a fresh implementer subagent per task (single-stage review by default, opt-in second-stage review for tasks tagged Risk: high). Parallel-dispatches tasks marked Depends on: none. Supports three Codex execution modes when codex is available -- full, partial-parallel, none. Implementers stage changes but never commit -- /hermes-commit owns the commit step. The single-stage review default and athena-code-review post-execution take the place of the legacy two-stage review and whole-codebase reviewer. When invoked directly without an orchestrator, the skill MUST verify the plan file's frontmatter contains `status: approved` (or equivalent) before dispatching; if missing, stop and ask the user.
 ---
 
 # Pandahrms Execute Plan
@@ -9,7 +9,7 @@ description: Triggers when atlas-pipeline-orchestrator/forge-pipeline-orchestrat
 
 Implement a plan task-by-task by dispatching a fresh implementer subagent per task. Single-stage review by default: the implementer self-reports compliance via the structured `Status:` line in its report, and the orchestrator validates the report's required fields (Status, TDD log with RED/GREEN or VERIFICATION markers, Test runtime, Files staged) before marking the task complete. There is no separate review subagent unless the task is tagged `**Risk:** high`. Tasks tagged `**Risk:** high` opt into a second-stage spec-compliance reviewer subagent. Tasks marked `Depends on: none` dispatch in parallel batches.
 
-This skill replaces `superpowers:subagent-driven-development` for Pandahrms work. It deliberately drops the v5 mandatory two-stage review on every task -- that change is the largest contributor to slow per-task throughput. We pay that cost only when the plan tags a task as high-risk.
+This skill deliberately drops mandatory two-stage review on every task -- single-stage review is the default to keep per-task throughput high. The second-stage spec-compliance reviewer runs only when the plan tags a task as `Risk: high`.
 
 ## Step 0 — Announcement (before any tool call)
 
@@ -35,7 +35,7 @@ If Codex is available locally (orchestrator already detected `codex_available: t
 
 ### Detect mode
 
-Before dispatching the first batch, check the plan file's `## Atlas Progress` (or `## Forge Progress`) section for a `Codex execution mode:` line. Possibilities:
+Before dispatching the first batch, check the plan file's `## Atlas Progress` section for a `Codex execution mode:` line. Possibilities:
 
 1. **Line exists with a valid value** -- read the value. If it is exactly `full`, `partial-parallel`, or `none`, use it. No question.
 2. **Line exists with an invalid value** (typo, unknown variant) -- treat it as missing. Re-ask the user via AskUserQuestion and overwrite the line with the answer.
@@ -44,7 +44,7 @@ Before dispatching the first batch, check the plan file's `## Atlas Progress` (o
 
 ### The mode question
 
-The mode question is asked ONLY when invoked outside atlas-pipeline-orchestrator -- atlas pre-sets `Codex execution mode: full` at plan creation per its [role split policy](../atlas-pipeline-orchestrator/SKILL.md#codex-availability) and execute-plan reads it back without prompting. For standalone invocations and forge-pipeline-orchestrator runs, ask:
+The mode question is asked ONLY when invoked outside atlas-pipeline-orchestrator -- atlas pre-sets `Codex execution mode: full` at plan creation per its [role split policy](../atlas-pipeline-orchestrator/SKILL.md#codex-availability) and execute-plan reads it back without prompting. For standalone invocations, ask:
 
 ```
 question: "Codex is available locally. How would you like to use it for this execution run?"
@@ -130,17 +130,16 @@ digraph execute {
 
 ### 1. Load plan, resolve codex mode, group tasks
 
-1. **Verify Pandahrms project context** -- before reading the plan, verify the working directory is a Pandahrms project (the project root contains a `Pandahrms.*` solution file, a `pandahrms-*` package name in `package.json`, or matches a Pandahrms project listed in CLAUDE.md). If not, stop and tell the user to use `superpowers:subagent-driven-development` instead.
-2. **Verify approval (standalone invocation only)** -- if the skill was invoked directly by the user (not from atlas-pipeline-orchestrator/forge-pipeline-orchestrator), the plan file's frontmatter MUST contain `status: approved` (or equivalent). If missing, stop and ask the user to confirm approval before proceeding. When invoked by atlas-pipeline-orchestrator/forge-pipeline-orchestrator, skip this check (the orchestrator already gated approval).
-3. Read the plan file
-4. Extract every task with its full text, files, spec ref, test ref, `Depends on:` markers, and `Risk:` tag (if any). If the plan has zero tasks, stop and report `BLOCKED -- plan contains no tasks` to the orchestrator (or the user, if standalone).
-5. **Detect codex availability** -- if the orchestrator passed `codex_available`, use that value. Otherwise run `command -v codex`: if it returns a path, `codex_available = true`; else `false`.
-6. **Resolve codex mode** -- read the plan's progress section for `Codex execution mode:`. If present and valid (`full`, `partial-parallel`, `none`), use it. If present but invalid, treat as missing. If missing AND `codex_available` is true, ask the user (see [Codex Execution Mode](#codex-execution-mode)) and persist the answer. If missing AND `codex_available` is false, set `mode = none` without asking.
-7. **Persist mode answer** -- if you collected a new mode answer, append `Codex execution mode: <value>` to the plan's `## Atlas Progress` (or `## Forge Progress`) section. If the plan has no progress section at all, create one as `## Atlas Progress` immediately after the frontmatter, with the `Codex execution mode:` line as its first entry. Do NOT silently skip persistence.
-8. Build batches by dependency level:
+1. **Verify approval (standalone invocation only)** -- if the skill was invoked directly by the user (not from atlas-pipeline-orchestrator), the plan file's frontmatter MUST contain `status: approved` (or equivalent). If missing, stop and ask the user to confirm approval before proceeding. When invoked by atlas-pipeline-orchestrator, skip this check (the orchestrator already gated approval).
+2. Read the plan file
+3. Extract every task with its full text, files, spec ref, test ref, `Depends on:` markers, and `Risk:` tag (if any). If the plan has zero tasks, stop and report `BLOCKED -- plan contains no tasks` to the orchestrator (or the user, if standalone).
+4. **Detect codex availability** -- if the orchestrator passed `codex_available`, use that value. Otherwise run `command -v codex`: if it returns a path, `codex_available = true`; else `false`.
+5. **Resolve codex mode** -- read the plan's progress section for `Codex execution mode:`. If present and valid (`full`, `partial-parallel`, `none`), use it. If present but invalid, treat as missing. If missing AND `codex_available` is true, ask the user (see [Codex Execution Mode](#codex-execution-mode)) and persist the answer. If missing AND `codex_available` is false, set `mode = none` without asking.
+6. **Persist mode answer** -- if you collected a new mode answer, append `Codex execution mode: <value>` to the plan's `## Atlas Progress` section. If the plan has no progress section at all, create one as `## Atlas Progress` immediately after the frontmatter, with the `Codex execution mode:` line as its first entry. Do NOT silently skip persistence.
+7. Build batches by dependency level:
    - **Batch 0** = tasks with `Depends on: none`
    - **Batch N** = tasks whose `Depends on:` IDs are all in batches < N
-9. Create a TodoWrite entry per task
+8. Create a TodoWrite entry per task
 
 ### 2. Dispatch each batch in parallel
 
@@ -164,7 +163,6 @@ For each batch (smallest batch number first):
 If a subagent fails (build error, test failure, merge conflict, non-zero exit), stop dispatching further batches. Do NOT silently retry, skip, or guess. Hand off based on invocation context:
 
 - **Invoked by atlas:** read `../atlas-pipeline-orchestrator/SKILL.md#subagent-failure-handling` and follow it.
-- **Invoked by forge:** read `../forge-pipeline-orchestrator/SKILL.md` for its failure section; if missing, fall to standalone behavior.
 - **Standalone:** print a structured failure report (failed task ID, batch number, status returned, blocker details) and ask the user via AskUserQuestion how to proceed (Retry / Skip task / Abort run). Do NOT decide on the user's behalf.
 
 The timing row for the failed task records `Wall-clock: <duration>` and `Status: <failure status>`.
@@ -193,7 +191,7 @@ When all tasks have returned successfully and any required reviews have approved
 1. Update each task's checkbox in the plan file from `- [ ]` to `- [x]`
 2. Mark all TodoWrite entries complete
 3. Announce based on invocation context:
-   - **Invoked by atlas-pipeline-orchestrator/forge-pipeline-orchestrator:** `"All N tasks executed. Changes are staged but uncommitted. Returning to atlas-pipeline-orchestrator for /simplify and the user-test step."`
+   - **Invoked by atlas-pipeline-orchestrator:** `"All N tasks executed. Changes are staged but uncommitted. Returning to atlas-pipeline-orchestrator for /simplify and the user-test step."`
    - **Standalone invocation (direct user invocation, no orchestrator):** `"All N tasks executed. Changes are staged but uncommitted. Recommended next steps: run /simplify, then test the changes manually, then run /hermes-commit. I will not invoke these automatically -- they are yours to run."`
 
 Track which path applies via the orchestrator's invocation arguments. Do NOT invoke `/simplify`, `athena-code-review`, or `/hermes-commit` yourself in either case. Atlas-pipeline-orchestrator owns the post-execution flow when present; the user owns it when standalone.
@@ -506,7 +504,7 @@ The orchestrator (atlas-pipeline-orchestrator, or whoever invoked you) decides w
 | "I'll add a final whole-codebase reviewer subagent at the end" | No. Atlas-pipeline-orchestrator runs `/simplify` and athena-code-review post-execution. Don't duplicate. |
 | "I'll hand off to finishing-a-development-branch when done" | No. Atlas-pipeline-orchestrator owns the user-test + /hermes-commit step. Just announce completion. |
 | "The plan task has no test ref but I'll just implement it" | Stop and report -- the plan is missing required references. Atlas-pipeline-orchestrator decides whether to fix the plan or proceed. |
-| "Codex is available -- I'll ask the user which mode they want even when atlas already set the line" | No. If the plan's `Codex execution mode:` line already holds `full`, `partial-parallel`, or `none`, use it without asking. Atlas pre-sets `full` per its role split policy. Only ask when invoked outside atlas (standalone or forge) and the line is missing. |
+| "Codex is available -- I'll ask the user which mode they want even when atlas already set the line" | No. If the plan's `Codex execution mode:` line already holds `full`, `partial-parallel`, or `none`, use it without asking. Atlas pre-sets `full` per its role split policy. Only ask when invoked outside atlas (standalone) and the line is missing. |
 | "Full mode is just an opt-in -- the recommended default is none" | Outdated. Under the atlas role split (Codex implements, Claude audits), `full` is the recommended default when codex is available. The mode question reflects that. |
 | "I'll route the second-stage spec-compliance reviewer for Risk: high tasks through codex" | No. Reviewing codex's output is Claude's job. The second-stage reviewer always uses Agent, regardless of codex availability or implementer dispatcher. |
 | "I'll prefix the codex implementer dispatch with READ-ONLY REVIEW" | No. The read-only prefix is for review-only dispatches. Implementation prompts let codex write. |
@@ -523,4 +521,3 @@ The orchestrator (atlas-pipeline-orchestrator, or whoever invoked you) decides w
 
 - Plans without dependency markers or test refs (send back to `pandahrms:plan-writing` to fix first)
 - Tightly-coupled tasks where each builds on the previous in subtle ways: do NOT use this skill. Stop and tell the user the plan is unsuitable for subagent-driven execution and recommend manual implementation.
-- Non-Pandahrms projects (use `superpowers:subagent-driven-development` directly)

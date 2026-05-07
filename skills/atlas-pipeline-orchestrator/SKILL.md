@@ -1,17 +1,9 @@
 ---
 name: atlas-pipeline-orchestrator
-description: MANUAL INVOCATION ONLY -- never auto-trigger. atlas-pipeline-orchestrator activates only when forge-pipeline-orchestrator routes here from its Pipeline Selection question, or when the user explicitly invokes /atlas-pipeline-orchestrator. Do NOT activate from phrases like "start new work", "build a feature", "design", "brainstorm", "plan", or "execute" -- those route through forge-pipeline-orchestrator first, and forge-pipeline-orchestrator decides whether to hand off to atlas-pipeline-orchestrator. atlas-pipeline-orchestrator is the no-superpowers cousin of forge-pipeline-orchestrator: same pipeline shape (design -> spec-writing -> QA review -> plan -> Plan-Spec cross-review -> execute -> simplify -> ask user to test), but uses pandahrms:design-refinement / pandahrms:plan-writing / pandahrms:execute-plan internally with single-stage review by default.
+description: Triggers on any mention of starting new work, building a feature, adding functionality, fixing a bug, refactoring, brainstorming, designing, writing a plan, or executing an existing plan. The single entry point for design-through-execution work. Pipeline shape: design -> spec-writing -> QA review -> plan -> Plan-Spec cross-review -> execute -> simplify -> Playwright e2e -> ask user to test, using pandahrms:design-refinement / pandahrms:plan-writing / pandahrms:execute-plan internally with single-stage review by default. Also triggers on "atlas-pipeline-orchestrator", "atlas", "run the pipeline", or being handed a plan file.
 ---
 
 # Pandahrms Atlas Pipeline Orchestrator
-
-<MANUAL-ONLY>
-atlas-pipeline-orchestrator activates ONLY when one of these conditions holds:
-1. The immediately preceding assistant turn invoked the forge-pipeline-orchestrator skill and announced "Routing to atlas-pipeline-orchestrator based on Pipeline Selection".
-2. The user's most recent message starts with `/atlas-pipeline-orchestrator` (with optional plan path, `--resume`, or `--skip-e2e` flag).
-
-In all other cases, STOP and respond verbatim: "Atlas Pipeline Orchestrator is reachable only via /atlas-pipeline-orchestrator or via forge-pipeline-orchestrator's Pipeline Selection. Run /forge-pipeline-orchestrator to start." Do NOT auto-activate from work-start triggers, brainstorming triggers, planning triggers, or execution triggers -- forge-pipeline-orchestrator owns the entry point for all such phrases.
-</MANUAL-ONLY>
 
 <SINGLE-INSTANCE>
 Only one atlas-pipeline-orchestrator pipeline runs in a session at a time. Before starting, check whether a plan file exists with an `## Atlas Progress` section that has incomplete steps. If so, STOP and ask the user via AskUserQuestion: "An atlas-pipeline-orchestrator run is already in progress for plan '<path>'. How would you like to proceed?" with options: "Resume existing run", "Abort existing and start fresh", "Cancel this invocation". Do not silently start a parallel run.
@@ -33,13 +25,13 @@ All AskUserQuestion option labels shown in this skill are CANONICAL. Use them ve
 
 ## Overview
 
-Unified Pandahrms-native pipeline: design, spec writing, QA review, implementation planning, Plan <-> Spec cross-review, and subagent-driven execution -- all in a single session, with no superpowers dependency.
+Unified Pandahrms-native pipeline: design, spec writing, QA review, implementation planning, Plan <-> Spec cross-review, and subagent-driven execution -- all in a single session.
 
-Atlas Pipeline Orchestrator is the no-superpowers cousin of `forge-pipeline-orchestrator`. The pipeline shape is the same; the component skills swap from `superpowers:*` to `pandahrms:*`. The biggest practical difference is per-task throughput: atlas-pipeline-orchestrator runs single-stage review by default and only opts into a second-stage spec-compliance reviewer for tasks the plan tags `**Risk:** high`. This was the v4->v5 superpowers change that produced the largest slowdown.
+Atlas runs single-stage review by default and only opts into a second-stage spec-compliance reviewer for tasks the plan tags `**Risk:** high`. This is the per-task throughput lever that keeps the pipeline fast on standard work without sacrificing rigor on risky tasks.
 
 **Role split between Codex and Claude (active only when Codex is available locally):** when `codex_available` is `true`, **Codex implements** (Step 6 dispatches, fix re-dispatches) and **Claude plans and audits** (Steps 1, 2, 4 planning; Steps 3, 5, 7 review; Step 8 exploration; second-stage reviewer for `Risk: high`). Codex never reviews its own output. When Codex is unavailable, the split collapses and Claude handles every step including implementation. See [Codex Availability](#codex-availability) for the full policy and announcement strings.
 
-**Announce at start:** "I'm using Pandahrms atlas-pipeline-orchestrator to orchestrate design through execution (no-superpowers mode). Routed here from forge-pipeline-orchestrator."
+**Announce at start:** "I'm using Pandahrms atlas-pipeline-orchestrator to orchestrate design through execution."
 
 ## Fast Path (plan provided)
 
@@ -724,14 +716,14 @@ Skip Step 8 entirely (with announcement) when any of these hold:
 
 ## When to Use
 
-- **Only** when forge-pipeline-orchestrator's Pipeline Selection routes here (user picked "Atlas Pipeline Orchestrator")
-- **Only** when the user explicitly invokes `/atlas-pipeline-orchestrator`, `/atlas-pipeline-orchestrator <plan-path>`, or `/atlas-pipeline-orchestrator --resume`
-- Otherwise: route the user to `forge-pipeline-orchestrator` -- it owns the entry point for all design/plan/execute work in Pandahrms projects.
+- Any work request that needs design, specs, plan, or execution -- atlas is the single entry point.
+- Natural-language triggers: "start new work", "build a feature", "add functionality", "fix a bug", "refactor X", "brainstorm", "design", "write a plan", "execute the plan".
+- Slash invocations: `/atlas-pipeline-orchestrator`, `/atlas-pipeline-orchestrator <plan-path>` (Fast Path), `/atlas-pipeline-orchestrator --resume`, `/atlas-pipeline-orchestrator --skip-e2e`.
 
 ## When NOT to Use
 
-- ANY auto-trigger from natural-language phrases ("start new work", "build feature", "brainstorm", "design", "write a plan", "execute"). forge-pipeline-orchestrator owns those triggers and decides whether to hand off here.
-- Quick fixes that don't need design (typos, config changes) -- handle directly without any orchestrator.
-- Non-Pandahrms projects (use `superpowers:brainstorming` directly).
-- Writing specs for existing functionality without a new design (use `pandahrms:spec-writing` directly).
-- When the user explicitly wants the superpowers-based pipeline (use `forge-pipeline-orchestrator` instead).
+- Quick fixes that don't need design (typos, config-only changes, dependency bumps, formatting fixes) -- handle directly without the orchestrator.
+- Writing specs for existing functionality without a new design -- use `pandahrms:spec-writing` directly.
+- Pure code review of working-tree changes -- use `pandahrms:athena-code-review` directly.
+- Pure security audit -- use `pandahrms:aegis-security-review` directly.
+- Committing already-reviewed changes -- use `pandahrms:hermes-commit` directly.
