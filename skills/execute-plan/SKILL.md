@@ -11,6 +11,10 @@ Implement a plan task-by-task by dispatching a fresh implementer subagent per ta
 
 This skill deliberately drops mandatory two-stage review on every task -- single-stage review is the default to keep per-task throughput high. The second-stage spec-compliance reviewer runs only when the plan tags a task as `Risk: high`.
 
+<HARD-GATE>
+PLAN FILE IS THE SINGLE SOURCE OF TRUTH FOR IMPLEMENTATION PROGRESS. Every meaningful event during a run -- task completion (with timestamp), errors, blockers, re-dispatches, reviewer gaps/conflicts, user mid-run corrections, and accepted concerns -- MUST be persisted to the plan file as it happens. The TodoWrite list is a transient scratchpad; the plan file is the durable record. If a future Claude session, the orchestrator, or the user reads only the plan file, they should be able to reconstruct what happened, what failed, what the user corrected, and where execution currently stands. Never silently retry, skip, or self-correct without writing the event to the plan file's `### Execution Log`.
+</HARD-GATE>
+
 ## Step 0 — Announcement (before any tool call)
 
 Output exactly this text before any tool call:
@@ -165,7 +169,7 @@ If a subagent fails (build error, test failure, merge conflict, non-zero exit), 
 - **Invoked by atlas:** read `../atlas-pipeline-orchestrator/SKILL.md#subagent-failure-handling` and follow it.
 - **Standalone:** print a structured failure report (failed task ID, batch number, status returned, blocker details) and ask the user via AskUserQuestion how to proceed (Retry / Skip task / Abort run). Do NOT decide on the user's behalf.
 
-The timing row for the failed task records `Wall-clock: <duration>` and `Status: <failure status>`.
+The timing row for the failed task records `Wall-clock: <duration>` and `Status: <failure status>`. **Also append a row to the Execution Log** with the failure category (`blocker` for hard failures, `redispatch` if the user chose Retry, etc.) and the one-line detail. If the user provided guidance during failure handling (e.g. "this column is named differently," "use the existing repository," "skip this task because the spec is wrong"), append a `user-correction` row capturing both what was wrong AND the corrected behavior.
 
 ### 3. Conditional second-stage review
 
@@ -180,15 +184,15 @@ The default is single-stage. The plan author decides which tasks pay the second-
 
 On reviewer return:
 
-- **All scenarios Pass** -- mark task complete, proceed to next batch.
-- **One or more Gap, zero Conflict** -- re-dispatch the implementer with the gap evidence. Cap at 2 re-dispatches (3 implementer attempts total). If the third reviewer pass still flags Gap, stop dispatching and hand off to the orchestrator's failure handler with `Status: BLOCKED -- reviewer failed to approve after 3 implementer attempts` and the gap report attached.
-- **One or more Conflict** -- stop dispatching. Conflicts indicate plan/spec disagreement that the implementer cannot resolve. Hand off to the orchestrator's failure handler with the conflict evidence; do NOT re-dispatch the implementer.
+- **All scenarios Pass** -- mark task complete (with completion timestamp per Step 4), proceed to next batch. No Execution Log row needed for clean passes.
+- **One or more Gap, zero Conflict** -- append a `gap` row to the Execution Log naming the unsatisfied scenario(s), then re-dispatch the implementer with the gap evidence and append a `redispatch` row recording the attempt number. Cap at 2 re-dispatches (3 implementer attempts total). If the third reviewer pass still flags Gap, append a final `blocker` row, stop dispatching, and hand off to the orchestrator's failure handler with `Status: BLOCKED -- reviewer failed to approve after 3 implementer attempts` and the gap report attached.
+- **One or more Conflict** -- append a `conflict` row to the Execution Log, stop dispatching. Conflicts indicate plan/spec disagreement that the implementer cannot resolve. Hand off to the orchestrator's failure handler with the conflict evidence; do NOT re-dispatch the implementer.
 
 ### 4. Mark complete
 
 When all tasks have returned successfully and any required reviews have approved:
 
-1. Update each task's checkbox in the plan file from `- [ ]` to `- [x]`
+1. Update each task's checkbox in the plan file from `- [ ]` to `- [x]` and append a completion timestamp on the same line. Format: `- [x] <existing task line> — completed YYYY-MM-DD HH:MM:SS`. Capture the timestamp via `date "+%Y-%m-%d %H:%M:%S"` at the moment the controller decides the task is done (after subagent return + any required review approval). Do NOT mark a task complete without the timestamp -- a missing timestamp means the row hasn't been audited.
 2. Mark all TodoWrite entries complete
 3. Announce based on invocation context:
    - **Invoked by atlas-pipeline-orchestrator:** `"All N tasks executed. Changes are staged but uncommitted. Returning to atlas-pipeline-orchestrator for /simplify and the user-test step."`
@@ -275,6 +279,52 @@ Append a `### Step 6 Task Timing` block beneath the Atlas Progress table, after 
 The point is data, not precision. If a value is hard to capture exactly, leave `--` rather than fabricate. The orchestrator's job is to record what's easy to know (dispatched_at, returned_at, dispatcher, type) and let the subagent self-report what only it knows (test runtime).
 
 Always record `batch_prep_seconds` and `batch_wall_clock`. Record `idle_wait_seconds` only when the batch has 2+ tasks AND a per-task active-time signal is available from subagent reports; otherwise leave `--`. Skipping `dispatch_prep` entirely is only allowed for single-task batches.
+
+## Execution Log
+
+The plan file is the durable record of what happened during execution. The Step 6 Task Timing table captures *how long* tasks took; the Execution Log captures *what went wrong, what was corrected, and what decisions were made* along the way. Both are required.
+
+Persist as a `### Execution Log` block beneath `### Step 6 Task Timing` inside the `## Atlas Progress` section. If neither section exists yet, create them in order: Task Timing first, Execution Log second. Append rows in real time -- not at end-of-run -- so a partial or aborted run still has a complete audit trail.
+
+### What to log
+
+Append a row whenever any of these events occurs:
+
+- A subagent returns a non-DONE status (`DONE_WITH_CONCERNS`, `NEEDS_CONTEXT`, `BLOCKED`)
+- A reviewer returns Gap or Conflict
+- A task is re-dispatched (record the reason and which attempt this is)
+- The user mid-run corrects something the controller or a subagent did wrongly -- both what was wrong AND the corrected behavior
+- The user accepts or rejects a `DONE_WITH_CONCERNS` finding
+- A blocker forces handoff to the orchestrator's failure handler
+- Any deviation from the plan (e.g. a step skipped because the codebase already had the change, an extra step inserted because the plan turned out incomplete)
+
+If the event is just "task completed cleanly with no concerns," do NOT add a row -- the checkbox + completion timestamp + Step 6 Task Timing row already cover it.
+
+### Format
+
+```markdown
+### Execution Log
+
+| Timestamp | Task | Type | Detail |
+|-----------|------|------|--------|
+| 2026-05-07 14:23:11 | T3 | blocker | BLOCKED -- migration ran but EF mapping does not match table schema |
+| 2026-05-07 14:31:05 | T3 | user-correction | User: column is `EmployeeNumber` not `EmpNumber`; controller updated mapping and re-dispatched |
+| 2026-05-07 14:35:42 | T2 | redispatch | NEEDS_CONTEXT (attempt 1/3) -- missing test base class; re-dispatched with context |
+| 2026-05-07 14:38:04 | T7 | concern | DONE_WITH_CONCERNS -- subagent flagged fragile EmployeeId lookup; user accepted, marked complete |
+| 2026-05-07 14:42:18 | T9 | gap | Reviewer flagged 1 spec scenario unsatisfied (probation extension audit row); re-dispatched with evidence |
+| 2026-05-07 14:48:55 | T9 | gap | Reviewer pass 2: still gap; re-dispatched (attempt 3/3) |
+| 2026-05-07 14:55:12 | T11 | deviation | Step 4 skipped -- `IProbationRepository` already registered in DI from prior task; not re-registered |
+```
+
+Categories: `blocker`, `concern`, `redispatch`, `user-correction`, `gap`, `conflict`, `deviation`, `decision`.
+
+### Recording rules
+
+- Append the row at the moment the event happens. Do not batch log writes to end-of-batch.
+- `Detail` is a one-liner -- enough for a future reader to know what occurred. Long evidence belongs in the implementer/reviewer report, not the log.
+- `user-correction` rows MUST capture both what was wrong AND the corrected behavior. A row that only says "user corrected X" without saying what the correct behavior is loses the audit value.
+- Use absolute timestamps (`date "+%Y-%m-%d %H:%M:%S"`), not relative ("2 minutes later").
+- The orchestrator never silently retries, skips, or self-corrects. If you take an action other than the literal plan text, the action goes in this log.
 
 ## Placeholder Resolution
 
@@ -364,12 +414,12 @@ Then provide:
 
 When an implementer subagent returns:
 
-| Status | Controller action |
-|--------|-------------------|
-| `DONE` | Mark batch task complete; proceed to second-stage review (if `Risk: high`) or next batch. |
-| `DONE_WITH_CONCERNS` | Surface the concerns to the user before marking the task complete. The user decides: accept (mark complete), re-dispatch with guidance, or escalate. |
-| `NEEDS_CONTEXT` | Re-dispatch the same implementer with the missing context filled in. Cap at 2 re-dispatches per task (3 attempts total). After the third `NEEDS_CONTEXT` return, stop dispatching this task and report `BLOCKED -- repeated NEEDS_CONTEXT after 3 attempts` to the orchestrator. If the missing context isn't available before reaching the cap, escalate to the user via [Subagent Failure Handling](#when-to-stop-and-ask-the-orchestrator). Do NOT guess. |
-| `BLOCKED` | Stop dispatching further batches. Hand off to the orchestrator's failure handler with the blocker details. |
+| Status | Controller action | Execution Log row |
+|--------|-------------------|-------------------|
+| `DONE` | Mark batch task complete (with completion timestamp per Step 4); proceed to second-stage review (if `Risk: high`) or next batch. | None -- the checkbox + Step 6 timing row already cover clean completions. |
+| `DONE_WITH_CONCERNS` | Surface the concerns to the user before marking the task complete. The user decides: accept (mark complete), re-dispatch with guidance, or escalate. | Append a `concern` row capturing the concern and the user's decision (accept / re-dispatch / escalate). If the user re-dispatched with guidance, also append a `user-correction` row with the guidance verbatim. |
+| `NEEDS_CONTEXT` | Re-dispatch the same implementer with the missing context filled in. Cap at 2 re-dispatches per task (3 attempts total). After the third `NEEDS_CONTEXT` return, stop dispatching this task and report `BLOCKED -- repeated NEEDS_CONTEXT after 3 attempts` to the orchestrator. If the missing context isn't available before reaching the cap, escalate to the user via [Subagent Failure Handling](#when-to-stop-and-ask-the-orchestrator). Do NOT guess. | Append a `redispatch` row each attempt with the missing-context detail and attempt number. After the third failed attempt, append a `blocker` row before handing off. |
+| `BLOCKED` | Stop dispatching further batches. Hand off to the orchestrator's failure handler with the blocker details. | Append a `blocker` row with the blocker details before handoff. |
 
 ## Spec Reviewer Prompt Template
 
@@ -480,6 +530,17 @@ The plan author decides. Recommended triggers:
 
 A task is tagged with a `**Risk:** high` line in its header (alongside `**Files:**`, `**Spec ref:**`, etc.). Untagged tasks are treated as standard risk and skip the second-stage reviewer.
 
+## User Mid-Run Corrections
+
+When the user interrupts the run with a correction -- e.g. "no, that column is named differently," "use the existing repository instead of creating a new one," "skip this task because the spec is wrong," "the test name should be X" -- treat it as a first-class event:
+
+1. **Stop the current dispatch path** if one is in flight. Do not let a stale subagent run keep producing output that the user has already overruled.
+2. **Append a `user-correction` row to the Execution Log** capturing two things on the same line: (a) what was wrong (the controller's or subagent's behavior the user is overruling), and (b) what the corrected behavior is (verbatim from the user when possible).
+3. **If the correction reveals a plan defect** (the plan itself is wrong, not just a subagent's interpretation), additionally append a `deviation` row noting which step/task the plan got wrong, and surface this to the orchestrator at end-of-run so the plan author can update the source.
+4. **Apply the correction** and re-dispatch (or proceed) per the user's instruction. Append a `redispatch` row if you re-dispatched the task.
+
+Never silently absorb a correction. The plan file must show that the user intervened, what they intervened about, and what the corrected behavior is -- otherwise a later reader (or a resumed run) cannot tell why the implementation diverged from the plan text.
+
 ## When to Stop and Ask the Orchestrator
 
 Stop dispatching and report up immediately when:
@@ -511,6 +572,11 @@ The orchestrator (atlas-pipeline-orchestrator, or whoever invoked you) decides w
 | "Codex mode is `partial-parallel` but I'll dispatch the codex tasks in a separate message to be safe" | Same batch, same message. Mixing Agent + codex in one parallel batch is the whole point of `partial-parallel`. |
 | "I'll re-ask the codex mode question on every batch" | Ask once. Persist the answer to the orchestrator's progress section. Resumed runs read it back. |
 | "I'll call the dispatch groupings 'Wave' (or 'Round' / 'Phase') in the user-facing plan" | No. The vocabulary is **Batch**, used everywhere. Synonyms cause confusion when the user reads the skill text. See [Display vocabulary](#display-vocabulary). |
+| "I'll mark the task `- [x]` and skip the completion timestamp -- it's noise" | No. Completion timestamp is required (Step 4 step 1). A checkbox without a timestamp means the row hasn't been audited and a future reader can't tell when the task actually finished. |
+| "The user told me to do something different -- I'll just do it without writing it down" | No. Mid-run user corrections MUST be appended to the Execution Log as a `user-correction` row capturing both what was wrong AND the corrected behavior. The plan file is the single source of truth for progress; silent corrections destroy that. See [User Mid-Run Corrections](#user-mid-run-corrections). |
+| "The subagent returned DONE_WITH_CONCERNS -- I'll mark it complete and move on" | No. Surface the concerns to the user, then log the user's decision (accept / re-dispatch / escalate) as a `concern` row. |
+| "The reviewer flagged a Gap and I re-dispatched -- the timing table already shows it" | The timing table shows wall-clock; the Execution Log shows *what happened*. Append a `gap` row plus a `redispatch` row with the attempt number. Both are required. |
+| "I'll write all Execution Log rows at end-of-run so the plan file isn't churning during execution" | No. Append rows in real time. A partial or aborted run must still leave a complete audit trail in the plan file. |
 
 ## When to Use
 
