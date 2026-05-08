@@ -143,11 +143,18 @@ digraph execute {
 7. Build batches by dependency level:
    - **Batch 0** = tasks with `Depends on: none`
    - **Batch N** = tasks whose `Depends on:` IDs are all in batches < N
-8. Create a TodoWrite entry per task
+8. **Create the TodoWrite tracker -- HARD GATE before any dispatch.** Call TodoWrite once with one entry per plan task AND one entry per gate (Auto Gate and Manual Gate alike), in plan order, each starting `pending`. This is the user's live progress view; without it the user cannot see where the run is. Use the task ID + short title as the content (e.g. `T1: Persist CurrentYearKpi section source-config settings`), and a one-line activeForm (e.g. `Implementing T1: CurrentYearKpi section source-config`). For gates, prefix the content with `Auto Gate:` or `Manual Gate:` so the user can tell at a glance which ones will pause. Do NOT proceed to Section 2 until this call has been made.
 
 ### 2. Dispatch each batch in parallel
 
 **Sequential -- do not parallelize.** Each numbered sub-step below runs sequentially in the order listed. Do NOT parallelize sub-steps -- only the dispatches inside sub-step 5 run in parallel, and only via multiple tool calls in a single message.
+
+**Precondition gate.** Before starting sub-step 1 of the first batch, confirm the TodoWrite tracker from Section 1 step 8 exists with one entry per task. If not, create it now -- do NOT dispatch without it. This is non-negotiable: dispatching subagents while the user has no progress view is a skill violation.
+
+Per-batch lifecycle for the TodoWrite tracker:
+- **At dispatch (sub-step 5):** flip every task in the batch from `pending` to `in_progress` in the same message that dispatches them.
+- **After all subagents return + any required review approves (sub-step 9 / Section 3):** flip each completed task to `completed`. A task only flips to `completed` after its plan checkbox is `- [x]` with a timestamp.
+- **On failure / re-dispatch:** keep the task `in_progress` until it actually resolves; do NOT mark it `completed` to "clear the tracker."
 
 For each batch (smallest batch number first):
 
@@ -170,6 +177,27 @@ If a subagent fails (build error, test failure, merge conflict, non-zero exit), 
 - **Standalone:** print a structured failure report (failed task ID, batch number, status returned, blocker details) and ask the user via AskUserQuestion how to proceed (Retry / Skip task / Abort run). Do NOT decide on the user's behalf.
 
 The timing row for the failed task records `Wall-clock: <duration>` and `Status: <failure status>`. **Also append a row to the Execution Log** with the failure category (`blocker` for hard failures, `redispatch` if the user chose Retry, etc.) and the one-line detail. If the user provided guidance during failure handling (e.g. "this column is named differently," "use the existing repository," "skip this task because the spec is wrong"), append a `user-correction` row capturing both what was wrong AND the corrected behavior.
+
+### 2.5. Process gates between batches
+
+Between completing one batch and starting the next, check whether the plan has any gate (Auto Gate or Manual Gate) positioned after the just-completed batch and before the next pending task. Process them in plan order before dispatching the next batch.
+
+**Auto Gate** -- run automatically:
+
+1. Flip the gate's TodoWrite entry to `in_progress`.
+2. Announce one line to the user: `"Auto Gate: <name> -- running: <command>"`.
+3. Execute the gate's `Run:` command via Bash. Use the working directory implied by the command (e.g. `cd apps/performance-fe && pnpm openapi-ts` runs in the FE app dir; `dotnet ef database update` runs in the migrations project; `docker compose ...` runs in `_docker/`).
+4. On success: mark the gate's checkbox `- [x]` in the plan with a completion timestamp (same format as task completion), flip the TodoWrite entry to `completed`, and append an `auto-gate` row to the Execution Log with the command + duration. Proceed to the next gate or the next batch.
+5. On failure (non-zero exit, build error, migration error, regen error): stop. Do NOT retry silently. Append a `blocker` row to the Execution Log with the failing command + exit code + last 20 lines of output. Hand off based on invocation context (atlas: subagent-failure-handling; standalone: AskUserQuestion with Retry / Skip / Abort).
+
+**Manual Gate** -- pause for user:
+
+1. Flip the gate's TodoWrite entry to `in_progress`.
+2. Announce: `"Manual Gate: <name>. Run: <command>. Reply with the confirmation phrase to resume."`.
+3. Wait for the user's confirmation message before continuing.
+4. On confirmation: mark the gate's checkbox `- [x]` in the plan with a completion timestamp, flip the TodoWrite entry to `completed`, append a `manual-gate` row to the Execution Log noting the user's confirmation. Proceed.
+
+Auto Gates never pause; Manual Gates always pause. Do NOT downgrade a Manual Gate to Auto Gate at runtime, and do NOT upgrade an Auto Gate to Manual Gate "to be safe" -- the plan author chose the kind deliberately.
 
 ### 3. Conditional second-stage review
 
@@ -297,6 +325,8 @@ Append a row whenever any of these events occurs:
 - The user accepts or rejects a `DONE_WITH_CONCERNS` finding
 - A blocker forces handoff to the orchestrator's failure handler
 - Any deviation from the plan (e.g. a step skipped because the codebase already had the change, an extra step inserted because the plan turned out incomplete)
+- An Auto Gate ran -- record the command and outcome (`auto-gate` row, success or failure)
+- A Manual Gate paused and the user confirmed completion (`manual-gate` row)
 
 If the event is just "task completed cleanly with no concerns," do NOT add a row -- the checkbox + completion timestamp + Step 6 Task Timing row already cover it.
 
@@ -316,7 +346,7 @@ If the event is just "task completed cleanly with no concerns," do NOT add a row
 | 2026-05-07 14:55:12 | T11 | deviation | Step 4 skipped -- `IProbationRepository` already registered in DI from prior task; not re-registered |
 ```
 
-Categories: `blocker`, `concern`, `redispatch`, `user-correction`, `gap`, `conflict`, `deviation`, `decision`.
+Categories: `blocker`, `concern`, `redispatch`, `user-correction`, `gap`, `conflict`, `deviation`, `decision`, `auto-gate`, `manual-gate`.
 
 ### Recording rules
 
@@ -577,6 +607,11 @@ The orchestrator (atlas-pipeline-orchestrator, or whoever invoked you) decides w
 | "The subagent returned DONE_WITH_CONCERNS -- I'll mark it complete and move on" | No. Surface the concerns to the user, then log the user's decision (accept / re-dispatch / escalate) as a `concern` row. |
 | "The reviewer flagged a Gap and I re-dispatched -- the timing table already shows it" | The timing table shows wall-clock; the Execution Log shows *what happened*. Append a `gap` row plus a `redispatch` row with the attempt number. Both are required. |
 | "I'll write all Execution Log rows at end-of-run so the plan file isn't churning during execution" | No. Append rows in real time. A partial or aborted run must still leave a complete audit trail in the plan file. |
+| "I'll skip the TodoWrite tracker -- the plan file already records progress" | No. The plan file is the durable audit; TodoWrite is the user's *live* progress view. Without it the user cannot see how many tasks are in flight, queued, or done. Section 1 step 8 is a hard gate before Section 2. |
+| "I'll create the TodoWrite tracker after the first batch returns -- it's just for visibility" | No. Create it BEFORE dispatching Batch 0. The user must see queued tasks while subagents are still running, not after. |
+| "I'll pause on every gate to be safe -- even Auto Gates" | No. Auto Gates run automatically with a one-line announcement. Pausing on them contradicts the user's BE-then-deploy-then-FE rule, which is a sequencing rule, not a pause rule. Only Manual Gates pause. |
+| "The Auto Gate command failed -- I'll retry it once silently" | No. Stop on failure. Append a `blocker` row to the Execution Log and hand off (atlas: failure-handling; standalone: AskUserQuestion). The user decides retry vs skip vs abort. |
+| "I'll downgrade this Manual Gate to Auto Gate because the command looks safe" | No. The plan author chose Manual Gate deliberately -- maybe the deploy is to prod, maybe a DBA needs to review. Do not change the kind at runtime. If the plan kind looks wrong, surface it to the user before dispatching. |
 
 ## When to Use
 

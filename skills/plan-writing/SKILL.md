@@ -21,7 +21,7 @@ Run these steps strictly in order. Do not parallelize, reorder, or skip any step
 2. Run the Scope Check.
 3. Emit the Plan Document Header (see "Plan Document Header" section).
 4. Emit the File Structure block (see "File Structure" section). You MUST emit this block before writing any `### Task N:` heading.
-5. Emit every `### Task N:` block with required references and Red-Green steps. Insert Manual Gates between tasks per the placement rule in "Manual Gates".
+5. Emit every `### Task N:` block with required references and Red-Green steps. Insert Auto Gates / Manual Gates between tasks per the placement rule in "Gates".
 6. Run the 8-item Self-Review checklist top to bottom; fix issues inline per its sequencing rule.
 7. Save the plan to its path with the Write tool. Do NOT print the plan inline to the user. Do NOT skip the Write call.
 8. Print the Hand Off announcement, then emit the Copyable Execute Instruction (fenced code block with `/pandahrms:execute-plan <path>`), then end the turn. Do NOT begin implementing any task. Do NOT modify any source files. Do NOT run any tests.
@@ -96,30 +96,55 @@ These are strictly sequential, all "persist promotion probation" -- collapse int
 
 These touch different concerns (validation vs persistence) even when sequential -- keep separate.
 
-### Manual Gates (not tasks)
+### Gates (not tasks)
 
-Some steps are not implementer work -- they are operator commands that the user (or the orchestrator) runs once:
+Some steps are not implementer work -- they are commands the orchestrator runs between tasks. Gates come in two flavors:
 
-- `pnpm openapi-ts` (or equivalent regen)
-- `dotnet ef database update` against a local DB
-- Deploying a service so swagger is live before FE work begins
+**Auto Gate** -- mechanical, idempotent local commands. The orchestrator announces and runs them automatically; no user pause. Use Auto Gate for:
+- `pnpm openapi-ts` (or equivalent FE OpenAPI regen)
+- `dotnet ef database update` against the local DB
+- Local BE redeploy (e.g. `docker compose up -d --build performance-api`) so swagger reflects new endpoints before FE work begins
 
-These should NOT be numbered tasks in the plan. They appear as **Manual Gate** entries between tasks, marked with the command and a one-line "why this gate exists" note. Atlas-pipeline-orchestrator reads gates and pauses execution to surface them to the user; once the user confirms completion, atlas-pipeline-orchestrator resumes with the next task.
+**Manual Gate** -- operator action that genuinely requires human judgment or out-of-band steps. The orchestrator pauses and waits for the user to confirm. Use Manual Gate only for:
+- Production deploys
+- Database migrations against shared/prod environments
+- Schema review by a DBA
+- Anything destructive or with cross-team coordination
 
-**Placement rule:** Place each Manual Gate immediately after the last task whose output the gate consumes, and immediately before the first task that depends on the gate. Example: the `pnpm openapi-ts` gate goes immediately after the BE endpoint task and immediately before the first FE task that imports the regenerated type. A Manual Gate MUST NOT appear before any task it does not gate, and MUST NOT be bunched at the top or bottom of the plan.
+When in doubt, prefer Auto Gate for local-dev mechanics; Manual Gate is the exception, not the default.
+
+These should NOT be numbered tasks in the plan. They appear as **Auto Gate** or **Manual Gate** entries between tasks, marked with the command and a one-line "why this gate exists" note.
+
+**Placement rule (applies to both kinds):** Place each gate immediately after the last task whose output the gate consumes, and immediately before the first task that depends on the gate. Example: the `pnpm openapi-ts` Auto Gate goes immediately after the BE endpoint task and immediately before the first FE task that imports the regenerated type. A gate MUST NOT appear before any task it does not gate, and MUST NOT be bunched at the top or bottom of the plan.
+
+**Auto Gate format:**
+
+```markdown
+---
+
+**Auto Gate: API regen**
+
+Run: `cd apps/performance-fe && pnpm openapi-ts`
+
+Why: Backend types must be regenerated before any FE task that imports the new endpoint.
+
+Behavior: orchestrator announces and runs automatically; no pause.
+
+---
+```
 
 **Manual Gate format:**
 
 ```markdown
 ---
 
-**Manual Gate: API regen**
+**Manual Gate: Production deploy**
 
-Run: `cd apps/performance-fe && pnpm openapi-ts`
+Run: (operator action -- not auto-runnable)
 
-Why: Backend types must be regenerated before any FE task that imports the new endpoint.
+Why: Prod deploy requires release-window coordination.
 
-User confirms: type "regen done" to resume.
+User confirms: type "deploy done" to resume.
 
 ---
 ```

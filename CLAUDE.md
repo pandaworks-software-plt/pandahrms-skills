@@ -25,7 +25,8 @@ pandahrms-skills/
 │   │  # Standalone skills
 │   ├── branching/                     # Safe branch creation with upstream protection
 │   ├── bridge-file/                   # Communication between FE/BE Claude sessions
-│   └── ef-migrations/                 # Entity Framework Core migrations
+│   ├── ef-migrations/                 # Entity Framework Core migrations
+│   └── debugging/                     # 4-phase root-cause-first debugging for bugs/test failures
 ├── hooks/                       # Claude Code hooks (session-start, etc.)
 └── docs/                        # Plans and documentation
 ```

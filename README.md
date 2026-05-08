@@ -18,6 +18,7 @@ Pandahrms-specific skills plugin for Claude Code.
 | **branching** | `/pandahrms:branching` | Safe branch creation with upstream protection and folder-based naming |
 | **bridge-file** | `/pandahrms:bridge-file` | Structured protocol for debugging cross-project FE/BE issues |
 | **ef-migrations** | `/pandahrms:ef-migrations` | EF Core migration commands for Performance and Recruitment APIs |
+| **debugging** | `/pandahrms:debugging` | 4-phase root-cause-first debugging for bugs, test failures, and unexpected behavior |
 
 ## Installation
 
@@ -57,7 +58,7 @@ Any work request --> pandahrms:atlas-pipeline-orchestrator
 
 It ensures `spec-writing` is never skipped after design and that code review, security review (when applicable), simplification, and spec compliance are verified before the user tests.
 
-Additional standalone skills: `pandahrms:branching`, `pandahrms:bridge-file`, `pandahrms:athena-code-review`, `pandahrms:aegis-security-review`, `pandahrms:hermes-commit`, and `pandahrms:ef-migrations`.
+Additional standalone skills: `pandahrms:branching`, `pandahrms:bridge-file`, `pandahrms:athena-code-review`, `pandahrms:aegis-security-review`, `pandahrms:hermes-commit`, `pandahrms:ef-migrations`, and `pandahrms:debugging`.
 
 ## License
 
