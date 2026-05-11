@@ -92,7 +92,7 @@ digraph code_review {
 }
 ```
 
-## Phase 0: Triage
+**Phase 0: Triage**
 
 Run `git diff` and `git diff --cached` to assess change size.
 
@@ -108,7 +108,7 @@ Run `git diff` and `git diff --cached` to assess change size.
 
 **If not small**: proceed directly to Phase 1 (no question asked).
 
-## Phase 1: Gather Changes
+**Phase 1: Gather Changes**
 
 Run in parallel:
 - `git status` - all modified, added, untracked files
@@ -204,7 +204,7 @@ When Codex returns:
 
 If Codex fails or times out, do not block review -- note "Codex unavailable, proceeding with Claude-only review" and continue.
 
-## Phase 2: Review
+**Phase 2: Review**
 
 Apply these checks to every changed file. Include any lint/format violations from Phase 1 in findings.
 
@@ -284,7 +284,7 @@ Categorization always runs on merged set, never on Claude-only findings.
 
 **Major (ask first):** SOLID violations, god classes, duplicated logic that should reuse existing code, missing DI registration, missing audit fields, missing audit trail on API endpoints, security vulnerabilities, missing test coverage, architectural concerns, missing authorization attributes, every `TODO` / `FIXME` / `XXX` in diff, and anything not enumerated in Minor list above.
 
-## Phase 3: Fix
+**Phase 3: Fix**
 
 Work from merged finding set (Claude checklist + Codex second opinion, if dispatched). Preserve `[Claude]` / `[Codex]` / `[Claude + Codex]` attribution in user-facing report so user can see where each finding originated.
 
@@ -297,7 +297,7 @@ Work from merged finding set (Claude checklist + Codex second opinion, if dispat
 
 If user's answer does not match offered options, re-ask same question once. If second response still off-list, stop skill and let user direct next steps.
 
-## Phase 4: Security Review (/aegis-security-review)
+**Phase 4: Security Review (/aegis-security-review)**
 
 Phase 2 catches obvious security issues. Aegis Security Review is the deeper pass: OWASP Top 10, tenant isolation, PII handling, audit-trail completeness, and dependency scanning.
 
@@ -313,7 +313,7 @@ Skip this phase entirely if **any** of the following apply:
 
 When skipped, announce: "Skipping security review -- no security-relevant surface in these changes." and proceed to Phase 5.
 
-### Step 1: Detect Security-Relevant Changes
+**Step 1: Detect Security-Relevant Changes**
 
 From diff already gathered in Phase 1, check for any of:
 
@@ -329,7 +329,7 @@ From diff already gathered in Phase 1, check for any of:
 
 If none apply, apply skip condition above. Otherwise continue.
 
-### Step 2: Invoke /aegis-security-review
+**Step 2: Invoke /aegis-security-review**
 
 Use `AskUserQuestion` to confirm:
 
@@ -342,7 +342,7 @@ Options:
 
 When aegis-security-review returns, treat any approved fixes as already applied (aegis-security-review does not commit). Do not re-ask about committing -- control returns here, not to aegis-security-review's own commit prompt. If aegis-security-review exits with an error or times out, see "Sub-Skill Failure Handling" below.
 
-### Step 3: Record Outcome
+**Step 3: Record Outcome**
 
 Capture aegis-security-review outcome for Phase 7 summary:
 - **Skipped** -- no security surface, or user declined
@@ -352,11 +352,11 @@ Capture aegis-security-review outcome for Phase 7 summary:
 
 Then proceed to Phase 5.
 
-## Phase 5: Spec Discrepancy Check
+**Phase 5: Spec Discrepancy Check**
 
 **Skip this phase entirely if changes are UI-only** (use precise UI-only definition from Phase 4 above).
 
-### Step 1: Locate pandahrms-spec
+**Step 1: Locate pandahrms-spec**
 
 Resolve spec repo path using this order (use FIRST one that exists):
 
@@ -366,7 +366,7 @@ Resolve spec repo path using this order (use FIRST one that exists):
 
 If none exist, report "Spec repo not found at any expected location" to user and proceed to Phase 6. Do not block review.
 
-### Step 2: Identify affected specs
+**Step 2: Identify affected specs**
 
 From git changes gathered in Phase 1, determine:
 1. **What module** changes belong to (performance, recruitment, hr, leave, campaign, etc.)
@@ -375,7 +375,7 @@ From git changes gathered in Phase 1, determine:
 
 Search `pandahrms-spec/specs/` for existing spec files covering the affected feature area. Use Glob and Grep to find relevant `.feature` files by module directory and keyword matching.
 
-### Step 3: Compare changes against specs
+**Step 3: Compare changes against specs**
 
 For each behavioral change in git diff, check whether spec covers it:
 
@@ -390,7 +390,7 @@ Categorize findings:
 - **Outdated** -- spec exists but describes old behavior that no longer matches
 - **Missing** -- no spec covers the new/changed behavior
 
-### Step 4: Report and ask
+**Step 4: Report and ask**
 
 If all changes covered, report: "Specs are in sync with changes." and move to Phase 6.
 
@@ -410,7 +410,7 @@ Then use `AskUserQuestion` to ask:
 
 **Never write `.feature` files yourself in this skill.** Only path to spec creation/update is invoking `/spec-writing`. If user declines, do NOT draft spec content as a courtesy. If `/spec-writing` exits with an error, see "Sub-Skill Failure Handling" below.
 
-## Phase 6: Simplify
+**Phase 6: Simplify**
 
 Run `/simplify` automatically. Launches three parallel review agents (Code Reuse, Code Quality, Efficiency) against current changes.
 
@@ -425,7 +425,7 @@ If `/simplify` exits with an error or times out, record `Simplify: failed - <rea
 
 After `/simplify` completes and fixes are applied, show user a summary of what changed.
 
-## Phase 7: Done
+**Phase 7: Done**
 
 Summarize all changes made during review:
 - Minor issues auto-fixed (with `[Claude]` / `[Codex]` / `[Claude + Codex]` attribution)

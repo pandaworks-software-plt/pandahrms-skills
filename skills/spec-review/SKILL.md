@@ -26,7 +26,7 @@ If spec files are missing, apply Skip Condition (evaluated after Step 1).
 
 ## The Process
 
-### Step 1: Locate Artifacts (sequential)
+**Step 1: Locate Artifacts (sequential)**
 
 Step 1 is sequential. Do not parallelize the two sub-steps; sub-step 2 depends on module/feature path declared in document resolved in sub-step 1.
 
@@ -61,7 +61,7 @@ If skipped:
 
 Then proceed to Skill Exit.
 
-### Step 2: Extract Design Requirements
+**Step 2: Extract Design Requirements**
 
 Read design document and produce a single flat numbered list `D1..Dn`. Do not produce nested or category-grouped numbering.
 
@@ -73,7 +73,7 @@ Each entry has:
 
 Extract only requirements explicitly stated in design doc text. Do not add inferred requirements, industry-standard expectations, or items implied by domain. If a requirement is not literally present in document, do not include it as `D`-numbered.
 
-### Step 3: Extract Spec Coverage
+**Step 3: Extract Spec Coverage**
 
 Read all `.feature` files resolved in Step 1 and produce a single flat numbered list `S1..Sm`. Each entry has:
 
@@ -83,7 +83,7 @@ Read all `.feature` files resolved in Step 1 and produce a single flat numbered 
 
 Steps 2 and 3 may run in parallel, but both must complete and emit fully-numbered lists (`D1..Dn` and `S1..Sm`) before Step 4 begins. Do not start cross-checking until both lists are fixed.
 
-### Step 4: Cross-Check (sequential)
+**Step 4: Cross-Check (sequential)**
 
 Complete 4a fully (every `D` evaluated, GAP table finalized) before starting 4b. Do not interleave 4a and 4b findings.
 
@@ -108,7 +108,7 @@ Mark each EXTRA as `Defensive` or `Drift` in Extras table. Do not leave any EXTR
 
 If more than 10 EXTRAs are found, stop classifying and present count to user via AskUserQuestion before continuing. Do not silently process a large extras set.
 
-### Step 5: Report
+**Step 5: Report**
 
 Present findings in this format:
 
@@ -143,7 +143,7 @@ Present findings in this format:
 | D3 | [description] | S3 | Covered |
 ```
 
-### Step 6: Resolve
+**Step 6: Resolve**
 
 Branch on findings.
 

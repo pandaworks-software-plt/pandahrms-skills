@@ -45,7 +45,7 @@ When the skill is triggered, determine what the user wants:
 | "check the bridge", "read the bridge", "review the bridge" | **Read** | [Checking the Bridge](#checking-the-bridge) |
 | Ambiguous | **Ask** | Ask the user: "Do you want to write a message to the bridge, or check for incoming messages?" |
 
-## Step 1: Resolve the Bridge Path
+**Step 1: Resolve the Bridge Path**
 
 Determine the bridge base path based on the current platform. The platform is provided in your environment context.
 
@@ -57,7 +57,7 @@ Determine the bridge base path based on the current platform. The platform is pr
 
 **Never hardcode absolute paths.** Always resolve the home directory at runtime.
 
-## Step 2: Auto-Detect Project Pair
+**Step 2: Auto-Detect Project Pair**
 
 Determine which bridge directory to use:
 
@@ -77,7 +77,7 @@ Determine which bridge directory to use:
 
 **If detection fails**, ask the user which project they are bridging to.
 
-## Step 3: Create the Bridge Directory
+**Step 3: Create the Bridge Directory**
 
 Create the bridge directory if it does not exist:
 

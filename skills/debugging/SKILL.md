@@ -110,7 +110,7 @@ digraph systematic_debugging {
 }
 ```
 
-## Phase 1: Root Cause Investigation
+**Phase 1: Root Cause Investigation**
 
 You MUST complete this phase before proposing any fix.
 
@@ -169,7 +169,7 @@ After instrumenting, run the failing scenario once. The first boundary where inp
 
 **Remove all diagnostic instrumentation before handing off in Phase 4.** Diagnostic logs, console statements, and dump calls must not survive into the commit.
 
-## Phase 2: Pattern Analysis
+**Phase 2: Pattern Analysis**
 
 Before forming a hypothesis, find the pattern.
 
@@ -181,7 +181,7 @@ Before forming a hypothesis, find the pattern.
 
 4. **Understand dependencies.** What other components, settings, or environment does the broken code need? Is anything missing or misconfigured?
 
-## Phase 3: Hypothesis and Testing
+**Phase 3: Hypothesis and Testing**
 
 Scientific method, not pattern matching.
 
@@ -195,7 +195,7 @@ Scientific method, not pattern matching.
 
 4. **When you don't know, say so.** "I don't understand why X is happening" is a valid state. Ask the user, search the codebase further, or read more of the framework source. Don't pretend to know.
 
-## Phase 4: Implementation
+**Phase 4: Implementation**
 
 Fix the root cause, not the symptom.
 

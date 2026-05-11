@@ -156,7 +156,7 @@ Persist result into plan file's `## Atlas Progress` section once plan exists, on
 
 When `codex_enabled` is `false`, the split collapses -- Claude does both planning/audit AND implementation across all steps.
 
-### Step 4 codex execution mode
+**Step 4 codex execution mode**
 
 Codex execution mode is binary: `full` (every implementer dispatches via `codex:codex-rescue`) or `none` (every implementer dispatches via the regular Agent tool). No in-between.
 

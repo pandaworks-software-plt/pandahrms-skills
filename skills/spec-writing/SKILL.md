@@ -131,7 +131,7 @@ Do NOT auto-checkout, auto-fetch, or auto-pull `pandahrms-spec`.
 
 ## The Process
 
-### Step 1: Understand the Change
+**Step 1: Understand the Change**
 
 Identify what user is about to work on. Source can be:
 
@@ -147,7 +147,7 @@ Determine:
 
 Do NOT advance to Step 2 until all three resolved.
 
-### Step 2: Check for Existing Specs
+**Step 2: Check for Existing Specs**
 
 Search `pandahrms-spec/specs/<module>/` (or, for non-Pandahrms projects, the project's own spec directory determined under "Skip Condition: Non-Pandahrms Project") for existing `.feature` files related to the affected feature area.
 
@@ -156,7 +156,7 @@ Search `pandahrms-spec/specs/<module>/` (or, for non-Pandahrms projects, the pro
 - **Specs exist but don't cover this feature area** — proceed through Step 3, then write additional scenarios for new/changed behavior in Step 4.
 - **No specs exist** — proceed through Step 3, then write specs from scratch in Step 4.
 
-### Step 3: Study Existing Conventions
+**Step 3: Study Existing Conventions**
 
 Before writing any spec, read existing feature files to match style. Required selection rule:
 
@@ -174,7 +174,7 @@ Key conventions to observe and follow:
 - **Split by concern:** Separate files for template management vs. lifecycle vs. responses
 - **File length:** Each `.feature` file MUST NOT exceed 200 lines. If a draft would exceed 200 lines, split into multiple files using rules under "File Splitting Strategy" before writing to disk.
 
-### Step 4: Write the Gherkin
+**Step 4: Write the Gherkin**
 
 #### Mandatory Sub-Step Order
 
@@ -423,7 +423,7 @@ Split features by **functional concerns/bounded contexts**, not by CRUD operatio
 - Scenario names: describe expected behavior (e.g., "HR creates a base ad-hoc review template")
 - Consistent role names: "HR administrator", "Head of Department", "employee", "reviewer", "manager"
 
-### Step 5: Review
+**Step 5: Review**
 
 1. Present complete spec (new or updated) to user for review.
 2. Highlight any assumptions made or gaps in understanding.
@@ -432,7 +432,7 @@ Split features by **functional concerns/bounded contexts**, not by CRUD operatio
 5. Do NOT commit, write to disk in spec repository, or proceed to Step 6 without explicit approval.
 6. **Only after approval:** proceed to Step 6 (commit). Step 5 ends at approval; "implementation planning/coding" is handled by downstream skills, not this one.
 
-### Step 6: Commit
+**Step 6: Commit**
 
 After approval:
 

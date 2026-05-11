@@ -13,7 +13,7 @@ Implement plan task-by-task by dispatching a fresh implementer subagent per task
 PLAN FILE IS THE SINGLE SOURCE OF TRUTH FOR IMPLEMENTATION PROGRESS. Every meaningful event during a run -- task completion (with timestamp), errors, blockers, re-dispatches, reviewer gaps/conflicts, user mid-run corrections, and accepted concerns -- MUST be persisted to the plan file as it happens. TodoWrite list is a transient scratchpad; plan file is the durable record. A future reader of only the plan file must be able to reconstruct what happened, what failed, what the user corrected, and where execution stands. Never silently retry, skip, or self-correct without writing the event to the plan file's `### Execution Log`.
 </HARD-GATE>
 
-## Step 0 — Announcement (before any tool call)
+**Step 0 — Announcement (before any tool call)**
 
 Output exactly this text before any tool call:
 
@@ -235,7 +235,7 @@ Never merge tasks from different dependency batches into the same parallel dispa
 
 When announcing dispatch plan or progress to user, always call these groupings **"Batch"** (e.g. "Batch 1: T1", "Batch 2: T2, T5 (parallel)"). Do NOT use synonyms like "Wave", "Round", "Phase", or "Tier" -- they introduce vocabulary drift between skill's internal terminology (Batch 0, Batch 1, ...) and user-facing announcement. One word, used everywhere.
 
-## Step 6 Timing Breakdown
+**Step 6 Timing Breakdown**
 
 For benchmarking, capture per-task and per-batch timing as you go and persist to plan file.
 

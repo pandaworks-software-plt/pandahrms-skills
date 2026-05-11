@@ -96,7 +96,7 @@ digraph aegis {
 }
 ```
 
-## Phase 0: Scope
+**Phase 0: Scope**
 
 ### 0.1 Resolve scope to concrete file list
 
@@ -121,7 +121,7 @@ If file exceeds 2000 lines, page through with explicit `offset`/`limit` calls un
 
 Do not begin Phase 1 until every in-scope file shows "Fully read: yes".
 
-## Phase 1: Detect Project Type
+**Phase 1: Detect Project Type**
 
 Detect every project-type signal in the in-scope file list. Run checklist rows for **every** matching project type (a change touching both `*.csproj` and `package.json` runs both checklists). Multiple matches are common and expected.
 
@@ -137,7 +137,7 @@ Detect every project-type signal in the in-scope file list. Run checklist rows f
 
 If **no** project-type signal matches in scope, halt and use `AskUserQuestion` to confirm whether to (a) abort as out-of-scope, or (b) proceed using user-specified checklist set. Do not infer checklist from absence of signals, and do not silently default to .NET.
 
-## Phase 2: Threat Pass
+**Phase 2: Threat Pass**
 
 Before checklist work, produce written **Trust Boundary Map** emitted into final report under "Phase 2: Trust Boundaries". Map is required input to Phase 3.
 
@@ -151,7 +151,7 @@ Map has exactly five labelled rows. Each row lists `file:line` references drawn 
 
 Append "weak spots" list at end of map -- specific concerns feeding into Phase 3 checklist findings. Do not begin Phase 3 until map is written.
 
-## Phase 3: OWASP Checklist
+**Phase 3: OWASP Checklist**
 
 Work rows in **strict numeric order**: A01, A02, A03, A04, A05, A06, A07, A08. A09 and A10 are covered downstream as noted but must still be acknowledged in report ("A09: see Phase 4 audit-trail row", "A10: see A03 SSRF row"). Do not skip a row because earlier rows produced findings.
 
@@ -253,7 +253,7 @@ Covered in Pandahrms-specific checks below (audit trail).
 
 Covered in A03 above.
 
-## Phase 4: Pandahrms-Specific Checks
+**Phase 4: Pandahrms-Specific Checks**
 
 | Check | What to look for |
 |-------|------------------|
@@ -266,7 +266,7 @@ Covered in A03 above.
 | **EF migrations** | New columns holding PII marked for encryption / masking. `DROP COLUMN` on sensitive columns reviewed for data retention policy. No unfiltered `UPDATE`/`DELETE` in migration SQL. |
 | **Bridge / external keys** | No API keys, service account tokens, or bridge secrets committed. Check `.env*`, `appsettings.*.json`, `launchSettings.json`, `.github/workflows/*`. |
 
-## Phase 5: Secret and Credential Scan
+**Phase 5: Secret and Credential Scan**
 
 Phase 5 runs as discrete pass after Phase 4 completes. Do not merge into Phase 3 or Phase 4 even if those phases noticed potential secrets.
 
@@ -286,7 +286,7 @@ On full set of changed files (including untracked):
 
    This block appears at very top of Phase 6 report, above Counts table, in addition to (not instead of) regular Critical entry under Findings.
 
-## Phase 6: Categorize and Report
+**Phase 6: Categorize and Report**
 
 Group findings into four buckets:
 
@@ -320,7 +320,7 @@ Deviation from this structure is defect. Do not omit a section because empty -- 
 
 Every `Where:` reference must come from file actually opened by Read tool in this run. Do not write line number unless you have read that line. If finding spans a concept rather than single line, write `path/to/file.cs (whole file)` instead of guessing.
 
-## Phase 7: Fix (Optional)
+**Phase 7: Fix (Optional)**
 
 ### When to run Phase 7
 
@@ -361,7 +361,7 @@ After applying fixes, re-verify each fix by:
 
 Record re-verification results inline under each fixed finding in report ("Re-verified: clean" or "Re-verified: new finding -- [details]").
 
-## Phase 8: Handoff
+**Phase 8: Handoff**
 
 Summarize:
 - Counts by severity

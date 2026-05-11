@@ -49,11 +49,11 @@ Treat scope rule as hard floor for rest of turn. Subsequent skills do not need t
 5. Return control to the caller
 ```
 
-### Phase 1: Read raw input
+**Phase 1: Read raw input**
 
 Take most recent user message that triggered parent skill. Do not include earlier conversation turns -- rephrase is scoped to current request only. Earlier turns are context, not intent.
 
-### Phase 2: Classify clarity
+**Phase 2: Classify clarity**
 
 **Hard gate before classification:** request MUST be both **explicit** AND **declarative**. If either is missing, request is NOT CLEAR and skill MUST ask via AskUserQuestion -- proceed silently is forbidden.
 
@@ -85,7 +85,7 @@ Then apply these checks in order. First match wins.
 - A required field for parent skill is missing (branch name for `branching`, plan path for execute-plan Fast Path, DB name for `swap-perf-db`, etc.).
 - User named a target not existing in working tree (file/function/branch not found).
 
-### Phase 2 examples
+**Phase 2 examples**
 
 | Raw input | Verdict | Why |
 |-----------|---------|-----|
@@ -99,7 +99,7 @@ Then apply these checks in order. First match wins.
 | `create a branch` | UNDER-SPECIFIED | Branch purpose missing -- required field for `branching`. |
 | `switch perf db` | UNDER-SPECIFIED | DB name missing -- required field for `swap-perf-db`. |
 
-### Phase 3a: CLEAR path
+**Phase 3a: CLEAR path**
 
 Emit a single line in B2 English:
 
@@ -115,7 +115,7 @@ Examples:
 
 Do NOT call AskUserQuestion. Return control to the caller.
 
-### Phase 3b: AMBIGUOUS / UNDER-SPECIFIED path
+**Phase 3b: AMBIGUOUS / UNDER-SPECIFIED path**
 
 Call AskUserQuestion once. Question MUST follow this shape:
 
@@ -145,13 +145,13 @@ options:
   - { label: "Restored prod copy", description: "performance_prod_2026_05_10" }
 ```
 
-### Phase 4: Lock the confirmed intent
+**Phase 4: Lock the confirmed intent**
 
 Once user picks an option (or CLEAR path applied), store confirmed intent as a single B2-English sentence. Parent skill reads this sentence and treats it as canonical request for rest of its run.
 
 If user picks "Other" and writes free text, run Phase 2 once more on that free text. If still ambiguous after one extra round, stop and tell user: "I am still not sure what you want. Please write the request again in a different way."
 
-### Phase 5: Return
+**Phase 5: Return**
 
 Hand control back to caller. Do not summarize at the end -- caller picks up from locked intent as canonical request.
 

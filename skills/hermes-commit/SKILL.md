@@ -59,7 +59,7 @@ Within Phase 1, sub-steps run strictly in this order: Phase 1A (format auto-fix)
 
 Within Phase 2, the four `git` commands listed run in parallel; that is the only parallelism allowed in this workflow.
 
-## Phase 1: Hard Gate (Format + Lint + Tests)
+**Phase 1: Hard Gate (Format + Lint + Tests)**
 
 This phase is a **HARD GATE**. The skill cannot proceed past Phase 1 unless all three checks (format, lint, tests) report 0 errors and 0 failures. The gate applies **even when failures are pre-existing or unrelated to the current session's changes** -- if the working tree is broken, the commit does not happen until the working tree is fixed.
 
@@ -74,7 +74,7 @@ Detect ALL project types present in the workspace (not just the changed-files se
 - Mixed repos: run BOTH for every sub-step. Aggregate results. STOP if any sub-step fails.
 - If neither matches, emit verbatim: `No format/lint/test configuration recognized for this repo; proceeding to Phase 2 without verification.` Then continue to Phase 2. Do not invent or guess at commands.
 
-### Phase 1A: Format Auto-Fix
+**Phase 1A: Format Auto-Fix**
 
 Run the formatter in **write mode** to auto-fix mechanical formatting violations. Files modified by this step get picked up by Phase 2 and included in the commit plan in Phase 3.
 
@@ -93,7 +93,7 @@ If verification still reports issues, STOP and emit diagnostic output verbatim f
 
 `Format errors remain after auto-fix. Likely cause: a generated/vendored file the formatter cannot reach, or a syntax error that broke the parser. Inspect each failing file above. Generated or vendored -> add to .editorconfig / biome.json / .prettierignore. Real source -> fix the syntax that defeated the formatter. Re-run /hermes-commit when verify passes.`
 
-### Phase 1B: Lint Auto-Fix
+**Phase 1B: Lint Auto-Fix**
 
 Run the linter in **fix mode** to auto-fix mechanical lint violations, then run it in verify mode.
 
@@ -110,7 +110,7 @@ If the verify pass shows remaining errors (i.e. errors the linter could not auto
 
 `Lint errors remain after auto-fix. These are real code issues that need targeted edits. For each violation above: fix the offending code, or add a one-line "// reason" suppression when the rule does not apply here. Re-run /hermes-commit when verify passes.`
 
-### Phase 1C: Test Suite
+**Phase 1C: Test Suite**
 
 Run the full test suite for every detected project type. Tests run **after** format/lint auto-fix so they execute on final post-fix code state.
 
@@ -133,7 +133,7 @@ If any test fails, STOP and emit a concise summary of failing test names followe
 - **Auto-fix made changes**: expected. Note in the Phase 3 commit plan that pre-existing format/lint fixes are included.
 - **Verify-pass errors after auto-fix**: STOP per sub-step instructions above. Do not retry, do not attempt manual edits, do not bypass.
 
-## Phase 2: Gather Changes
+**Phase 2: Gather Changes**
 
 Run these four commands in parallel:
 
@@ -152,7 +152,7 @@ Read every changed file in the diff using the `Read` tool, with these exceptions
 - For files over 1000 lines, read only diff hunks via `git diff <file>`.
 - For binary files, note their presence but do not read.
 
-## Phase 3: Plan Atomic Commits
+**Phase 3: Plan Atomic Commits**
 
 Group changes into logical commits. Each commit MUST be:
 
@@ -213,7 +213,7 @@ After presenting the plan, ask via AskUserQuestion: "Proceed with this commit pl
 - **"Approve -- execute the commits"** -> Phase 4.
 - **"Abort -- leave the working tree untouched"** -> STOP. Do not commit.
 
-## Phase 4: Execute Commits
+**Phase 4: Execute Commits**
 
 For each commit N in the plan, in order:
 
@@ -226,7 +226,7 @@ Do not batch the per-commit `git status` to the end of the loop -- run it after 
 
 **NEVER** use `git add -A` or `git add .` -- always stage specific files.
 
-## Phase 5: Terminate
+**Phase 5: Terminate**
 
 After the last commit's `git status` verification, emit a one-line summary in this exact format:
 
