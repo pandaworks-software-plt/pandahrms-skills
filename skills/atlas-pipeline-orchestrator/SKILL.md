@@ -1,6 +1,6 @@
 ---
 name: atlas-pipeline-orchestrator
-description: Triggers on any mention of starting new work, building a feature, adding functionality, fixing a bug, refactoring, brainstorming, designing, writing a plan, or executing an existing plan. The single entry point for design-through-execution work. Pipeline shape: design -> spec-writing -> QA review -> plan -> Plan-Spec cross-review -> execute -> simplify -> Playwright e2e -> ask user to test, using pandahrms:design-refinement / pandahrms:plan-writing / pandahrms:execute-plan internally with single-stage review by default. Also triggers on "atlas-pipeline-orchestrator", "atlas", "run the pipeline", or being handed a plan file.
+description: Triggers on any mention of starting new work, building a feature, adding functionality, fixing a bug, refactoring, brainstorming, designing, writing a plan, or executing an existing plan. The single entry point for the full Pandahrms lifecycle: optimise-prompt -> design (gather/clarify/brainstorm/impact via pandahrms:design-refinement) -> spec routing -> plan -> execute -> spec<->code audit -> simplify -> Playwright e2e -> user test -> follow-up loop -> code review (athena + aegis) -> commit (hermes-commit). Also triggers on "atlas-pipeline-orchestrator", "atlas", "run the pipeline", or being handed a plan file.
 ---
 
 # Pandahrms Atlas Pipeline Orchestrator
@@ -14,24 +14,41 @@ Atlas Pipeline Orchestrator state lives ONLY in:
 - The design doc at `docs/pandahrms/designs/<...>.md`
 - The plan file's `## Atlas Progress` section
 - Updated `.feature` spec files in `pandahrms-spec`
-- Staged code changes via implementer subagents
+- Staged code changes via implementer subagents (Steps 4 and 9)
+- The commit history once Step 11 completes
 
-Do NOT create any other state, log, tracking, scratch, or progress files. Do NOT create README.md, NOTES.md, CHANGELOG entries, summary docs, or any markdown file outside the design doc and plan file -- the Development Summary at Step 9 is delivered in the chat response, not as a file. Do NOT write to `~/.claude/bridge/` unless the user explicitly instructs you to.
+Do NOT create any other state, log, tracking, scratch, or progress files. Do NOT create README.md, NOTES.md, CHANGELOG entries, summary docs, or any markdown file outside the design doc and plan file. The Development Summary at Step 8 (user-test handoff) is delivered in the chat response, not as a file. Do NOT write to `~/.claude/bridge/` unless the user explicitly instructs you to.
 </STATE-FILES>
 
 <CANONICAL-LABELS>
-All AskUserQuestion option labels shown in this skill are CANONICAL. Use them verbatim -- do not paraphrase, shorten, expand, or reorder. All announcement strings shown in quoted form (e.g. "Skipping QA review -- ...") are also canonical -- emit them verbatim with only the bracketed placeholders substituted.
+All AskUserQuestion option labels shown in this skill are CANONICAL. Use them verbatim -- do not paraphrase, shorten, expand, or reorder. All announcement strings shown in quoted form (e.g. "Skipping Aegis -- ...") are also canonical -- emit them verbatim with only the bracketed placeholders substituted.
 </CANONICAL-LABELS>
 
 ## Overview
 
-Unified Pandahrms-native pipeline: design, spec writing, QA review, implementation planning, Plan <-> Spec cross-review, and subagent-driven execution -- all in a single session.
+Atlas drives the full Pandahrms work lifecycle from user prompt to committed code, in a single orchestrated run. The 12 internal atlas steps map to the 16-step user-visible lifecycle as follows:
 
-Atlas runs single-stage review by default and only opts into a second-stage spec-compliance reviewer for tasks the plan tags `**Risk:** high`. This is the per-task throughput lever that keeps the pipeline fast on standard work without sacrificing rigor on risky tasks.
+| Atlas Step | User lifecycle |
+|------------|----------------|
+| Pre-flight: optimise-prompt | 2 |
+| 0. Setup (codex + time tracking + conditional branch reminder) | -- |
+| 1. Design (gather/clarify/brainstorm/impact via pandahrms:design-refinement) | 3-6 |
+| 2. Spec routing (ask if missing; always write if exists) | 7 |
+| 3. Plan (pandahrms:plan-writing) | 8 |
+| 4. Execute (pandahrms:execute-plan) | 9 |
+| 5. Spec <-> Code audit | 10 |
+| 6. Simplify (conditional) | 11 |
+| 7. Playwright e2e (conditional) | 12 |
+| 8. User test pause | 13 |
+| 9. Follow-up loop (back to Step 1 if scope changes, Step 4 if code-only) | 14 |
+| 10. Code review (athena + aegis) | 15 |
+| 11. Commit (hermes-commit, pure) | 16 |
 
-**Role split between Codex and Claude (active only when Codex is available locally):** when `codex_available` is `true`, **Codex implements** (Step 6 dispatches, fix re-dispatches) and **Claude plans and audits** (Steps 1, 2, 4 planning; Steps 3, 5, 7 review; Step 8 exploration; second-stage reviewer for `Risk: high`). Codex never reviews its own output. When Codex is unavailable, the split collapses and Claude handles every step including implementation. See [Codex Availability](#codex-availability) for the full policy and announcement strings.
+Atlas runs single-stage review by default for Step 4 (execute) and only opts into a second-stage spec-compliance reviewer for tasks the plan tags `**Risk:** high`.
 
-**Announce at start:** "I'm using Pandahrms atlas-pipeline-orchestrator to orchestrate design through execution."
+**Role split between Codex and Claude** (active when the user opts in to Codex at Step 0): when `codex_enabled` is `true`, **Codex implements** (Step 4 dispatches, follow-up re-dispatches in Step 9, review-driven fixes in Step 10) and **Claude plans and audits** (Steps 1, 2, 3 planning; Steps 5, 6, 10 review; Step 7 exploration; second-stage reviewer for `Risk: high`). Codex never reviews its own output. When the user picks "No" at Step 0, the split collapses and Claude handles every step including implementation. See [Codex Usage](#codex-usage) for the full policy and announcement strings.
+
+**Announce at start:** "I'm using Pandahrms atlas-pipeline-orchestrator to drive design through commit."
 
 ## Pre-Flight: Optimise the prompt (mandatory before any other step)
 
@@ -54,54 +71,50 @@ When `/atlas-pipeline-orchestrator` is invoked with a positional argument that i
 1. Verify the path exists and is readable via the Read tool.
 2. If the path is missing, unreadable, or does not contain a recognizable plan structure, STOP and respond verbatim: "Plan file '<path>' not found or unreadable. Provide a valid path or run /atlas-pipeline-orchestrator with no arguments to start fresh." Do not auto-create the file.
 
-If validation passes, run Step 0 (Setup) FIRST, THEN announce "Executing existing plan -- running Plan <-> Spec cross-review, then execution.", THEN skip directly to step 5 (Plan <-> Spec cross-review), then step 6 (Execute plan).
+If validation passes, run Step 0 (Setup) FIRST, THEN announce "Executing existing plan -- skipping Steps 1-3, starting at Execute.", THEN skip directly to Step 4 (Execute). After Step 4, atlas continues through the remaining steps in order (5 audit, 6 simplify, 7 e2e, 8 user test, 9 follow-up if needed, 10 review, 11 commit).
 
 - Step 0 runs in full -- codex detection and time tracking init still happen, even on Fast Path.
-- On Fast Path entry, before Step 6 invokes pandahrms:execute-plan, atlas-pipeline-orchestrator reconciles the `Codex execution mode:` line in the existing plan against current `codex_available`:
-  - If `codex_available` is true and the line is missing or set to `none`, overwrite it to `full` (the new policy default). Announce: `"Codex available -- setting execution mode to 'full' (atlas policy default)."`
-  - If `codex_available` is true and the line is already `full` or `partial-parallel`, leave it alone.
-  - If `codex_available` is false, force the line to `none` regardless of its previous value.
+- On Fast Path entry, before Step 4 invokes pandahrms:execute-plan, atlas reconciles the `Codex execution mode:` line in the existing plan against the user's Step 0 choice:
+  - If `codex_enabled` is true and the line is missing or set to `none`, overwrite it to `full` (the policy default). Announce: `"Codex enabled -- setting execution mode to 'full' (atlas policy default)."`
+  - If `codex_enabled` is true and the line is already `full`, leave it alone.
+  - If `codex_enabled` is false, force the line to `none` regardless of its previous value.
 
-  Do NOT prompt the user with AskUserQuestion to confirm. The user can override by editing the line manually before Step 6 starts.
-- Still run step 5 to catch drift between the pre-existing plan and current specs.
-- After execution, still run step 7 (simplify), step 8 (Playwright e2e), and step 9 (ask user to test) with the Development Summary.
+  Do NOT prompt the user with AskUserQuestion to confirm. The user can override by editing the line manually before Step 4 starts.
+
+Fast Path still runs Step 5 (Spec<->Code audit) post-execute to catch drift between the pre-existing plan/spec and the freshly-implemented code.
 
 ## Resume Path
 
 If invoked with `/atlas-pipeline-orchestrator --resume`:
 
 1. Read the plan file's `## Atlas Progress` section to determine which steps completed and their timing.
-2. Validate the section: it MUST have a parseable step table AND `Atlas started:` AND `Codex available:` lines. If any are missing or malformed, STOP and ask the user via AskUserQuestion: "Plan file's Atlas Progress section is malformed or unparseable. How would you like to proceed?" with options: "Start fresh (overwrite progress section)", "Abort so I can fix it manually". Do not auto-recover.
+2. Validate the section: it MUST have a parseable step table AND `Atlas started:` AND `Codex enabled:` lines. If any are missing or malformed, STOP and ask the user via AskUserQuestion: "Plan file's Atlas Progress section is malformed or unparseable. How would you like to proceed?" with options: "Start fresh (overwrite progress section)", "Abort so I can fix it manually". Do not auto-recover.
 3. Announce: "Resuming atlas-pipeline-orchestrator from step N -- [step name]."
 4. Continue from the next incomplete step with full time tracking.
 5. If no plan file exists, announce: "No atlas-pipeline-orchestrator state found -- starting fresh." and begin from Step 0 (Setup), then Step 1.
-6. If a plan file exists but has no `## Atlas Progress` section, STOP and prompt via AskUserQuestion: "Plan file exists but has no atlas-pipeline-orchestrator state. How would you like to proceed?" with canonical options: "Treat as Fast Path (start at Step 5)", "Start fresh (overwrite plan)", "Cancel". Do not silently fall through to Step 1.
-7. After resuming, run all remaining incomplete steps in order through Step 9 inclusive. Resume mode does NOT change which steps run -- only which step the run starts at. The Step 9 termination rules apply identically to resumed runs.
+6. If a plan file exists but has no `## Atlas Progress` section, STOP and prompt via AskUserQuestion: "Plan file exists but has no atlas-pipeline-orchestrator state. How would you like to proceed?" with canonical options: "Treat as Fast Path (start at Step 4)", "Start fresh (overwrite plan)", "Cancel". Do not silently fall through to Step 1.
+7. After resuming, run all remaining incomplete steps in order through Step 11 inclusive. Resume mode does NOT change which steps run -- only which step the run starts at. The Step 11 termination rules apply identically to resumed runs.
 
 ## Scope Profile
 
-After the design is approved (end of Step 1), classify the work into a **Scope Profile** so downstream steps can scale ceremony to feature size. This is the single biggest lever for cutting wall-clock on small features without sacrificing rigor on big ones.
+After the design is approved (end of Step 1), classify the work into a **Scope Profile** so downstream steps can scale ceremony to feature size.
 
-**Classification precedence (apply in order, first match wins):**
-1. Check **heavyweight** triggers first. If ANY heavyweight trigger matches, classify as `heavyweight` regardless of file count or other criteria.
-2. Otherwise, check **lightweight** criteria. ALL FIVE bullets must match for `lightweight`.
-3. Otherwise, classify as `standard`.
+Two profiles. Apply in order, first match wins.
 
-| Profile | Triggers (any one matches) | What scales down |
-|---------|---------------------------|------------------|
-| **lightweight** | • Touches <3 production source files (see [Production Source File](#production-source-file) for definition), AND<br>• No schema migration / EF migration, AND<br>• No auth, multi-tenant boundary, billing, payment, or PII change, AND<br>• No breaking API change (additive endpoints/fields are fine), AND<br>• Plan estimate <8 tasks | • QA review (Step 3) auto-skips even at >=3 new scenarios<br>• Plan-Spec cross-review (Step 5) runs in pragmatic mode (only business-logic tasks need Test refs flagged; wiring/property tasks are accepted)<br>• Simplify (Step 7) auto-skips unless Execute reported `DONE_WITH_CONCERNS` for any task<br>• Plan tightening: target 5-7 tasks, collapse strictly-sequential wiring, mechanical commands become Auto Gates (or Manual Gates if operator action is required) not tasks<br>• Design (Step 1) MUST batch clarifying questions into a single AskUserQuestion call when 2-4 of them are causally independent (definition: the user's answer to question A does not change the wording, options, or applicability of question B). Otherwise ask sequentially. |
-| **standard** | Anything that doesn't match `lightweight` and doesn't match `heavyweight` | Default ceremony: every step runs as documented |
-| **heavyweight** | Any one matches:<br>• Touches auth, multi-tenant data, billing, payment, or PII<br>• Schema migration affecting >1 table or destructive (drop/rename column)<br>• Breaking API change<br>• Touches >10 production files | Adds: mandatory `Risk: high` tag review on every task in [pandahrms:execute-plan](../execute-plan/SKILL.md) (not just plan-author-tagged), and athena-code-review run BEFORE Step 8 (in addition to user-triggered post-test review) |
+| Profile | Triggers (ALL must match for `small`) | What scales down |
+|---------|---------------------------------------|------------------|
+| **small** | • Touches <3 production source files (see [Production Source File](#production-source-file)), AND<br>• No schema migration / EF migration, AND<br>• No auth, multi-tenant boundary, billing, payment, or PII change, AND<br>• No breaking API change (additive endpoints/fields are fine), AND<br>• Plan estimate <8 tasks | • design-refinement skips the forced second-clarify (user lifecycle Step 4) and uses a single-question approve flow<br>• Spec<->Code audit (Step 5) runs sample-based instead of full sweep<br>• Simplify (Step 6) auto-skips unless Execute reported `DONE_WITH_CONCERNS` for any task<br>• Plan tightening: target 5-7 tasks, collapse strictly-sequential wiring, mechanical commands become Auto Gates (or Manual Gates if operator action is required) not tasks<br>• Design clarifying questions MUST batch into a single AskUserQuestion call when 2-4 are causally independent<br>• Aegis security review at Step 10 auto-skips (athena still runs) unless the design touched validation, permission, or data-state code |
+| **normal** | Anything that doesn't match `small`. Includes auth, multi-tenant data, billing, payment, PII, schema migrations, breaking API changes, or >=3 production files. | Default ceremony: every step runs as documented. Tasks touching auth, multi-tenant, billing, schema, or PII get `Risk: high` tagging at plan-writing time. |
 
 ### How to set it
 
-1. After Step 1 approval, before invoking spec-writing, estimate file count and check trigger criteria using the precedence above. Announce verbatim: `"Scope Profile: <profile> (<rationale>)."` -- always include the rationale.
-2. Persist to the plan's Atlas Progress section once the plan is created (Step 4): `Scope Profile: lightweight|standard|heavyweight`. Resumed runs read it back; do not re-classify on resume.
+1. After Step 1 approval, before invoking spec routing, estimate file count and check the trigger criteria. Announce verbatim: `"Scope Profile: <profile> (<rationale>)."` -- always include the rationale.
+2. Persist to the plan's Atlas Progress section once the plan is created (Step 3): `Scope Profile: small|normal`. Resumed runs read it back; do not re-classify on resume.
 3. Do NOT proactively offer override via AskUserQuestion. Only re-classify if the user explicitly objects to the announced profile in their next message.
 
 ### Production Source File
 
-For Scope Profile classification (the lightweight criterion above), "production source file" means any file under the project's source tree (`src/`, `Pandahrms.*/` for BE) EXCLUDING:
+For Scope Profile classification (the `small` criterion above), "production source file" means any file under the project's source tree (`src/`, `Pandahrms.*/` for BE) EXCLUDING:
 
 - Generated types (`*.d.ts`, OpenAPI client output)
 - Test files (`*.test.*`, `*.spec.*`, `*Tests.cs`)
@@ -113,79 +126,79 @@ EF migration files COUNT as production source files for this rule. CSS/Tailwind 
 
 ### Display in Development Summary
 
-Step 9 displays the profile in the summary header so the user can see why ceremony was tightened or expanded:
+Step 8 displays the profile in the summary header so the user can see why ceremony was tightened or expanded:
 
 ```
-Development Summary [Scope: lightweight] (active work time, ...)
+Development Summary [Scope: small] (active work time, ...)
 ```
 
-## Codex Availability
+## Codex Usage
 
-At the very start of every atlas-pipeline-orchestrator run (Step 0 / Setup, including Fast Path and Resume Path), detect whether Codex is available locally.
+At Step 0 (Setup, including Fast Path and Resume Path), decide whether to use Codex for code implementation in this run. Two-step gate:
 
-1. Run `command -v codex` via Bash. Treat as available ONLY if exit code is 0 AND stdout is non-empty AND the resolved path exists. In any other case (non-zero exit, empty stdout, missing path, Bash error), set `codex_available=false`. Do not retry detection.
-2. Store the result in conversation context as `codex_available` (true/false). Persist it into the plan file's `## Atlas Progress` section once the plan exists, on a `Codex available: true|false` line, so resumed runs do not need to re-detect.
+1. **Detect installation.** Run `command -v codex` via Bash. Treat as installed ONLY if exit code is 0 AND stdout is non-empty AND the resolved path exists.
+2. **If installed, ask the user.** Call AskUserQuestion: `"Use Codex for code implementation in this run? (Codex implements, Claude reviews. Pick 'No' to keep Claude for everything.)"` with canonical options:
+   - `"Yes, use Codex"` -- set `codex_enabled=true` in conversation context.
+   - `"No, Claude does everything"` -- set `codex_enabled=false`.
+3. **If not installed, skip the prompt.** Set `codex_enabled=false` automatically and continue silently.
 
-### Role split (active ONLY when `codex_available` is true)
+Persist the result into the plan file's `## Atlas Progress` section once the plan exists, on a `Codex enabled: true|false` line, so resumed runs do not re-detect or re-prompt.
 
-The role split below applies if and only if `codex_available` is `true` at Step 0. When codex is unavailable, the split is **inactive** -- Claude handles every step, including Step 6 implementation and fix re-dispatches. Skip the rest of this subsection on no-codex runs.
-
-When codex IS available, this pipeline divides labor by capability, not by step number:
+### Role split (active ONLY when `codex_enabled` is true)
 
 | Layer | Owner | Steps |
 |-------|-------|-------|
-| **Implementation / fix** | Codex (`codex:codex-rescue`) | Step 6 implementer dispatch, Subagent Failure Handling re-dispatch on `insufficient reasoning`, any code-fix follow-up triggered by Step 7 Simplify findings |
-| **Planning** | Claude (local `Agent` tool) | Step 1 design, Step 2 spec-writing, Step 4 plan-writing |
-| **Auditing / review of Codex output** | Claude (local `Agent` tool) | Step 3 QA review, Step 5 Plan <-> Spec cross-review, Step 7 Simplify review pass, second-stage spec-compliance reviewer for `Risk: high` tasks |
-| **Exploration** | Claude (local `Agent` tool) | Step 8 Playwright e2e, ad-hoc codebase exploration during design/plan |
+| **Implementation / fix** | Codex (`codex:codex-rescue`) | Step 4 implementer dispatch, Subagent Failure Handling re-dispatch on `insufficient reasoning`, code-fix follow-up triggered by Step 6 Simplify findings, Step 9 code-only follow-up iterations, Step 10 review-driven fixes |
+| **Planning** | Claude (local `Agent` tool) | Step 1 design, Step 2 spec routing (delegates to spec-writing), Step 3 plan-writing |
+| **Auditing / review of Codex output** | Claude (local `Agent` tool) | Step 5 Spec<->Code audit, Step 6 Simplify review pass, Step 10 athena + aegis review, second-stage spec-compliance reviewer for `Risk: high` tasks |
+| **Exploration** | Claude (local `Agent` tool) | Step 7 Playwright e2e, ad-hoc codebase exploration during design/plan |
 
-The principle: when Codex is available, Codex writes code and Claude plans, audits, and explores. Codex is never asked to review its own work, and Claude never writes production code in this pipeline.
+When `codex_enabled` is `false`, the split collapses -- Claude does both planning/audit AND implementation across all steps.
 
-**No-codex fallback:** when `codex_available` is `false`, the split collapses -- Claude does both planning/audit AND implementation. Announce the degradation explicitly so the user knows.
+### Step 4 codex execution mode
 
-### Default Step 6 codex execution mode
+Codex execution mode is binary: `full` (every implementer dispatches via `codex:codex-rescue`) or `none` (every implementer dispatches via the regular Agent tool). There is no in-between.
 
-When `codex_available` is true, atlas-pipeline-orchestrator pre-sets the Step 6 [Codex Execution Mode](../execute-plan/SKILL.md#codex-execution-mode) to **`full`** -- every implementer dispatches via `codex:codex-rescue`. Atlas writes `Codex execution mode: full` into the plan file's `## Atlas Progress` section at plan creation (Step 4), and `pandahrms:execute-plan` reads it back without re-prompting.
+When `codex_enabled` is `true`, atlas sets the Step 4 [Codex Execution Mode](../execute-plan/SKILL.md#codex-execution-mode) to **`full`** and writes `Codex execution mode: full` into the plan file's `## Atlas Progress` section at plan creation (Step 3). The user can override to `none` by editing the line before Step 4 starts.
 
-The user can override by editing the line to `partial-parallel` or `none` before Step 6 starts; atlas honors whatever value the line holds when execute-plan runs. Do NOT prompt the user with AskUserQuestion just to confirm the default -- silent default is the point.
+When `codex_enabled` is `false`, atlas writes `Codex execution mode: none`.
 
-When `codex_available` is false, atlas writes `Codex execution mode: none`. There is no question to ask.
+### Reviews never route to codex
 
-### Reviews never route to codex (only relevant when codex is available)
+When `codex_enabled` is `true`:
 
-This rule only matters when `codex_available` is `true` -- on no-codex runs there is nothing to route anywhere. When codex IS available:
-
-- Step 3 (QA Review Agent), Step 5 (Plan <-> Spec cross-review), and Step 7 Simplify's review pass run via the local `Agent` tool -- not `codex:codex-rescue`. These are auditing tasks; Claude is the auditor.
-- The second-stage spec-compliance reviewer dispatched by `pandahrms:execute-plan` for `Risk: high` tasks also runs via Agent, even when codex implemented the task. Reviewing Codex's output is Claude's job; see `pandahrms:execute-plan` Reviewer Verdict Handling.
-- Do NOT use the `READ-ONLY REVIEW` prefix in atlas -- it was needed only to keep codex from modifying files during a review dispatch, and atlas no longer dispatches codex for reviews.
-
-### Implementation dispatches let Codex write
-
-Step 6 implementation prompts (sent to `codex:codex-rescue` from `pandahrms:execute-plan`) MUST NOT include the `READ-ONLY REVIEW` prefix. They let codex modify files. The read-only prefix is reserved for review-only dispatches -- and since atlas no longer routes reviews to codex, the prefix only appears in this pipeline if a future skill explicitly opts in.
+- Step 5 (Spec<->Code audit), Step 6 Simplify's review pass, and Step 10 (athena + aegis) all run via the local `Agent` tool -- not `codex:codex-rescue`. These are auditing tasks; Claude is the auditor.
+- The second-stage spec-compliance reviewer dispatched by `pandahrms:execute-plan` for `Risk: high` tasks also runs via Agent, even when codex implemented the task. Codex output is reviewed by Claude; see `pandahrms:execute-plan` Reviewer Verdict Handling.
+- Do NOT use the `READ-ONLY REVIEW` prefix in atlas. Atlas does not dispatch reviews to codex.
 
 ### Codex failure mid-run
 
-If a `codex:codex-rescue` dispatch fails after Step 0 detection succeeded (timeout, runtime error, non-zero exit, missing binary): do NOT retry codex. Set `codex_available=false` in conversation context for the remainder of this run, persist `Codex available: true (degraded to false at step N)` in the Atlas Progress section, and re-dispatch the failing implementer via the regular `Agent` tool (Claude takes over implementation). Also flip the `Codex execution mode:` line to `none` so subsequent batches don't try codex again. Do not stall waiting for codex recovery.
+If a `codex:codex-rescue` dispatch fails (timeout, runtime error, quota exhausted, non-zero exit): pause execution and ask the user via AskUserQuestion: `"Codex dispatch failed: [one-line error]. How would you like to proceed?"` with options:
+
+- `"Switch to Claude for the rest of this run"` -- flip `codex_enabled` to `false`, persist `Codex enabled: true (switched to false at step N)` in the Atlas Progress section, flip the `Codex execution mode:` line to `none`, and re-dispatch the failing task via the regular `Agent` tool.
+- `"Retry the same dispatch"` -- re-issue the codex dispatch once; if it fails again, this option is not offered.
 
 ### Start announcements
 
-- Codex available: `"Codex detected -- Step 6 implementations route to codex:codex-rescue (mode: full). Planning and reviews stay on Claude."`
-- Codex unavailable: `"Codex not detected -- Claude handles both implementation and reviews for this run."`
+- `codex_enabled=true`: `"Codex on -- implementations via codex, reviews on Claude."`
+- `codex_enabled=false` (either user chose No or codex not installed): silent. No announcement; proceed to Step 1 directly.
 
 <HARD-GATE>
 AUTHORITY HIERARCHY:
 
-**Design time (steps 1-4):** Discussion/decisions are the source of truth. If a discussion or decision diverges from the existing spec, UPDATE the spec before writing the plan. Never write a plan that contradicts the spec -- update the spec first, then plan from the updated spec.
+**Design time (Steps 1-3):** Discussion/decisions are the source of truth. If a discussion or decision diverges from the existing spec, UPDATE the spec before writing the plan. Never write a plan that contradicts the spec -- update the spec first, then plan from the updated spec.
 
-**Execution time (step 6):** The plan is the source of truth for each implementer subagent. But implementers MUST cross-check against the spec. If plan and spec disagree, STOP and report -- never silently pick one.
+**Execution time (Step 4):** The plan is the source of truth for each implementer subagent. But implementers MUST cross-check against the spec. If plan and spec disagree, STOP and report -- never silently pick one.
 
-**Never silently reconcile.** When authority sources disagree, STOP and prompt via AskUserQuestion: "Authority sources disagree -- [describe the conflict]. How would you like to resolve?" with canonical options: "Update spec to match plan", "Update plan to match spec", "Abort atlas". Never silently pick a side; never just print a warning and continue.
+**Post-execution audit (Step 5):** The spec is the source of truth for what behavior must exist. The code is audited against the spec, not against the plan. If code and spec diverge, fix the code (loop back to Step 4) or update the spec (loop back to Step 2) per the rules in [Spec<->Code Audit](#spec-code-audit).
+
+**Never silently reconcile.** When authority sources disagree and the loop-back rules cannot resolve them, STOP and prompt via AskUserQuestion: "Authority sources disagree -- [describe the conflict]. How would you like to resolve?" with canonical options: "Update spec to match implementation", "Fix code to match spec", "Abort atlas". Never silently pick a side; never just print a warning and continue.
 </HARD-GATE>
 
 <HARD-GATE>
-NO COMMITS DURING EXECUTION. Implementer subagents stage changes (`git add`) but never run `git commit`. The user tests first, then runs `/hermes-commit` to plan and execute atomic commits across the full set of changes. This rule lives in `pandahrms:execute-plan` -- atlas-pipeline-orchestrator just trusts the component skill to enforce it.
+NO COMMITS DURING EXECUTION OR REVIEW. Implementer subagents (Step 4, Step 9 follow-up code-only) and review agents (Step 10 athena + aegis) stage changes (`git add`) but never run `git commit`. Commits happen ONLY at Step 11 via `pandahrms:hermes-commit`.
 
-GIT COMMAND ALLOWLIST. Implementer subagents and atlas-pipeline-orchestrator itself may ONLY run these git verbs without user approval: `add`, `diff`, `status`, `log`, `show`, `ls-files`, `rev-parse`, `blame`. Any other git verb (`commit`, `push`, `checkout`, `restore`, `reset`, `stash`, `rebase`, `merge`, `branch`, `tag`, `clean`, `rm`, `mv`, `cherry-pick`, `revert`) requires explicit user approval via AskUserQuestion before invocation. Read-only inspections of git state are always permitted.
+GIT COMMAND ALLOWLIST. Implementer subagents, atlas itself, and audit/review agents may ONLY run these git verbs without user approval: `add`, `diff`, `status`, `log`, `show`, `ls-files`, `rev-parse`, `blame`. Any other git verb (`commit`, `push`, `checkout`, `restore`, `reset`, `stash`, `rebase`, `merge`, `branch`, `tag`, `clean`, `rm`, `mv`, `cherry-pick`, `revert`) requires explicit user approval via AskUserQuestion before invocation. The exception is Step 11 (`pandahrms:hermes-commit`) which is authorized to run `git commit` as its core operation. Read-only inspections of git state are always permitted.
 </HARD-GATE>
 
 ## Pipeline
@@ -194,133 +207,172 @@ GIT COMMAND ALLOWLIST. Implementer subagents and atlas-pipeline-orchestrator its
 digraph atlas_pipeline {
     "Work request" [shape=doublecircle];
     "Plan file provided?" [shape=diamond];
-    "Invoke pandahrms:design-refinement\n(loads test + spec context,\ncovers spec + test impact)" [shape=box];
-    "Design approved" [shape=diamond];
-    "Write specs?\n(UI-only auto-skip\nor user choice)" [shape=diamond];
-    "Invoke pandahrms:spec-writing" [shape=box];
-    "Run QA review?\n(<3 new scenarios -> skip)" [shape=diamond];
-    "Invoke QA review" [shape=box, style=filled, fillcolor=lightblue];
-    "QA gaps or edge cases?" [shape=diamond];
-    "Invoke pandahrms:plan-writing" [shape=box];
-    "Plan <-> Spec cross-review" [shape=box, style=filled, fillcolor=lightblue];
-    "Plan aligned\n(spec + test refs)?" [shape=diamond];
-    "Invoke pandahrms:execute-plan" [shape=box, style=filled, fillcolor=lightgreen];
+    "Setup (codex + time + branch?)" [shape=box];
+    "Design\n(design-refinement:\ngather -> clarify -> brainstorm -> impact)" [shape=box];
+    "Design approved?" [shape=diamond];
+    "Spec routing\n(ask if missing,\nalways write if exists)" [shape=box];
+    "Plan\n(plan-writing)" [shape=box];
+    "Execute\n(execute-plan)" [shape=box, style=filled, fillcolor=lightgreen];
     "Subagent failed?" [shape=diamond, style=filled, fillcolor=lightyellow];
     "Handle failure" [shape=box, style=filled, fillcolor=orange];
+    "Spec <-> Code audit" [shape=box, style=filled, fillcolor=lightblue];
+    "Audit gaps?" [shape=diamond];
     "Simplify\n(/simplify)" [shape=box, style=filled, fillcolor=lightblue];
-    "Ask user to test" [shape=doublecircle];
+    "Playwright e2e" [shape=box, style=filled, fillcolor=lightblue];
+    "User test pause" [shape=diamond];
+    "Follow-up scope?" [shape=diamond];
+    "Code review\n(athena + aegis)" [shape=box, style=filled, fillcolor=lightblue];
+    "Review pass?" [shape=diamond];
+    "Commit\n(hermes-commit)" [shape=box, style=filled, fillcolor=lightgreen];
+    "Done" [shape=doublecircle];
 
     "Work request" -> "Plan file provided?";
-    "Plan file provided?" -> "Plan <-> Spec cross-review" [label="yes (fast path)"];
-    "Plan file provided?" -> "Invoke pandahrms:design-refinement\n(loads test + spec context,\ncovers spec + test impact)" [label="no"];
-    "Invoke pandahrms:design-refinement\n(loads test + spec context,\ncovers spec + test impact)" -> "Design approved";
-    "Design approved" -> "Invoke pandahrms:design-refinement\n(loads test + spec context,\ncovers spec + test impact)" [label="no, revise"];
-    "Design approved" -> "Write specs?\n(UI-only auto-skip\nor user choice)" [label="yes"];
-    "Write specs?\n(UI-only auto-skip\nor user choice)" -> "Invoke pandahrms:spec-writing" [label="yes"];
-    "Write specs?\n(UI-only auto-skip\nor user choice)" -> "Invoke pandahrms:plan-writing" [label="UI-only or skip"];
-    "Invoke pandahrms:spec-writing" -> "Run QA review?\n(<3 new scenarios -> skip)";
-    "Run QA review?\n(<3 new scenarios -> skip)" -> "Invoke QA review" [label=">=3 new scenarios"];
-    "Run QA review?\n(<3 new scenarios -> skip)" -> "Invoke pandahrms:plan-writing" [label="<3, skip"];
-    "Invoke QA review" -> "QA gaps or edge cases?";
-    "QA gaps or edge cases?" -> "Invoke pandahrms:spec-writing" [label="yes, fix specs"];
-    "QA gaps or edge cases?" -> "Invoke pandahrms:plan-writing" [label="no, reconciled"];
-    "Invoke pandahrms:plan-writing" -> "Plan <-> Spec cross-review";
-    "Plan <-> Spec cross-review" -> "Plan aligned\n(spec + test refs)?";
-    "Plan aligned\n(spec + test refs)?" -> "Invoke pandahrms:plan-writing" [label="no, update plan"];
-    "Plan aligned\n(spec + test refs)?" -> "Invoke pandahrms:spec-writing" [label="no, update spec"];
-    "Plan aligned\n(spec + test refs)?" -> "Invoke pandahrms:execute-plan" [label="yes"];
-    "Invoke pandahrms:execute-plan" -> "Subagent failed?";
+    "Plan file provided?" -> "Setup (codex + time + branch?)";
+    "Setup (codex + time + branch?)" -> "Execute\n(execute-plan)" [label="yes (fast path)"];
+    "Setup (codex + time + branch?)" -> "Design\n(design-refinement:\ngather -> clarify -> brainstorm -> impact)" [label="no"];
+    "Design\n(design-refinement:\ngather -> clarify -> brainstorm -> impact)" -> "Design approved?";
+    "Design approved?" -> "Design\n(design-refinement:\ngather -> clarify -> brainstorm -> impact)" [label="no, revise"];
+    "Design approved?" -> "Spec routing\n(ask if missing,\nalways write if exists)" [label="yes"];
+    "Spec routing\n(ask if missing,\nalways write if exists)" -> "Plan\n(plan-writing)";
+    "Plan\n(plan-writing)" -> "Execute\n(execute-plan)";
+    "Execute\n(execute-plan)" -> "Subagent failed?";
     "Subagent failed?" -> "Handle failure" [label="yes"];
-    "Handle failure" -> "Invoke pandahrms:execute-plan" [label="retry/skip"];
-    "Handle failure" -> "Ask user to test" [label="abort, no changes"];
-    "Handle failure" -> "Simplify\n(/simplify)" [label="abort, partial done"];
-    "Subagent failed?" -> "Simplify\n(/simplify)" [label="no, all passed"];
-    "Simplify\n(/simplify)" -> "Ask user to test";
+    "Handle failure" -> "Execute\n(execute-plan)" [label="retry/skip"];
+    "Handle failure" -> "Done" [label="abort, no changes"];
+    "Subagent failed?" -> "Spec <-> Code audit" [label="no, all passed"];
+    "Spec <-> Code audit" -> "Audit gaps?";
+    "Audit gaps?" -> "Execute\n(execute-plan)" [label="fix code"];
+    "Audit gaps?" -> "Spec routing\n(ask if missing,\nalways write if exists)" [label="update spec"];
+    "Audit gaps?" -> "Simplify\n(/simplify)" [label="aligned"];
+    "Simplify\n(/simplify)" -> "Playwright e2e";
+    "Playwright e2e" -> "User test pause";
+    "User test pause" -> "Follow-up scope?" [label="issues found"];
+    "Follow-up scope?" -> "Design\n(design-refinement:\ngather -> clarify -> brainstorm -> impact)" [label="scope changes"];
+    "Follow-up scope?" -> "Execute\n(execute-plan)" [label="code-only"];
+    "User test pause" -> "Code review\n(athena + aegis)" [label="satisfied"];
+    "User test pause" -> "Done" [label="abort"];
+    "Code review\n(athena + aegis)" -> "Review pass?";
+    "Review pass?" -> "Code review\n(athena + aegis)" [label="fixes needed"];
+    "Review pass?" -> "Commit\n(hermes-commit)" [label="clean"];
+    "Commit\n(hermes-commit)" -> "Done";
 }
 ```
-
-> **Note:** The diagram above shows the core flow. Step 8 (Playwright e2e) inserts between Simplify and Ask user to test when configured -- see Checklist for the authoritative step list.
 
 ## Checklist
 
 You MUST create a task for each of these items and complete them in order. Apply [Time Tracking](#time-tracking) to every step -- record start/end times and pause during user prompts.
 
-0. **Setup** -- run [Codex Availability](#codex-availability) detection and Time Tracking initialization (see [Time Tracking > On atlas-pipeline-orchestrator start](#time-tracking)). This MUST complete before Step 1 begins. Persist results to conversation context until the plan file is created.
+0. **Setup** -- run [Codex Usage](#codex-usage) prompt and Time Tracking initialization (see [Time Tracking > On atlas start](#time-tracking)). This MUST complete before Step 1 begins. Persist results to conversation context until the plan file is created.
 
-   **Branch reminder (one-shot, pre-design).** Before invoking Step 1, check the working project's current branch with `git rev-parse --abbrev-ref HEAD` and emit ONE short reminder via AskUserQuestion: `"You're on <branch>. Atlas does not manage branches -- staying here is fine, or switch now (e.g. via pandahrms:branching) before Step 1 begins. How would you like to proceed?"` with options `"Continue on <branch>"` and `"Pause -- I'll switch branches first"`. On `Continue`, proceed to Step 1 immediately. On `Pause`, stop and wait for the user to switch and then say to resume. Do NOT auto-create or auto-switch branches; do NOT re-prompt later in the pipeline; do NOT emit branch-related Manual Gates in any plan downstream. Branching is fully owned by the user from this moment on.
-1. **Design** -- invoke `pandahrms:design-refinement`. The skill loads test + spec context, asks clarifying questions (one at a time by default; batched into a single AskUserQuestion when 2-4 questions are causally independent -- definition: the user's answer to question A does not change the wording, options, or applicability of question B. If even one pair fails this test, ask sequentially. See the [pandahrms:design-refinement batched-questions rule](../design-refinement/SKILL.md#question-pacing)), proposes 2-3 approaches, presents the design in sections, and saves an uncommitted design doc to `docs/pandahrms/designs/<...>.md` covering spec impact, test impact, and implementation approach. **Immediately after Step 1 approval, in this exact order:** (a) classify the work using [Scope Profile](#scope-profile), (b) announce the result verbatim per the format in Scope Profile > How to set it, (c) persist Scope Profile to conversation context (the plan file write happens at Step 4), (d) THEN proceed to Step 2.
-2. **Write or update specs?** -- two routing decisions in one place:
-   - **UI-only auto-skip**: if the work changes ONLY: CSS/Tailwind classes, color tokens, layout primitives (flex/grid props), animation timings, breakpoint behavior, dark-mode tokens, or static copy in components -- AND does NOT change form validation logic, API calls, conditional rendering driven by data, role/permission checks, route guards, or any handler/effect logic -- announce "Skipping spec-writing -- UI-only change with no business behavior impact" and proceed to step 4 (QA auto-skipped too). If even one non-UI change is present, do NOT auto-skip; route through the AskUserQuestion below.
-   - **Otherwise**: use AskUserQuestion: "Would you like to write/update Gherkin specs before proceeding to the implementation plan?" with options "Yes, write/update specs" and "Skip specs". The user decides; do not pre-empt the question or recommend skipping. If yes, invoke `pandahrms:spec-writing` to write or update specs in pandahrms-spec. **Discussion/decisions are authoritative** -- if the design produced decisions that diverge from existing specs, update the spec to reflect the new decisions BEFORE writing the plan. Never leave an outdated spec to be reconciled later. Present the written/updated specs to the user for review before proceeding.
-3. **QA review (conditional)** -- skip when ANY of these hold:
-   - No specs exist for the area (UI-only, skip-specs path, or spec-less feature)
-   - Fewer than 3 NEW scenarios were added in step 2. Use the grep specified in [QA Review Agent > Skip Condition](#skip-condition) to count -- modifications to existing scenarios do not count.
-   - Scope Profile is `lightweight` (auto-skip regardless of scenario count -- the design pass at this scale is sufficient)
+   **Branch reminder (conditional, pre-design).** Before invoking Step 1, check the working project's current branch with `git rev-parse --abbrev-ref HEAD`. If the branch matches one of `main`, `master`, `development`, `develop`, emit ONE short reminder via AskUserQuestion: `"You're on the <branch> branch -- this is usually protected. Atlas does not manage branches. Switch now (e.g. via pandahrms:branching) before Step 1 begins, or continue if this is intentional. How would you like to proceed?"` with options `"Continue on <branch>"` and `"Pause -- I'll switch branches first"`. On `Continue`, proceed to Step 1 immediately. On `Pause`, stop and wait for the user to switch and then say to resume. On any branch NOT in the protected list, skip the reminder silently and proceed directly to Step 1. Do NOT auto-create or auto-switch branches; do NOT re-prompt later in the pipeline; do NOT emit branch-related Manual Gates in any plan downstream.
 
-   Otherwise dispatch the QA-review sub-agent (two-pass: design<->spec coverage + edge cases) and wait for it to complete. See [QA Review Agent](#qa-review-agent) for dispatch prompt, skip-condition detection, and result handling. If QA surfaces coverage gaps or new scenarios, loop back to `pandahrms:spec-writing` to update the specs, then re-run QA. When QA returns zero blocking findings (or the user chooses to proceed), move on to step 4.
-4. **Create implementation plan** -- invoke `pandahrms:plan-writing`. The skill produces a plan with:
+1. **Design** -- invoke `pandahrms:design-refinement`. The skill runs an internal four-phase flow that maps to user lifecycle Steps 3-6:
+   - (a) **Gather** -- read spec files, test files, and code files relevant to the request.
+   - (b) **Forced repeat-back clarify** -- after context is loaded, repeat the user's intent in B2 English and ask the user to confirm or correct.
+   - (c) **Brainstorm** -- propose 2-3 approaches with trade-offs and let the user pick.
+   - (d) **Impact section** -- list before/after for code paths, DB schema/migrations, and business logic / business rules. The user must understand what changes in business rules. The impact section also folds in coverage thinking: list any spec scenarios the design implies but does not yet write, so spec-writing in Step 2 can pick them up.
+
+   The skill saves an uncommitted design doc to `docs/pandahrms/designs/<...>.md` covering spec impact, test impact, implementation approach, and the impact section above. **Immediately after Step 1 approval, in this exact order:** (a) classify the work using [Scope Profile](#scope-profile), (b) announce the result verbatim per the format in Scope Profile > How to set it, (c) persist Scope Profile to conversation context (the plan file write happens at Step 3), (d) THEN proceed to Step 2.
+
+2. **Spec routing** -- determine whether to write/update specs:
+   - **UI-only auto-skip**: if the work changes ONLY: CSS/Tailwind classes, color tokens, layout primitives (flex/grid props), animation timings, breakpoint behavior, dark-mode tokens, or static copy in components -- AND does NOT change form validation logic, API calls, conditional rendering driven by data, role/permission checks, route guards, or any handler/effect logic -- announce `"Skipping spec-writing -- UI-only change with no business behavior impact"` and proceed to Step 3.
+   - **Otherwise**: detect whether a relevant `.feature` file exists for the feature area in `pandahrms-spec` (use the file paths surfaced by design-refinement's gather phase in Step 1). Two sub-cases:
+     - **Spec exists** -- always invoke `pandahrms:spec-writing` to update it. Do NOT ask the user; the design discussion is authoritative and the spec must reflect it. Announce: `"Updating existing spec at <path> with design decisions."`
+     - **Spec missing** -- use AskUserQuestion: `"No spec exists for this feature. Would you like to write one before proceeding to the plan?"` with options `"Yes, write a spec"` and `"Skip specs"`. If yes, invoke `pandahrms:spec-writing`; if no, proceed to Step 3 with no spec.
+   - When specs are written or updated, present them to the user for review before proceeding to Step 3.
+
+3. **Plan** -- invoke `pandahrms:plan-writing`. The skill produces a plan with:
    - **Spec ref** on every business-behavior task (when specs exist)
    - **Test ref** on every production-code task with Red-before-Green ordering
-   - **Depends on:** marker on every task (atlas-pipeline-orchestrator reads this in step 6 to parallel-dispatch)
+   - **Depends on:** marker on every task (atlas reads this in Step 4 to parallel-dispatch)
    - **Risk:** tag on tasks that need second-stage review (auth, multi-tenant, billing, schema, PII)
-   - **No commit steps** -- plans stage changes only; /hermes-commit owns commits
-5. **Plan <-> Spec cross-review** -- after the plan is written (or at Fast Path entry), verify three directions: (a) every plan task references a real spec scenario, (b) every in-scope spec scenario has at least one plan task, and (c) every plan task that touches production code names a test reference with Red-before-Green ordering. The (c) check is the only test-ref validator on Fast Path -- do not skip it. If gaps exist, fix them before execution. See [Plan-Spec Cross-Review](#plan-spec-cross-review) for skip conditions and resolution paths.
-6. **Execute plan** -- invoke `pandahrms:execute-plan`. The skill reads the plan, resolves the codex execution mode (asks the user once if `codex_available` is true and the mode isn't already set in the progress section), groups tasks by `Depends on:`, parallel-dispatches independent batches (cap 5 per batch, Agent + codex counted together), runs single-stage review by default, and opts into second-stage spec-compliance review only for tasks tagged `**Risk:** high` (reviewer routes through codex when available). Implementer subagents stage changes but never commit. Time tracking records the step as a whole (wall-clock from first dispatch to last return). If a subagent fails, follow [Subagent Failure Handling](#subagent-failure-handling).
+   - **No commit steps** -- plans stage changes only; Step 11 owns commits
 
-   **Step 6 completion is reached when one of:** (a) all dispatched tasks return success or skipped status, OR (b) the user chooses "Abort atlas" in the failure-handling flow. Time tracking ends at that moment regardless of outcome.
+   At plan creation, atlas appends the `## Atlas Progress` section (see [On plan creation](#on-plan-creation-step-3)) with all 12 steps initialised.
 
-   **Plan-file mutations allowed during Step 6:** (i) checking off completed tasks (`[ ]` -> `[x]`), (ii) updating the Atlas Progress table, (iii) appending the Step 6 Task Timing block, (iv) annotating individual failed task entries with their final status (`failed-skipped`, `failed-aborted`, `succeeded-after-retry-N`). Do NOT modify task definitions, dependencies, risk tags, spec refs, or test refs during execution. Any task-definition change requires looping back to `pandahrms:plan-writing` first.
+4. **Execute plan** -- invoke `pandahrms:execute-plan`. The skill reads the plan, reads the `Codex execution mode:` line from the Atlas Progress section (atlas pre-set this at plan creation), groups tasks by `Depends on:`, parallel-dispatches independent batches (cap 5 per batch, Agent + codex counted together), runs single-stage review by default, and opts into second-stage spec-compliance review only for tasks tagged `**Risk:** high`. Implementer subagents stage changes but never commit. Time tracking records the step as a whole (wall-clock from first dispatch to last return). If a subagent fails, follow [Subagent Failure Handling](#subagent-failure-handling).
 
-7. **Simplify (conditional)** -- once Step 6 has finished, decide whether to run `simplify` using these conditions in this exact precedence order (first match wins):
-   - **Auto-skip** when Step 6 was aborted with no completed tasks. Announce: `"Skipping Simplify -- Step 6 aborted with no completed tasks."`
-   - **Auto-skip** when Scope Profile is `lightweight` AND no implementer returned `Status: DONE_WITH_CONCERNS`. Announce: `"Skipping Simplify -- lightweight scope with no concerns flagged."`
-   - **Run with severity filter** when Scope Profile is `lightweight` AND at least one task returned `DONE_WITH_CONCERNS`. Tell the simplify subagents to report only severity >= medium findings; ignore cosmetic-only suggestions (comment trims, helper extractions of <10 lines, file-level reorderings).
-   - **Run normally** when Scope Profile is `standard` or `heavyweight`, regardless of `DONE_WITH_CONCERNS` status.
+   **Step 4 completion is reached when one of:** (a) all dispatched tasks return success or skipped status, OR (b) the user chooses "Abort atlas" in the failure-handling flow. Time tracking ends at that moment regardless of outcome.
 
-   All resulting changes remain uncommitted -- the user still tests in Step 9 before /hermes-commit.
-8. **Playwright e2e (conditional)** -- if Playwright is configured for the working project, run an e2e pass on the changes from this session. See [Playwright E2E Step](#playwright-e2e-step) for the detection and execution rules. Skip silently when Playwright isn't installed.
-9. **Ask user to test** -- present the Development Summary. If the plan file's `## Atlas Progress` section has an `### Acknowledged Gaps` block (gaps the user chose to "Proceed anyway -- mark as known gap" during Step 5), surface each gap with: "**Acknowledged gaps to verify manually:** [gap list]." Then end with: "Please test your changes, then run /hermes-commit when ready."
+   **Plan-file mutations allowed during Step 4:** (i) checking off completed tasks (`[ ]` -> `[x]`), (ii) updating the Atlas Progress table, (iii) appending the Step 4 Task Timing block, (iv) annotating individual failed task entries with their final status (`failed-skipped`, `failed-aborted`, `succeeded-after-retry-N`). Do NOT modify task definitions, dependencies, risk tags, spec refs, or test refs during execution. Any task-definition change requires looping back to `pandahrms:plan-writing` first.
 
-   **atlas-pipeline-orchestrator terminates the moment the closing line ('Please test your changes, then run /hermes-commit when ready.') is appended to the response.** Before that line is sent, atlas-pipeline-orchestrator remains active and treats any user message as input to the in-progress step. After the closing line is sent, atlas-pipeline-orchestrator is fully terminated.
+5. **Spec <-> Code audit** -- after Step 4 completes successfully, audit the implementation against the spec. See [Spec<->Code Audit](#spec-code-audit) for full mechanics, skip conditions, and resolution paths. Auto-loops back to Step 4 (fix code) or Step 2 (update spec) on gaps; only prompts the user on irreconcilable conflicts.
 
-   After termination, do NOT: invoke `/hermes-commit`, offer to `/schedule` any agent, propose follow-up work, summarize what was done a second time, suggest next steps, comment on the diff, or continue producing analysis. The next user message restarts evaluation from the system prompt; treat it as unrelated unless it begins with `/atlas-pipeline-orchestrator`, `/atlas-pipeline-orchestrator <plan-path>`, or `/atlas-pipeline-orchestrator --resume`.
+6. **Simplify (conditional)** -- once Step 5 has passed, decide whether to run `simplify` using these conditions in this exact precedence order (first match wins):
+   - **Auto-skip** when Step 4 was aborted with no completed tasks. Announce: `"Skipping Simplify -- Step 4 aborted with no completed tasks."`
+   - **Auto-skip** when Scope Profile is `small` AND no implementer returned `Status: DONE_WITH_CONCERNS`. Announce: `"Skipping Simplify -- small scope with no concerns flagged."`
+   - **Run with severity filter** when Scope Profile is `small` AND at least one task returned `DONE_WITH_CONCERNS`. Tell the simplify subagents to report only severity >= medium findings; ignore cosmetic-only suggestions (comment trims, helper extractions of <10 lines, file-level reorderings).
+   - **Run normally** when Scope Profile is `normal`, regardless of `DONE_WITH_CONCERNS` status.
+
+   All resulting changes remain uncommitted -- commits happen at Step 11.
+
+7. **Playwright e2e (conditional)** -- if Playwright is configured for the working project, run an e2e pass on the changes from this session. See [Playwright E2E Step](#playwright-e2e-step) for the detection and execution rules. Skip silently when Playwright isn't installed.
+
+8. **User test pause** -- present the Development Summary. If the plan file's `## Atlas Progress` section has an `### Acknowledged Gaps` block, surface each gap with: `"**Acknowledged gaps to verify manually:** [gap list]."` Then ask via AskUserQuestion: `"Please test your changes locally. What did you find?"` with canonical options: `"Looks good -- proceed to code review"`, `"Found issues -- I'll describe them"`, `"Abort -- discard this run"`.
+
+   - On `"Looks good -- proceed to code review"`: proceed directly to Step 10 (Step 9 is bypassed).
+   - On `"Found issues -- I'll describe them"`: wait for the user's next message describing the issue, then proceed to Step 9.
+   - On `"Abort -- discard this run"`: announce `"Atlas aborted at user-test stage. Staged changes remain uncommitted. Use git restore --staged to discard or hermes-commit later to keep them."` and terminate.
+
+9. **Follow-up loop** -- the user has described issues. Classify the scope of the change:
+   - **Scope change** (the user's report implies a new feature, removed feature, changed business rule, or different approach) -- loop back to Step 1. Before re-invoking design-refinement, run a context-refresh: re-read the design doc and any spec/test/code files that may have changed since execute. If files have changed since the original Step 1 gather, re-run gather; otherwise jump straight to brainstorm. Announce: `"Looping back to design -- scope change detected: [one-line summary]."`
+   - **Code-only change** (the user's report is a bug fix, typo, behavior mismatch with existing spec, or styling tweak with no new business rule) -- loop back to Step 4. Generate a minimal fix-plan (1-3 tasks) and dispatch via pandahrms:execute-plan. Announce: `"Looping back to execute -- code-only fix: [one-line summary]."`
+
+   Classification is decided by atlas based on the user's described issue. If unsure, ask via AskUserQuestion: `"Is this a scope change or a code-only fix?"` with canonical options `"Scope change (re-design)"`, `"Code-only fix"`, `"Abort atlas"`. After the loop-back completes, atlas re-enters the audit -> simplify -> e2e -> user-test cycle. There is no cap on follow-up iterations; the user terminates the loop by choosing `"Looks good -- proceed to code review"` at Step 8.
+
+10. **Code review (athena + aegis)** -- run code review explicitly before commit:
+    - **athena-code-review** -- invoke `pandahrms:athena-code-review`. The skill reviews changed files against the standard checklist (TDD compliance, SOLID, quality, format/lint/tests). It can fix issues directly (no commits) and runs `/simplify` on its own findings.
+    - **aegis-security-review** -- invoke `pandahrms:aegis-security-review` if EITHER:
+      - Scope Profile is `normal`, OR
+      - The design touched auth, multi-tenant, billing, payment, PII, validation, permission, or data-state code.
+
+      Otherwise auto-skip with announcement: `"Skipping Aegis -- small scope with no security-sensitive touches."`
+
+    Both reviewers stage their fixes but do not commit. If either reviewer reports unresolved findings the user must decide on, prompt via AskUserQuestion with the findings and canonical options: `"Apply the suggested fixes and re-run review"`, `"Accept findings as known limitations"`, `"Abort atlas"`. On `"Apply the suggested fixes and re-run review"`, re-dispatch the relevant reviewer; on accept, persist the findings to the plan's `### Acknowledged Gaps` block and proceed to Step 11. On abort, terminate with announcement: `"Atlas aborted at code-review stage. Staged changes remain uncommitted."`
+
+11. **Commit** -- invoke `pandahrms:hermes-commit`. The skill verifies a clean working tree (0 test failures, 0 lint errors, 0 format errors), plans atomic commits across the staged changes, and executes them. hermes-commit only commits; review already ran at Step 10. Time tracking ends when hermes-commit returns.
+
+    **Atlas terminates the moment hermes-commit reports successful commits.** Emit the final summary line: `"Atlas complete -- N commit(s) created on branch <branch>. Push when ready."` After this line is sent, atlas is fully terminated.
+
+    After termination, do NOT: re-invoke any skill, offer to `/schedule` any agent, propose follow-up work, summarize what was done a second time, suggest next steps, comment on the diff, or continue producing analysis. The next user message restarts evaluation from the system prompt; treat it as unrelated unless it begins with `/atlas-pipeline-orchestrator`, `/atlas-pipeline-orchestrator <plan-path>`, or `/atlas-pipeline-orchestrator --resume`.
 
 ## Time Tracking
 
-Track **active work time** across the full atlas-pipeline-orchestrator run -- time spent by Claude doing work, excluding time waiting for user input or blocked on external factors. Display a summary when execution completes.
+Track **active work time** across the full atlas run -- time spent by Claude doing work, excluding time waiting for user input or blocked on external factors. Display a summary at Step 8 (user-test handoff) and update it after Step 11 (commit).
 
 ### How to track
 
 1. **On step start** -- record the current time (use `date +%s` via Bash)
 2. **Before any user prompt** -- record a pause timestamp. This includes:
-   - AskUserQuestion calls (design approval, "write specs?", "add QA findings to specs?", "how to resolve Plan <-> Spec gaps?", subagent-failure prompts)
+   - AskUserQuestion calls (design approval, spec routing decisions, audit conflict prompts, user-test response, follow-up classification, code-review findings prompts, subagent-failure prompts)
    - Any blocker requiring user action (e.g., environment issue, missing access)
    - Presenting results and waiting for user to respond
 3. **After user responds** -- record a resume timestamp. Add the paused duration to the step's excluded time.
 4. **On step completion** -- calculate: `duration = (end - start) - total_excluded_time`. Display: `"Step N completed in Xm Ys (active work)"`
-5. **On final step completion** -- display a summary:
+5. **At Step 8 (user-test handoff)** -- display a summary:
 
 ```
-Development Summary [Scope: lightweight] (active work time, excludes user-wait)
+Development Summary [Scope: small] (active work time, excludes user-wait)
 ===========================
 Design                       --  12m 34s
-Write specs                  --   8m 21s
-QA review                    --     skipped (lightweight)
-Create implementation plan   --  15m 02s
-Plan <-> Spec cross-review   --   1m 30s (pragmatic, inline)
-Execute plan                 --  18m 14s
+Spec routing                 --   8m 21s
+Plan                         --  15m 02s
+Execute                      --  18m 14s
   Dispatch-prep              --     0m 21s (1.9%)
   Subagent-active            --  17m 53s (98.1%)
     Test runtime sum         --   3m 12s
     Risk:high tasks          --   0 of 7
     Idle-wait observed       --     1m 19s (Batch 2: T3 waited on T2)
-Simplify                     --     skipped (lightweight, no concerns)
+Spec <-> Code audit          --   1m 30s
+Simplify                     --     skipped (small, no concerns)
 Playwright e2e               --   2m 06s
 ===========================
-Grand total (active)         --     58m 47s
-Total wall-clock time        --  1h 32m 11s
-User-wait time               --     33m 24s
+Through user-test (active)   --     58m 47s
+Total wall-clock so far      --  1h 32m 11s
+User-wait time so far        --     33m 24s
 ```
+
+6. **At Step 11 termination** -- append the post-test segment (Code review, Commit) to the summary and report the grand total.
 
 ### What counts as paused time
 
@@ -328,23 +380,24 @@ User-wait time               --     33m 24s
 |------------------------------|---------------------------|
 | Waiting for user to answer AskUserQuestion | Claude processing after user responds |
 | User reviewing a design doc or spec | Designing, writing specs, planning |
-| User fixing an environment issue | Subagent execution |
-| Blocked on external dependency | Reading files, running commands |
+| User testing the staged changes (between Step 8 and the user's reply) | Subagent execution |
+| User fixing an environment issue | Reading files, running commands |
+| Blocked on external dependency | -- |
 
 ### Implementation
 
-Use the plan file as the single source of truth for both progress tracking and timing. Before the plan file exists (steps 1-3), hold timestamps in conversation context. Once the plan is created (step 4), persist everything into the plan file.
+Use the plan file as the single source of truth for both progress tracking and timing. Before the plan file exists (Steps 1-2), hold timestamps in conversation context. Once the plan is created (Step 3), persist everything into the plan file.
 
 Use the Read and Write tools for all plan file I/O. Only use Bash for `date +%s`.
 
-**On atlas-pipeline-orchestrator start:**
+**On atlas start:**
 
 1. Run `date +%s` in Bash to get the epoch
-2. Hold the atlas-pipeline-orchestrator start time and step timestamps in conversation context until the plan file is created
+2. Hold the atlas start time and step timestamps in conversation context until the plan file is created
 
-**On plan creation (step 4):**
+### On plan creation (Step 3)
 
-Append a `## Atlas Progress` section to the plan file. Backfill timing for whichever of steps 1-3 actually ran in this session. For Fast Path entries (steps 1-3 skipped), mark those rows as `skipped (Fast Path)` with no duration. For lightweight runs that auto-skipped Step 3, mark it as `skipped (lightweight)`. Use the canonical skip-reason strings in the [Skipped duration format](#skipped-duration-format) section below.
+Append a `## Atlas Progress` section to the plan file. Backfill timing for whichever of Steps 1-2 actually ran in this session. For Fast Path entries (Steps 1-3 skipped), mark those rows as `skipped (Fast Path)` with no duration. Use the canonical skip-reason strings in the [Skipped duration format](#skipped-duration-format) section below.
 
 **Compose the full block first (step table + all metadata lines + empty Acknowledged Gaps block) and write it in a SINGLE Write tool call.** Do not split into multiple writes -- a single write avoids interleaving with concurrent reads and keeps the Atlas Progress section atomic.
 
@@ -354,30 +407,32 @@ Append a `## Atlas Progress` section to the plan file. Backfill timing for which
 | Step | Status | Duration |
 |------|--------|----------|
 | 1. Design | done | 12m 34s |
-| 2. Write specs | done | 8m 21s |
-| 3. QA review | skipped | skipped (lightweight) |
-| 4. Create implementation plan | done | 15m 02s |
-| 5. Plan <-> Spec cross-review | pending | -- |
-| 6. Execute plan | pending | -- |
-| 7. Simplify | pending | -- |
-| 8. Playwright e2e | pending | -- |
-| 9. Ask user to test | pending | -- |
+| 2. Spec routing | done | 8m 21s |
+| 3. Plan | done | 15m 02s |
+| 4. Execute | pending | -- |
+| 5. Spec <-> Code audit | pending | -- |
+| 6. Simplify | pending | -- |
+| 7. Playwright e2e | pending | -- |
+| 8. User test pause | pending | -- |
+| 9. Follow-up loop | pending | -- |
+| 10. Code review | pending | -- |
+| 11. Commit | pending | -- |
 
 Atlas started: 1718000000
-Codex available: true
+Codex enabled: true
 Codex execution mode: full
 Playwright e2e: auto-detect
-Scope Profile: lightweight
+Scope Profile: small
 
 ### Acknowledged Gaps
 
-(Populated only when the user chose "Proceed anyway" during Step 5. One bullet per gap. Step 9 surfaces this list to the user.)
+(Populated only when the user chose "Accept findings as known limitations" during Step 10, or "Proceed anyway -- mark as known gap" during Step 5. One bullet per gap. Step 8 surfaces this list to the user.)
 ```
 
 **On each step completion:**
 
 1. Run `date +%s` in Bash to get the timestamp
-2. Use the **Read** tool to load the plan file. **If the plan file is missing or unreadable, STOP and respond verbatim: "Plan file '<path>' is missing or unreadable. atlas-pipeline-orchestrator cannot continue without state. Restore the file or abort." Do NOT auto-recreate the plan file.**
+2. Use the **Read** tool to load the plan file. **If the plan file is missing or unreadable, STOP and respond verbatim: "Plan file '<path>' is missing or unreadable. atlas cannot continue without state. Restore the file or abort." Do NOT auto-recreate the plan file.**
 3. Update the step's row in the Atlas Progress table (status and duration)
 4. Use the **Write** tool to save the plan file back
 
@@ -385,20 +440,21 @@ Scope Profile: lightweight
 
 For skipped steps, the Duration column shows exactly one of these canonical strings (substitute the bracketed value where indicated):
 
-- `skipped (lightweight)` -- Scope Profile is lightweight and the step's lightweight-skip rule applied
+- `skipped (small)` -- Scope Profile is small and the step's small-skip rule applied
 - `skipped (no specs)` -- no specs exist or were created in this session
-- `skipped (<N new scenarios)` -- replace `<N` with the actual count, e.g. `skipped (2 new scenarios)`
-- `skipped (BE-only)` -- session changes have no FE-visible surface (Step 8 only)
-- `skipped (Playwright not configured)` -- Step 8 only
+- `skipped (BE-only)` -- session changes have no FE-visible surface (Step 7 only)
+- `skipped (Playwright not configured)` -- Step 7 only
 - `skipped (--skip-e2e)` -- user requested e2e skip via flag or progress section
 - `skipped (Fast Path)` -- step bypassed because /atlas-pipeline-orchestrator was invoked with a plan-file path
-- `skipped (aborted - nothing to test)` -- Step 6 ended with no completed tasks
+- `skipped (aborted - nothing to test)` -- Step 4 ended with no completed tasks
+- `skipped (UI-only)` -- Step 2 only, when the UI-only auto-skip applied
+- `skipped (bypassed - user satisfied)` -- Step 9 only, when user picked "Looks good" at Step 8
 
 Do not paraphrase these strings. If a new skip reason appears, add it to this list before using it.
 
-**On task completion (step 6):**
+**On task completion (Step 4):**
 
-When a subagent completes a plan task, update the task's checkbox in the plan file from `- [ ]` to `- [x]`, then update the Atlas Progress table for step 6's running duration.
+When a subagent completes a plan task, update the task's checkbox in the plan file from `- [ ]` to `- [x]`, then update the Atlas Progress table for Step 4's running duration.
 
 Active duration = `(end - start) - sum(resume - pause for each pause)`
 
@@ -406,16 +462,16 @@ Format durations by computing in your reasoning: `Xm YYs`. Skipped steps use the
 
 ### Execution step timing
 
-Step 6 (execute plan) is tracked as a single step at the orchestrator level (wall-clock from first subagent dispatch to last subagent completion), AND with per-task / per-batch breakdown for benchmarking.
+Step 4 (execute plan) is tracked as a single step at the orchestrator level (wall-clock from first subagent dispatch to last subagent completion), AND with per-task / per-batch breakdown for benchmarking.
 
-**Roll-up duration** -- the headline number shown in the Development Summary header for Step 6 is wall-clock from first dispatch to last return.
+**Roll-up duration** -- the headline number shown in the Development Summary header for Step 4 is wall-clock from first dispatch to last return.
 
-**Breakdown** -- pandahrms:execute-plan populates a `### Step 6 Task Timing` block beneath the Atlas Progress table as each batch completes. See [pandahrms:execute-plan Step 6 Timing Breakdown](../execute-plan/SKILL.md#step-6-timing-breakdown) for the exact schema (per-task: dispatcher, type, wall-clock, test runtime, risk, status; per-batch: prep time, wall-clock, idle-wait notes).
+**Breakdown** -- pandahrms:execute-plan populates a `### Step 4 Task Timing` block beneath the Atlas Progress table as each batch completes. See [pandahrms:execute-plan Step 6 Timing Breakdown](../execute-plan/SKILL.md#step-6-timing-breakdown) for the exact schema (per-task: dispatcher, type, wall-clock, test runtime, risk, status; per-batch: prep time, wall-clock, idle-wait notes).
 
-**Surfacing in the Development Summary** -- after the Step 6 row, append a sub-block summarizing the breakdown so the user gets benchmarking data without opening the plan file:
+**Surfacing in the Development Summary** -- after the Execute row, append a sub-block summarizing the breakdown so the user gets benchmarking data without opening the plan file. (Note: the execute-plan skill uses its own internal "Step 6" naming for the breakdown block name; atlas treats that as the breakdown of atlas Step 4.)
 
 ```
-Execute plan                 --  18m 14s
+Execute                      --  18m 14s
   Dispatch-prep              --     0m 21s (1.9%)
   Subagent-active            --  17m 53s (98.1%)
     Test runtime sum         --   3m 12s
@@ -433,215 +489,78 @@ When a subagent returns `Status: BLOCKED`, `Status: NEEDS_CONTEXT`, or any non-s
 2. **Check the retry counter** -- a single task may be re-dispatched at MOST 3 times across all classifications, counted in conversation context per task name. If the failing task has already been re-dispatched 3 times, do NOT offer the "Re-dispatch with added context" or "Re-dispatch with stronger model" options. Only offer "Send back to plan/spec", "Skip and continue", and "Abort atlas".
 3. **Classify the failure** -- before offering retry, identify the failure mode. This avoids blind retries that waste time:
    - **Missing context** (typically `Status: NEEDS_CONTEXT`) -- the implementer prompt was missing a file, type, scenario, or env var the task requires. Resolution: re-dispatch with the missing context added.
-   - **Insufficient reasoning** -- the subagent attempted the task but produced incorrect or incomplete code (e.g. failed verification it should have passed). Resolution: re-dispatch via `codex:codex-rescue` if `codex_available` is true. If the current codex execution mode is "none", switch to "partial-parallel" for the retry. If codex is unavailable, re-dispatch via the regular Agent tool with explicit user-supplied guidance.
+   - **Insufficient reasoning** -- the subagent attempted the task but produced incorrect or incomplete code (e.g. failed verification it should have passed). Resolution: re-dispatch via `codex:codex-rescue` if `codex_enabled` is true. If `codex_enabled` is false, re-dispatch via the regular Agent tool with explicit user-supplied guidance.
    - **Task too large** -- the subagent partially completed work but the scope exceeds what fits in one dispatch. Resolution: return to `pandahrms:plan-writing` to split the task; do not retry as-is.
    - **Plan or spec error** (typically `Status: BLOCKED` with conflict details) -- the plan and spec disagree, the spec is internally contradictory, or the plan references something that doesn't exist. Resolution: escalate to the user; loop back to `pandahrms:spec-writing` or `pandahrms:plan-writing` as appropriate.
 4. **Present the error and classification** -- show the failing subagent's name, task description, returned status, error output, your classification, and the current retry count for that task.
 5. **Ask the user** via AskUserQuestion: "Subagent '[task name]' returned [status] -- classified as [missing context / insufficient reasoning / task too large / plan or spec error]. How would you like to proceed?" with options matched to the classification (omit retry options if the 3-retry cap has been hit):
-   - **"Re-dispatch with added context"** (missing context) -- you provide the missing piece, atlas-pipeline-orchestrator re-dispatches the same task and increments the retry counter.
-   - **"Re-dispatch with stronger model"** (insufficient reasoning) -- atlas-pipeline-orchestrator re-dispatches via codex per the resolution rule above and increments the retry counter.
-   - **"Send back to plan/spec"** (task too large or plan/spec error) -- atlas-pipeline-orchestrator pauses execute, loops back to the relevant skill, then resumes; this resets the retry counter for that task.
+   - **"Re-dispatch with added context"** (missing context) -- you provide the missing piece, atlas re-dispatches the same task and increments the retry counter.
+   - **"Re-dispatch with stronger model"** (insufficient reasoning) -- atlas re-dispatches via codex per the resolution rule above and increments the retry counter.
+   - **"Send back to plan/spec"** (task too large or plan/spec error) -- atlas pauses execute, loops back to the relevant skill, then resumes; this resets the retry counter for that task.
    - **"Skip and continue"** -- note the failed task in the conversation and proceed with remaining tasks.
    - **"Abort atlas"** -- stop execution, display the Development Summary with the Execute step marked failed, and end with: "Atlas aborted. Completed tasks remain uncommitted. Run /hermes-commit when ready or discard with git restore."
 
 When the implementer returns `Status: DONE_WITH_CONCERNS`, do NOT silently mark the task complete. Surface the concerns via AskUserQuestion using these canonical option labels: "Accept (mark complete)", "Re-dispatch with guidance", "Escalate to design/plan".
 
-Failures do not alter the step-level Development Summary other than annotating the Execute step's outcome (e.g. `Execute plan -- 18m 14s (1 task failed, skipped)`).
+Failures do not alter the step-level Development Summary other than annotating the Execute step's outcome (e.g. `Execute -- 18m 14s (1 task failed, skipped)`).
 
-## QA Review Agent
+## Spec <-> Code Audit
 
-In step 3, after specs are written/updated, dispatch a sub-agent to audit the specs in two passes in a single run. The agent runs in the foreground -- wait for it to return and reconcile findings before moving on to plan-writing (step 4).
-
-1. **Design<->Spec structural coverage** -- does every design requirement have a corresponding spec scenario? (replaces the standalone spec-review step)
-2. **Edge-case hunt** -- what did both the design and spec miss? Unhappy paths, boundary conditions, implicit requirements.
+Step 5 runs an audit that compares the spec against the freshly-implemented code. The audit catches gaps that only show up once code exists -- incomplete handlers, missed conditional branches, dropped validation rules.
 
 ### Skip Condition
 
-Skip this step when EITHER condition holds:
-
-**A. No specs to review** -- detect by:
+Skip only when there are NO specs in the affected area. Detect this by:
 - No `.feature` files were created or updated in this session, AND
 - No in-scope `.feature` files exist for the feature area in `pandahrms-spec`
 
-Covers UI-only work, "skip specs" path, and any invocation against a spec-less feature.
+This covers UI-only work and the "skip specs" path. Announce: `"Skipping Spec <-> Code audit -- no specs for this feature."`
 
-**B. Light spec changes** -- specs were edited but fewer than 3 NEW scenarios were added in step 2. Modifications to existing scenarios DO NOT count. Step 1's design already covered impact for small edits, so a fresh edge-case hunt isn't worth the cost.
+### Sample mode (small scope)
 
-To count new scenarios, run `git diff` on the spec files updated in this session and count `^+\s*Scenario:` and `^+\s*Scenario Outline:` lines (added scenario headers only). If the count is < 3, skip.
+When [Scope Profile](#scope-profile) is `small`, run the audit in sample mode:
 
-Announce the skip reason -- e.g. `"Skipping QA review -- no specs to review."` or `"Skipping QA review -- only N new scenario(s) added (threshold: 3)."`
+- Read every in-scope `.feature` file.
+- Sample up to 5 scenarios per file (the first 3 + any 2 tagged `validation`, `permission`, or `boundary`).
+- For each sampled scenario, locate the code path that should implement it and verify the implementation covers the Given/When/Then.
 
-### Agent Dispatch
+Announce when sample mode is in effect: `"Spec <-> Code audit running in sample mode (small scope) -- sampling up to 5 scenarios per file."`
 
-QA review is an audit task -- ALWAYS dispatch via the local `Agent` tool, regardless of `codex_available`. Reviews stay on Claude in this pipeline (see [Codex Availability > Reviews stay on Claude](#codex-availability)). Do NOT add a `READ-ONLY REVIEW` prefix -- that prefix existed for codex review dispatches, and atlas no longer routes reviews to codex.
+For `normal` profile, run the full sweep (every scenario in every in-scope file).
 
-Replace the placeholders:
-- `{design_doc_path}` -- path to the approved design document
-- `{spec_file_paths}` -- paths to all written spec files
-- `{scope_notes}` -- brief "in scope / out of scope" summary extracted from the design doc, so the agent doesn't flag edge cases for deferred features
+### How to audit
 
-```
-prompt: |
-  You are a QA reviewer. Your job has TWO parts, completed in one pass:
-
-  **Part A: Design<->Spec structural coverage** -- verify every design
-  requirement has a corresponding Gherkin scenario.
-
-  **Part B: Edge-case hunt** -- identify missed edge cases, unhappy paths,
-  boundary conditions, and implicit requirements.
-
-  ## Inputs
-
-  Design document: {design_doc_path}
-  Spec files: {spec_file_paths}
-  Scope: {scope_notes}
-
-  Read the design document and all spec files. The scope section defines
-  what is in-scope and out-of-scope for this iteration. Only flag edge
-  cases for in-scope functionality -- do not report findings for features
-  explicitly marked as deferred or out-of-scope.
-
-  ## Part A: Structural coverage
-
-  For every functional requirement in the design doc, check whether at
-  least one spec scenario covers it. Report any design requirement that
-  has NO spec scenario as a "coverage gap".
-
-  ## Part B: What to Look For
-
-  1. **Unhappy paths** -- What happens when the user provides invalid input,
-     cancels mid-flow, loses connectivity, or hits a timeout?
-  2. **Boundary conditions** -- Empty lists, maximum lengths, zero values,
-     exactly-at-limit values, off-by-one scenarios.
-  3. **Concurrent/conflicting actions** -- Two users editing the same record,
-     duplicate submissions, race conditions.
-  4. **Permission edge cases** -- User's role changes mid-session, permission
-     revoked after page load, cross-tenant access attempts.
-  5. **Data state edge cases** -- Soft-deleted records, archived entities,
-     null/missing optional fields, migrated legacy data.
-  6. **Implicit requirements** -- Behavior the design assumes but never states
-     (e.g., audit logging, notification triggers, cascade effects).
-
-  ## Output Format
-
-  Return a structured report:
-
-  ### Coverage Gaps (Part A)
-
-  For each design requirement without spec coverage:
-  - **ID**: COV-1, COV-2, etc.
-  - **Design requirement**: Quote or summary from the design doc
-  - **Suggested scenario**: A Gherkin scenario outline that would cover it
-
-  ### Edge Cases Found (Part B)
-
-  For each finding:
-  - **ID**: QA-1, QA-2, etc.
-  - **Category**: (unhappy path | boundary | concurrency | permission | data state | implicit requirement)
-  - **Description**: What the edge case is
-  - **Suggested scenario**: A Gherkin scenario outline (Given/When/Then) that would cover it
-  - **Severity**: (high | medium | low) -- high means likely to cause a bug in production
-
-  ### Summary
-
-  - Coverage gaps: [count]
-  - Total edge-case findings: [count]
-  - High severity: [count]
-  - Medium severity: [count]
-  - Low severity: [count]
-
-  If you find zero edge cases, state that explicitly -- do not invent findings.
-  Only report findings whose Gherkin scenario fits inside the in-scope list
-  above. If a finding requires functionality marked out-of-scope or deferred
-  to a later iteration, omit it.
-
-description: "QA review specs for edge cases"
-```
-
-### Handling Results
-
-After the agent returns:
-
-- **Zero findings (both parts)** -- announce "QA review complete -- coverage is complete and no additional edge cases found." Proceed to step 4.
-- **Findings returned** -- present the agent's report to the user, then **automatically loop back to `pandahrms:spec-writing`** to incorporate coverage gaps AND high/medium/low severity edge-case findings as new scenarios. Do NOT ask the user whether to add them -- discrepancies found in spec review always go into the spec. Announce "QA review found [coverage_count] coverage gaps and [edge_count] edge cases ([high_count] high severity) -- adding to specs." Then re-run QA review on the updated specs. Low-severity findings are added by default; defer them ONLY if the user explicitly requests deferral during the spec-writing step (do not proactively offer deferral).
-
-## Plan-Spec Cross-Review
-
-After `pandahrms:plan-writing` produces the plan file (or when entering Fast Path with an externally-authored plan), verify the plan's integrity against both specs and tests before executing anything.
-
-This step is the only validator for fast-path plans -- since Fast Path skips Step 4's plan-requirements check, Step 5 must cover those guarantees too.
-
-### Skip Condition
-
-Skip only when there are NO specs AND NO existing tests in the affected area. Detect this by:
-- The plan file contains zero spec references, AND
-- No `.feature` files exist for the feature area in `pandahrms-spec`, AND
-- No test files exist in the affected codebase
-
-This covers UI-only work with no tests, "skip specs" path with a spec-less and test-less area, and fast-path invocations against truly content-less features.
-
-Announce the applicable skip reason -- e.g. `"Skipping Plan <-> Spec cross-review -- no specs or tests for this feature."`
-
-### Pragmatic Mode (lightweight scope)
-
-When [Scope Profile](#scope-profile) is `lightweight`, run cross-review in pragmatic mode:
-
-- **Plan -> Test direction**: only flag tasks that touch business logic (handlers, validators, services, calculation/decision code) without a Test ref. Wiring tasks (entity property additions, EF mapping additions, DTO field additions, FE state additions, generated-type regen, render-only component glue) do NOT need a Test ref flag in pragmatic mode -- their behavior is already covered by the integration tests of the consumer they wire into.
-- **Plan -> Spec direction**: same rule -- only business-logic tasks need an explicit spec ref. Property/wiring tasks pointing at scenarios that already cover the behavior the wiring delivers do not need their own line-item ref.
-- **Spec -> Plan direction**: unchanged. Every in-scope spec scenario still needs at least one plan task.
-
-Announce when pragmatic mode is in effect: `"Plan-Spec cross-review running in pragmatic mode (lightweight scope) -- wiring tasks accepted without per-line refs."`
-
-For `standard` and `heavyweight` profiles, all three directions run with full strictness.
-
-### How to Review
-
-Plan <-> Spec cross-review is an audit task -- ALWAYS run inline via the local `Agent` tool, regardless of `codex_available` or Scope Profile. Reviews stay on Claude in this pipeline (see [Codex Availability > Reviews stay on Claude](#codex-availability)). Do NOT route to `codex:codex-rescue`; do NOT use the `READ-ONLY REVIEW` prefix.
+Spec <-> Code audit is an audit task -- ALWAYS run inline via the local `Agent` tool, regardless of `codex_enabled` or Scope Profile. Reviews stay on Claude in this pipeline. Do NOT route to `codex:codex-rescue`; do NOT use the `READ-ONLY REVIEW` prefix.
 
 Inline review steps:
 
-1. Read the plan file and extract every task's spec reference, test reference, and (where present) verification slot.
-2. Read every in-scope `.feature` file for the feature.
-3. Check three directions:
-   - **Plan -> Spec** -- does every plan task that touches business behavior reference a real spec scenario? Flag tasks with no spec reference or broken references. (Skip this check if no specs exist.)
-   - **Spec -> Plan** -- does every in-scope spec scenario have at least one plan task implementing it? Flag uncovered scenarios. (Skip this check if no specs exist.)
-   - **Plan -> Test** -- does every plan task that touches production code carry EITHER a `Test ref:` (with explicit Red-before-Green ordering) OR a `Verification:` slot whose category appears in the [pandahrms:plan-writing No-Test-Pattern Categories](../plan-writing/SKILL.md#no-test-pattern-categories) table (EF mapping, EF migration, read DTO + projection, API regen, pure config)? **Do NOT flag tasks with a valid `Verification:` slot -- accept them silently as fulfilling the requirement.** Flag only tasks that have neither a Test ref nor a recognized Verification slot. (This check runs whenever any tests exist OR whenever the plan modifies production code.)
-4. Generate a findings report partitioned by direction. Do NOT prompt the user with AskUserQuestion at this point. Use the report internally to drive automatic loop-backs per Handling Results below. Surface findings to the user only via the announcement strings specified in Handling Results.
+1. Read every in-scope `.feature` file (full content for `normal`; sampled per the rule above for `small`).
+2. For each scenario, identify the production code path it covers. Use the test file names from the plan's Test refs as a starting point; the spec scenario -> test -> code chain is the audit trail.
+3. Read the relevant code files (via Read) and verify the implementation matches the Given/When/Then steps. Look specifically for:
+   - **Missing branches** -- scenario covers an error path that the code never enters.
+   - **Wrong outcomes** -- scenario expects "request rejected" but code returns success.
+   - **Validation drift** -- scenario specifies a range/format/constraint the code doesn't enforce.
+   - **Authorization drift** -- scenario specifies a role check the code skipped.
+   - **Cascade misses** -- scenario implies a side-effect (audit log, notification, related-record update) that the code doesn't trigger.
+4. Generate a findings report partitioned by scenario. Do NOT prompt the user with AskUserQuestion at this point. Use the report internally to drive automatic loop-backs per Handling Results below. Surface findings to the user only via the announcement strings specified in Handling Results.
 
 ### Handling Results
 
-- **All directions covered** -- announce "Plan, spec, and tests aligned. Proceeding to execution." Go to step 6.
-- **Gaps found** -- the cross-review auto-resolves any gap that has real coverage value. It does NOT prompt the user. Resolution by direction:
-  - **Plan -> Spec gap (plan task with no spec scenario)** -- discrepancy belongs in the spec. Loop back to `pandahrms:spec-writing` and add the missing scenario. Announce "Plan-Spec cross-review found N missing scenarios -- adding to specs."
-  - **Spec -> Plan gap (spec scenario with no plan task)** -- plan completeness issue. Loop back to `pandahrms:plan-writing` to add the missing task. For fast-path plans, edit the plan file directly. Announce "Plan-Spec cross-review found N uncovered scenarios -- adding plan tasks."
-  - **Plan -> Test gap (production-code task missing both Test ref and Verification)** -- loop back to `pandahrms:plan-writing` to add the missing reference. For fast-path plans, edit the plan file directly:
-     - If the task fits a recognized No-Test-Pattern Category, write a `Verification:` slot with the category and the verification method.
-     - Otherwise, add a real `Test ref:` with Red-before-Green ordering.
-     Announce "Plan-Spec cross-review found N tasks missing test references -- resolving."
-  - **Mixed gaps** -- handle each direction per the rules above with this strict order:
-     1. **Plan -> Spec FIRST** -- it edits `.feature` files in pandahrms-spec.
-     2. **Spec -> Plan SECOND** -- it edits the plan file in the working project.
-     3. **Plan -> Test THIRD** -- it edits test references inside the plan file; must run AFTER Spec -> Plan to avoid concurrent writes to the same plan file.
+- **All scenarios covered correctly** -- announce `"Spec <-> Code audit: code matches all scenarios. Proceeding to Simplify."` Go to Step 6.
+- **Gaps found** -- auto-resolve where possible; only ask the user on irreconcilable conflicts.
+  - **Code missing a scenario** -- loop back to Step 4. Generate a minimal fix-task list (1-3 tasks) and dispatch via `pandahrms:execute-plan`. Announce: `"Spec <-> Code audit found N missing scenarios in code -- looping back to Execute with fix tasks."`
+  - **Code implements behavior the spec doesn't describe** -- this is usually fine (the spec is intentionally minimal) BUT if the behavior is user-visible and load-bearing, loop back to Step 2 (Spec routing) to add a scenario. Announce: `"Spec <-> Code audit found N undocumented behaviors -- updating spec."` On unclear cases, fall through to the irreconcilable-conflict branch.
+  - **Scenario and code disagree on outcome** -- this is an authority conflict (per the [Authority Hierarchy](#hard-gate) HARD-GATE). Prompt via AskUserQuestion: `"Spec <-> Code conflict: scenario '[name]' expects [X], code does [Y]. How would you like to resolve?"` with canonical options: `"Fix code to match spec"` (loops back to Step 4), `"Update spec to match code"` (loops back to Step 2), `"Proceed anyway -- mark as known gap"` (appends to `### Acknowledged Gaps` and continues to Step 6), `"Abort atlas"`.
 
-     If Spec -> Plan has zero gaps, run Plan -> Test in parallel with Plan -> Spec (no shared file -- one writes the plan, the other writes `.feature` files). Never run two writes against the same file in parallel.
+When the user selects `"Proceed anyway -- mark as known gap"`, append a single bullet to the `### Acknowledged Gaps` block of the plan file's Atlas Progress section: `- [Step 5 conflict description] -- acknowledged at [ISO 8601 timestamp].`
 
-**Auto-accepted (do NOT loop back, do NOT report as gaps):**
-- Tasks with a valid `Verification:` slot whose category appears in the [pandahrms:plan-writing No-Test-Pattern Categories](../plan-writing/SKILL.md#no-test-pattern-categories) table.
-- Spec scenarios marked out-of-scope in the design doc's scope section.
+After any loop-back resolution (fix code OR update spec), atlas re-runs Step 5 on the freshly-changed state. There is no iteration cap on Step 5; the loop terminates when the audit returns zero gaps OR the user picks `"Proceed anyway"` / `"Abort atlas"` on an irreconcilable conflict.
 
-Only fall back to AskUserQuestion when one of these conditions holds:
-
-1. **Irreconcilable conflict** -- a loop-back surfaces a conflict that cannot be resolved without user input (e.g. the design itself contradicts the new spec scenario the cross-review wants to add). Prompt verbatim: "Plan-Spec cross-review found an irreconcilable conflict: [describe]. How would you like to proceed?" with canonical options: "Update design to match", "Proceed anyway -- mark as known gap", "Abort atlas".
-
-   When the user selects "Proceed anyway -- mark as known gap", append a single bullet to the `### Acknowledged Gaps` block of the plan file's Atlas Progress section: `- [Step 5 conflict description] -- acknowledged at [ISO 8601 timestamp].` This is the ONLY trigger that populates the Acknowledged Gaps block. atlas-pipeline-orchestrator does NOT auto-acknowledge gaps under any other condition.
-
-2. **Unrecognized Verification category** -- a `Verification:` slot uses a category NOT in the [pandahrms:plan-writing No-Test-Pattern Categories](../plan-writing/SKILL.md#no-test-pattern-categories) table. Prompt verbatim: "Task '[name]' uses Verification category '[category]' which is not in the No-Test-Pattern table. How would you like to proceed?" with canonical options: "Add category to pandahrms:plan-writing", "Convert to real Test ref", "Accept once for this run".
-
-Do not proceed to execution while real gaps remain unresolved.
+Do not proceed to Step 6 while real gaps remain unresolved.
 
 ## Playwright E2E Step
 
-Step 8 runs an end-to-end pass with Playwright after `simplify` and before handing the run back to the user, but only when Playwright is actually configured for the project. The goal is to catch UI-level regressions on the changes made this session before the user takes over.
+Step 7 runs an end-to-end pass with Playwright after `simplify` and before handing the run to the user for testing, but only when Playwright is actually configured for the project. Catches UI-level regressions on this session's changes before the user takes over.
 
 ### Detection
 
@@ -649,9 +568,9 @@ Check for Playwright in this order. The first match wins; stop checking once one
 
 1. `playwright.config.ts`, `playwright.config.js`, or `playwright.config.mjs` exists at the working project's root.
 2. The project's `package.json` has `@playwright/test` (or `playwright`) under `dependencies` or `devDependencies`.
-3. At least one `mcp__playwright__*` tool call has succeeded (returned a non-error result) earlier in the CURRENT atlas-pipeline-orchestrator conversation. Authorization in a prior session does not count.
+3. At least one `mcp__playwright__*` tool call has succeeded (returned a non-error result) earlier in the CURRENT atlas conversation. Authorization in a prior session does not count.
 
-If none match, announce `"Skipping Playwright e2e -- not configured for this project."` and proceed to Step 9. Do not install Playwright on the user's behalf.
+If none match, announce `"Skipping Playwright e2e -- not configured for this project."` and proceed to Step 8. Do not install Playwright on the user's behalf.
 
 ### Scope: changes made this session
 
@@ -681,7 +600,7 @@ For each scoped flow:
 
 ### Reporting
 
-After the e2e pass, append a `### Playwright E2E` block to the Development Summary in Step 9:
+After the e2e pass, append a `### Playwright E2E` block to the Development Summary in Step 8:
 
 ```
 ### Playwright E2E
@@ -692,49 +611,46 @@ After the e2e pass, append a `### Playwright E2E` block to the Development Summa
 | <route or page> | fail | <one-line failure summary> |
 ```
 
-If any flow failed, surface the failures in plain language to the user as part of "ask user to test" -- they decide whether the failure is real (block /hermes-commit) or a flaky test (proceed). Do NOT auto-rerun failed flows. Report each failure once; if the user asks for a rerun, run it exactly once and report the second result. Never run a flow more than twice without explicit user direction.
+If any flow failed, surface the failures in plain language to the user as part of the Step 8 user-test prompt -- they decide whether the failure is real (loop back via Step 9) or a flaky test (proceed). Do NOT auto-rerun failed flows. Report each failure once; if the user asks for a rerun, run it exactly once and report the second result. Never run a flow more than twice without explicit user direction.
 
 ### Skip conditions
 
-Skip Step 8 entirely (with announcement) when any of these hold:
+Skip Step 7 entirely (with announcement) when any of these hold:
 - Playwright is not configured (per Detection).
 - This session's changes have no FE-visible surface.
 - The user types `/atlas-pipeline-orchestrator --skip-e2e` or has set `Playwright e2e: skip` in the plan's `## Atlas Progress` section.
-- Step 6 was aborted with no completed tasks (nothing to test).
+- Step 4 was aborted with no completed tasks (nothing to test).
 
 ## Red Flags
 
 | Thought | Reality |
 |---------|---------|
 | "I'll skip the design step since the user described what they want" | Step 1 is mandatory. pandahrms:design-refinement enforces approval before implementation. |
-| "It's a bug fix, no need to discuss tests upfront" | Bug fixes especially need a failing test that would have caught the bug. The design proposes that test before the fix. |
-| "I'll just invoke pandahrms:execute-plan on a plan that has no Depends on: markers" | Reject the plan and loop back to pandahrms:plan-writing. Missing markers serialize the run -- atlas-pipeline-orchestrator can't parallel-dispatch. |
-| "I'll mark every task Risk: high to be safe" | The default single-stage review is the point of atlas-pipeline-orchestrator. Tag only auth, multi-tenant, billing, schema, PII, or design-flagged risky tasks. |
-| "I'll skip the QA review since specs look fine" | QA is conditional. Run it when Scope Profile is `standard` or `heavyweight` AND >=3 NEW scenarios were added; auto-skip for `lightweight` regardless. Don't skip a qualifying run on a hunch. |
-| "I'll skip the Scope Profile classification -- it's obvious" | No. Always announce the profile after Step 1 with the rationale. The profile gates QA, cross-review pragmatic mode, and Simplify -- silent classification means downstream behavior changes without an audit trail. |
-| "I'll keep the design questions strictly one-at-a-time even when they're clearly independent" | Default is one-at-a-time, but 2-4 causally-independent multiple-choice questions can batch into one AskUserQuestion. See pandahrms:design-refinement Question Pacing. |
-| "Plan has 12 numbered tasks for a 1-property feature -- looks thorough" | Over-decomposition. Use the Collapse Rule in pandahrms:plan-writing: strictly-sequential wiring tasks merge into one. For lightweight scope, target 5-7 tasks. |
+| "I'll just invoke pandahrms:execute-plan on a plan that has no Depends on: markers" | Reject the plan and loop back to pandahrms:plan-writing. Missing markers serialize the run -- atlas can't parallel-dispatch. |
+| "I'll mark every task Risk: high to be safe" | Atlas defaults to single-stage review. Tag `Risk: high` only on auth, multi-tenant, billing, schema, PII, or design-flagged risky tasks. |
+| "I'll skip the Scope Profile classification -- it's obvious" | No. Always announce the profile after Step 1 with the rationale. The profile gates design's forced second-clarify, Spec<->Code audit sample mode, Simplify, and aegis-at-Step-10 -- silent classification means downstream behavior changes without an audit trail. |
+| "Plan has 12 numbered tasks for a 1-property feature -- looks thorough" | Over-decomposition. Use the Collapse Rule in pandahrms:plan-writing: strictly-sequential wiring tasks merge into one. For small scope, target 5-7 tasks. |
 | "I'll number `pnpm openapi-ts` as Task 9" | Mechanical commands are Gates, not tasks. They don't run through implementer subagents. Use Auto Gate for local mechanical commands (regen, local EF migrate, local docker rebuild) and Manual Gate only for genuine operator actions (prod deploy, DBA-led migration). |
 | "I'll mark `pnpm openapi-ts` as Manual Gate so the user can confirm the regen finished" | No. Local mechanical commands are Auto Gates -- the orchestrator runs them automatically with a one-line announcement. The user's BE-then-deploy-then-FE rule is a sequencing rule, not a pause rule. |
-| "I'll write 'user sees error \"must be 1-24\"' in the spec to be precise" | Precision means business outcome, not UI copy. Write 'request is rejected as out of range'. Hard-coded validation strings or input-control behaviors (auto-clamp vs error) trigger spec rewrites mid-pipeline. |
-| "Discussion decided X but spec still says Y, I'll implement X" | Stop. Update the spec to reflect the decision FIRST, then plan. Never leave the spec outdated. |
-| "Plan has no spec refs, but I'll just execute it" | Plans without spec refs (when specs exist) must be rewritten before execution. No shortcuts. |
-| "Spec scenario has no plan task, but the plan looks complete" | Bi-directional coverage required. Either add a task or remove the scenario -- don't execute around it. |
-| "QA found edge cases -- I'll ask the user whether to add them to specs" | Don't ask. Spec-review discrepancies always go into the spec automatically. Loop back to pandahrms:spec-writing without prompting. |
-| "Plan-Spec cross-review found a missing scenario -- I'll AskUserQuestion how to resolve" | Don't ask for Plan -> Spec gaps. Auto-add the scenario via pandahrms:spec-writing. Only ask when an irreconcilable conflict surfaces during the loop-back. |
-| "Cross-review found a task missing a test ref -- I'll flag it" | Check first whether it fits a No-Test-Pattern Category (EF mapping, migration, read DTO + projection, API regen, pure config). If yes, the resolution is to add a `Verification:` slot, not a Test ref. Only flag tasks that have neither a Test ref nor a valid Verification slot. |
-| "I'll list noisy 'no test by convention' findings in the cross-review report" | No. Tasks with a valid Verification slot are silently accepted. The cross-review report only contains real gaps that need fixing. |
-| "Cross-review found gaps -- I'll ask the user whether to fix them" | No. Real gaps with coverage value are auto-resolved by looping back to spec-writing or plan. The user is only asked when an irreconcilable conflict surfaces or when a Verification category isn't in the recognized list. |
-| "Codex is installed -- I'll route the QA review (or Plan-Spec cross-review) through codex too, for second-opinion depth" | No. Reviews stay on Claude in this pipeline. Codex implements; Claude audits. The whole point of the role split is that Codex never reviews its own output. |
-| "I'll prefix the QA review or Plan-Spec cross-review dispatch with READ-ONLY REVIEW" | No. The read-only prefix existed because codex defaults to `--write`. Atlas no longer dispatches reviews to codex, so the prefix is not used in atlas-driven dispatches. |
-| "Codex is available but I'll ask the user which mode they want before Step 6" | No -- atlas pre-sets `Codex execution mode: full` when codex is available. The user can edit the line manually to override; do not prompt. |
-| "I'll let Claude implement Step 6 tasks even though codex is available" | No. When codex is available, Step 6 implementations route to codex per the role split. Claude reviews codex's output, not produces production code. |
-| "I'll let an implementer commit since the plan says to commit" | Plans should not contain `git commit` steps. pandahrms:execute-plan strips them on dispatch. /hermes-commit owns commits. |
+| "Discussion decided X but spec still says Y, I'll implement X" | Stop. Update the spec to reflect the decision FIRST (Step 2 spec routing), then plan. Never leave the spec outdated. |
+| "Spec exists -- I'll ask the user whether to update it" | No. When the spec exists, Step 2 ALWAYS updates it from the design decisions. Only ask the user when the spec is missing. |
+| "Spec <-> Code audit found a missing scenario -- I'll AskUserQuestion how to resolve" | Don't ask. Code-missing-scenario auto-loops back to Step 4 with a fix-task list. Only ask the user when the spec and code disagree on outcome (irreconcilable conflict). |
+| "User said the feature works -- I'll skip code review and commit directly" | No. Step 10 runs athena (and aegis when applicable) regardless of user satisfaction. The user-test pass at Step 8 covers behavior; Step 10 covers code quality and security. |
+| "I'll silently invoke aegis at Step 10 even on small scope" | No. Aegis at Step 10 auto-skips on `small` scope UNLESS the design touched validation, permission, or data-state code. Announce the skip with the canonical string. |
+| "hermes-commit will re-run athena on the diff, so Step 10 is optional" | No. hermes-commit only commits. Step 10 is the only place athena runs in the pipeline. Skipping it commits unreviewed code. |
+| "I'll let an implementer commit since the plan says to commit" | Plans should not contain `git commit` steps. pandahrms:execute-plan strips them on dispatch. Step 11 owns commits. |
+| "Codex is installed -- I'll route the Spec<->Code audit through codex too, for second-opinion depth" | No. Reviews always run on Claude (per Codex Usage role split). Codex never reviews its own output. |
+| "I'll prefix the Spec<->Code audit dispatch with READ-ONLY REVIEW" | No. Atlas does not dispatch reviews to codex, so the read-only prefix has no purpose here. |
+| "Codex is enabled but I'll ask the user which mode they want before Step 4" | No -- atlas pre-sets `Codex execution mode: full` when `codex_enabled` is true. The user can edit the line manually to override; do not prompt. |
+| "I'll let Claude implement Step 4 tasks even though codex is enabled" | No. When `codex_enabled` is true, Step 4 implementations route to codex per the role split. Claude reviews codex's output, not produces production code. |
+| "User said 'looks good' to the user-test prompt -- I'll terminate atlas and let them commit manually" | No. Atlas drives the full lifecycle through commit. On `"Looks good -- proceed to code review"`, atlas continues to Step 10 (review) and Step 11 (commit). Termination is at the end of Step 11, not Step 8. |
+| "User reported a styling tweak -- I'll loop back to design (Step 1)" | No. Styling tweaks with no business-rule change are code-only fixes. Loop back to Step 4 with a minimal fix-plan. Only loop to Step 1 when the report implies a scope change (new feature, removed feature, changed business rule, different approach). |
+| "Branch is `feature/foo` -- I'll show the branch reminder anyway" | No. Branch reminder only fires on `main`, `master`, `development`, `develop`. Any other branch skips the reminder silently. |
 
 ## When to Use
 
-- Any work request that needs design, specs, plan, or execution -- atlas is the single entry point.
-- Natural-language triggers: "start new work", "build a feature", "add functionality", "fix a bug", "refactor X", "brainstorm", "design", "write a plan", "execute the plan".
+- Any work request that needs design, specs, plan, execution, review, OR commit -- atlas is the single entry point.
+- Natural-language triggers: "start new work", "build a feature", "add functionality", "fix a bug", "refactor X", "brainstorm", "design", "write a plan", "execute the plan", "ship this", "do the whole flow".
 - Slash invocations: `/atlas-pipeline-orchestrator`, `/atlas-pipeline-orchestrator <plan-path>` (Fast Path), `/atlas-pipeline-orchestrator --resume`, `/atlas-pipeline-orchestrator --skip-e2e`.
 
 ## When NOT to Use
@@ -743,4 +659,4 @@ Skip Step 8 entirely (with announcement) when any of these hold:
 - Writing specs for existing functionality without a new design -- use `pandahrms:spec-writing` directly.
 - Pure code review of working-tree changes -- use `pandahrms:athena-code-review` directly.
 - Pure security audit -- use `pandahrms:aegis-security-review` directly.
-- Committing already-reviewed changes -- use `pandahrms:hermes-commit` directly.
+- Committing already-reviewed changes that did NOT go through atlas -- use `pandahrms:hermes-commit` directly.
