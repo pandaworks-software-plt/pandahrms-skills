@@ -1,15 +1,17 @@
 ---
 name: optimise-prompt
-description: ALWAYS run this as the very first step of every user-facing turn -- BEFORE any other tool call. Acts as a repeat-back step so the user can confirm Claude read their message correctly. Rephrases the user's request in clear B2-Level English, then either proceeds silently (when intent is unambiguous) or asks the user to confirm via AskUserQuestion (when the request is ambiguous, contradictory, or missing critical info). Triggers on read-only questions, diagnostic questions, working-tree actions (write/edit/refactor/fix/add/remove/rename/drop/run/build/commit/migrate/deploy), one-line tweaks, single-file edits, single-className removals, config touches, and short follow-up directives -- nothing exempts the request. Mechanical skips only: short acks that carry no new verb or object (e.g. "yes", "ok", "got it", "sounds good", "go ahead", "continue", "stop", "skip", "cancel", "nevermind"), direct replies to an in-flight AskUserQuestion, and recursive self-calls when the skill is already running. Also triggers on direct user invocation -- "/optimise-prompt", "rephrase this", "what do you think I'm asking", "clarify my prompt". Returns a single normalized intent statement that the caller uses as the canonical request from that point forward.
+description: ALWAYS run this as the very first step of every user-facing turn -- BEFORE any other tool call. Acts as a repeat-back step so the user can confirm Claude read their message correctly. Rephrases the user's request in clear B2-Level English and ALWAYS emits the restatement as a visible chat message to the user. When intent is unambiguous, emits the one-line restatement and returns; when the request is ambiguous, contradictory, or missing critical info, asks the user to confirm via AskUserQuestion. Triggers on read-only questions, diagnostic questions, working-tree actions (write/edit/refactor/fix/add/remove/rename/drop/run/build/commit/migrate/deploy), one-line tweaks, single-file edits, single-className removals, config touches, and short follow-up directives -- nothing exempts the request. Mechanical skips only: short acks that carry no new verb or object (e.g. "yes", "ok", "got it", "sounds good", "go ahead", "continue", "stop", "skip", "cancel", "nevermind"), direct replies to an in-flight AskUserQuestion, and recursive self-calls when the skill is already running. Also triggers on direct user invocation -- "/optimise-prompt", "rephrase this", "what do you think I'm asking", "clarify my prompt". Returns a single normalized intent statement that the caller uses as the canonical request from that point forward.
 ---
 
 # Optimise Prompt
 
 ## Overview
 
-Rephrase user's request in clear B2-Level English and confirm intent whenever input is not both **explicit** and **declarative**.
+Rephrase user's request in clear B2-Level English. ALWAYS emit the restatement to the user as a visible chat message. Confirm intent whenever input is not both **explicit** and **declarative**.
 
-**Hard gate:** proceed silently (CLEAR path) only when request is BOTH explicit (every key field named -- verb, object, qualifier) AND declarative (full statement of intent, not a question, fragment, or hedged guess). If user wrote a question, single noun, pronoun, or hedged guess ("maybe", "i think", "should we"), ask via AskUserQuestion.
+**Hard rule -- always echo:** every run of this skill MUST end with a one-line restatement printed in chat. Silent return is forbidden. The restatement is the artefact the user reads to confirm Claude understood them.
+
+**Hard gate -- restate vs ask:** take the CLEAR path (echo restatement and return) only when request is BOTH explicit (every key field named -- verb, object, qualifier) AND declarative (full statement of intent, not a question, fragment, or hedged guess). If user wrote a question, single noun, pronoun, or hedged guess ("maybe", "i think", "should we"), ask via AskUserQuestion -- the AskUserQuestion `question` text itself carries the rephrased intent and serves as the restatement.
 
 ## B2-Level English Rules
 
@@ -42,12 +44,14 @@ Treat scope rule as hard floor for rest of turn. Subsequent skills do not need t
 ```
 1. Read user's raw input
 2. Classify clarity: CLEAR | AMBIGUOUS | UNDER-SPECIFIED
-3. CLEAR        -> echo one-line restatement, return immediately
-   AMBIGUOUS    -> AskUserQuestion with 2-4 candidate intents
-   UNDER-SPEC   -> AskUserQuestion to fill the missing field
+3. CLEAR        -> print one-line restatement to chat, return
+   AMBIGUOUS    -> AskUserQuestion with 2-4 candidate intents (question text = restatement)
+   UNDER-SPEC   -> AskUserQuestion to fill missing field (question text = restatement)
 4. Lock the confirmed intent as the canonical request
-5. Return control to the caller
+5. Return control to the caller -- restatement already visible to the user
 ```
+
+Every path produces a user-visible restatement. The CLEAR path prints it as plain chat text; the AMBIGUOUS / UNDER-SPECIFIED paths embed it in the AskUserQuestion `question` field.
 
 **Phase 1: Read raw input**
 
@@ -55,14 +59,14 @@ Take most recent user message that triggered parent skill. Do not include earlie
 
 **Phase 2: Classify clarity**
 
-**Hard gate before classification:** request MUST be both **explicit** AND **declarative**. If either is missing, request is NOT CLEAR and skill MUST ask via AskUserQuestion -- proceed silently is forbidden.
+**Hard gate before classification:** request MUST be both **explicit** AND **declarative**. If either is missing, request is NOT CLEAR and skill MUST ask via AskUserQuestion. Either way, a visible restatement is emitted -- as plain chat (CLEAR) or as the AskUserQuestion `question` text (AMBIGUOUS / UNDER-SPECIFIED).
 
 - **Explicit** means every key field of intent is named in the message itself, not inferred from earlier turns, open files, or "what was probably meant". Fields that must be named: verb (what to do), object (what to do it to), and any qualifier parent skill needs (which branch, which DB, which file, which scope).
 - **Declarative** means message states an intent, not a question or fragment. `fix the failing UserService test` is declarative. `auth thing?`, `that bug`, `recruitment`, `?`, `the migration` are NOT declarative -- fragments, questions, or single nouns without a verb. A request opening with "should we...", "can you maybe...", "what about...", or ending with "?" is treated as non-declarative by default.
 
 Then apply these checks in order. First match wins.
 
-**CLEAR** -- proceed silently. Request is CLEAR when ALL hold:
+**CLEAR** -- print one-line restatement and return. Request is CLEAR when ALL hold:
 
 - Passes explicit + declarative hard gate above.
 - Verb is unambiguous (`fix`, `add`, `rename`, `delete`, `review`, `commit`, `migrate`, `restore`, etc.).
@@ -101,11 +105,20 @@ Then apply these checks in order. First match wins.
 
 **Phase 3a: CLEAR path**
 
-Emit a single line in B2 English:
+Print a single B2-English line as plain chat text to the user. This MUST be a visible assistant message -- not an internal log, not a thinking block, not a tool argument. Without this line, the skill has failed its core job.
+
+Template:
 
 ```
 Got it -- you want to <verb> <object> [<qualifier>]. Starting now.
 ```
+
+Rephrase rules for the restatement:
+
+- Use B2 vocabulary -- swap rare or formal words for common ones.
+- Make the verb and object explicit so the user can spot a misread in one glance.
+- Include every qualifier from the raw input (file, branch, scope, target DB, etc.) so the user sees Claude caught all the details.
+- Keep it to one line. If two ideas appear, pick the primary verb+object; secondary scope goes in the qualifier slot.
 
 Examples:
 
@@ -113,13 +126,13 @@ Examples:
 - `Got it -- you want to create a new branch off main for the performance overtime feature. Starting now.`
 - `Got it -- you want me to review the working-tree changes before commit. Starting now.`
 
-Do NOT call AskUserQuestion. Return control to the caller.
+Do NOT call AskUserQuestion. After the restatement line is printed, return control to the caller.
 
 **Phase 3b: AMBIGUOUS / UNDER-SPECIFIED path**
 
-Call AskUserQuestion once. Question MUST follow this shape:
+Call AskUserQuestion once. The `question` field itself is the restatement -- it must rephrase the user's raw input in B2 English so the user can see Claude read the message and is now asking only because a detail is missing. Question MUST follow this shape:
 
-- **question**: rephrased candidate intent in B2 English, ending in a question mark.
+- **question**: rephrased candidate intent in B2 English, ending in a question mark. Make the rephrase visible -- echo the verb, object, and any named qualifiers from the raw input before posing the choice.
 - **header**: max 12 chars summary (e.g. `Confirm intent`).
 - **options**: 2-4 distinct candidate intents OR (for UNDER-SPECIFIED) missing field choices. Each option label in B2 English.
 - **multiSelect**: false.
@@ -181,3 +194,4 @@ A mid-skill message is a **fresh directive** when ANY hold:
 - Skill NEVER edits files, runs git, runs tests, or calls any other skill. Read-only and dialogue-only.
 - Skill MUST finish in one round of AskUserQuestion at most.
 - Skill MUST NOT change user's intent. Clarifies; does not redirect.
+- Skill MUST always emit a visible restatement -- plain chat on CLEAR path, AskUserQuestion `question` text on AMBIGUOUS / UNDER-SPECIFIED. Silent return is forbidden.
