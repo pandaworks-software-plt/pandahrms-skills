@@ -13,9 +13,10 @@ Random fixes waste time and create new bugs. Quick patches mask the underlying c
 
 ## Pre-Flight: Optimise the prompt (mandatory before any other step)
 
-Before any other action in this skill, invoke `pandahrms:optimise-prompt` via the Skill tool with no arguments. It will either echo a one-line restatement (CLEAR) or ask the user to confirm intent (AMBIGUOUS / UNDER-SPECIFIED). Wait for it to return, then continue using the confirmed intent as the canonical request.
+If `pandahrms:optimise-prompt` has not already run on the current user message, invoke it via the Skill tool with no arguments. Wait for it to return, then continue using the confirmed intent as the canonical request.
 
-Skip this pre-flight only when:
+Skip this pre-flight when:
+- The standalone pre-flight already ran on the current user message and locked an intent. Reuse the locked intent.
 - The current message is a direct reply to an AskUserQuestion the assistant just sent.
 - The current message is a one-word ack ("yes", "ok", "no", "go", "continue").
 - optimise-prompt is already running in the current call stack.

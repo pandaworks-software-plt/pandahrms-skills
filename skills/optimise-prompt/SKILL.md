@@ -1,42 +1,57 @@
 ---
 name: optimise-prompt
-description: ALWAYS run this as the very first step of the user-facing entry-point skills -- atlas-pipeline-orchestrator, debugging, and design-refinement -- before any other action. Pipeline-node skills (athena-code-review, plan-writing, execute-plan, spec-writing, spec-review, hermes-commit, aegis-security-review, branching, bridge-file, ef-migrations) do NOT auto-invoke this skill, because they are normally reached through an entry-point skill that already ran the pre-flight. Rephrases the user's request in clear B2-Level English, then either proceeds silently (when intent is unambiguous) or asks the user to confirm via AskUserQuestion (when the request is ambiguous, contradictory, or missing critical info). Also triggers on direct user invocation -- "/optimise-prompt", "rephrase this", "what do you think I'm asking", "clarify my prompt". Never writes code, never edits files, never invokes other skills. Returns a single normalized intent statement that the caller (skill or assistant) uses as the canonical request from that point forward.
+description: ALWAYS run this as the very first step of any user-facing turn that asks for a working-tree action (write/edit/refactor/fix/add/remove/rename/drop/run/build/commit/migrate/deploy on code, tests, config, branches, or DB state) -- BEFORE any other tool call. This includes one-line tweaks, single-file edits, single-className removals, config touches, and short follow-up directives -- size of the change does not exempt it. Rephrases the user's request in clear B2-Level English, then either proceeds silently (when intent is unambiguous) or asks the user to confirm via AskUserQuestion (when the request is ambiguous, contradictory, or missing critical info). Also triggers on direct user invocation -- "/optimise-prompt", "rephrase this", "what do you think I'm asking", "clarify my prompt". Skip on pure read-only or diagnostic questions ("why does X look like Y", "what does this code do", "explain this"), one-word acks ("yes", "ok", "go"), and direct replies to an in-flight AskUserQuestion. Never writes code, never edits files, never invokes other skills. Returns a single normalized intent statement that the caller uses as the canonical request from that point forward.
 ---
 
 # Optimise Prompt
 
 ## Overview
 
-Pandahrms developers often write requests in non-native English: short, ungrammatical, sometimes missing nouns or verbs. Acting on a misread of that input wastes time and produces wrong work. This skill is a thin pre-flight check that runs before every entry-point skill: it rephrases the request in clear B2-Level English and confirms intent whenever the input is not both **explicit** and **declarative**.
+Rephrase the user's request in clear B2-Level English and confirm intent whenever the input is not both **explicit** and **declarative**.
 
-**Core principle:** the user's intent must be settled in clean B2 English before any other skill begins. Skills downstream act on the *normalized* intent, not the raw input.
+**Core principle:** the user's intent must be settled in clean B2 English before any other tool call.
 
-**Hard gate:** the skill proceeds silently (CLEAR path) only when the request is BOTH explicit (every key field named -- verb, object, qualifier) AND declarative (a full statement of intent, not a question, fragment, or hedged guess). If the user wrote a question, a single noun, a pronoun, or a hedged guess ("maybe", "i think", "should we"), the skill MUST ask via AskUserQuestion. Silence is reserved for unambiguous commands only.
+**Hard gate:** proceed silently (CLEAR path) only when the request is BOTH explicit (every key field named -- verb, object, qualifier) AND declarative (a full statement of intent, not a question, fragment, or hedged guess). If the user wrote a question, a single noun, a pronoun, or a hedged guess ("maybe", "i think", "should we"), ask via AskUserQuestion.
 
 ## When to Use
 
-Auto-invoked as the pre-flight step by the user-facing entry-point skills only:
+The skill auto-invokes in three cases.
+
+### 1. Standalone pre-flight -- any user turn that requests a working-tree action
+
+When the user's most recent message contains a verb directed at the working tree (write, edit, refactor, fix, add, remove, drop, rename, delete, run, build, commit, migrate, deploy, restore, swap, regenerate, etc.), the assistant MUST invoke `pandahrms:optimise-prompt` BEFORE any other tool call -- before reading files, before editing, before bash, before delegating to Codex, before TodoWrite, before any subagent.
+
+Size does not exempt the request. One-line tweaks, single-className removals, single-file edits, two-word follow-ups ("drop inner card", "rename it", "run it again"), and config touches all qualify.
+
+### 2. Entry-point skill Step 0
+
+The user-facing entry-point skills run optimise-prompt as their formal first step:
 
 - `pandahrms:atlas-pipeline-orchestrator`
 - `pandahrms:debugging`
 - `pandahrms:design-refinement`
 
-Pipeline-node skills (athena-code-review, plan-writing, execute-plan, spec-writing, spec-review, hermes-commit, aegis-security-review, branching, bridge-file, ef-migrations) do NOT auto-invoke this skill. They are normally reached through an entry-point skill that already ran the pre-flight, and re-running it on every internal hop would slow the pipeline and frustrate the user.
+If the standalone pre-flight already ran on the same user message, these skills reuse the locked intent and skip their own Step 0.
 
-Also triggers on direct user invocation, regardless of which skill is active:
+### 3. Direct user invocation
+
+Triggers on direct user invocation, regardless of which skill is active:
 
 - `/optimise-prompt` slash command
 - "rephrase this", "what are you understanding", "is that what you got from my message"
 - Any session where the user is unsure they communicated their intent clearly
 
-**Re-runs on mid-skill follow-up directives.** A long-running entry-point skill (atlas pipeline, debugging investigation, design refinement) will receive follow-up user messages between steps. Some of those are continuation chatter (replies to questions, acks, small clarifications) and must NOT re-trigger this skill. Others are **new directives** that change the scope, redirect the work, or introduce fresh intent -- those MUST pass the same explicit + declarative gate before the parent skill acts on them. See [Follow-up Directives](#follow-up-directives) for the trigger rules.
+### Re-runs on mid-skill follow-up directives
+
+A long-running entry-point skill (atlas pipeline, debugging investigation, design refinement) will receive follow-up user messages between steps. Some of those are continuation chatter (replies to questions, acks, small clarifications) and must NOT re-trigger this skill. Others are **new directives** that change the scope, redirect the work, or introduce fresh intent -- those MUST pass the same explicit + declarative gate before the parent skill acts on them. See [Follow-up Directives](#follow-up-directives) for the trigger rules.
 
 ## When NOT to Use
 
-- The skill is already running in the current call stack (no recursion). Each invocation calls `optimise-prompt` exactly once per directive being normalized.
-- The current message is a direct reply to an AskUserQuestion the assistant just sent. The reply belongs to the in-flight question, not to a fresh intent.
-- The current message is a one-word ack ("yes", "ok", "no", "go", "continue", "stop"). Treat as control flow, not intent.
-- The current message is a small clarification or addition that the parent skill's own dialogue is designed to absorb (e.g. "use 3 retries not 5" during plan-writing's task-design dialogue; "exclude the audit table" during EF migration scoping). These belong to the parent skill's in-flight Q&A loop, not to a fresh top-level directive.
+- **Pure read-only or diagnostic questions** with no action verb on the working tree. Examples: "why does the table look wrapped in multiple containers?", "what does this hook do?", "explain how queryKeys works", "is X correct?", "where is Y defined?". Answer directly without the pre-flight. The moment the user follows up with an action verb on the same topic (e.g. "drop the inner card", "rename it", "fix it"), the standalone pre-flight MUST run on that follow-up.
+- This skill is already running in the current call stack. Each invocation runs `optimise-prompt` exactly once per directive. If the standalone pre-flight already locked an intent for the current user message, an entry-point skill that fires from the same message reuses the locked intent and skips its own Step 0.
+- The current message is a direct reply to an AskUserQuestion the assistant just sent.
+- The current message is a one-word ack ("yes", "ok", "no", "go", "continue", "stop").
+- The current message is a small clarification or addition that the parent skill's own dialogue is designed to absorb (e.g. "use 3 retries not 5" during plan-writing's task-design dialogue; "exclude the audit table" during EF migration scoping).
 
 ## B2-Level English Rules
 
@@ -167,7 +182,38 @@ If the user picks "Other" and writes free text, run Phase 2 once more on that fr
 
 ### Phase 5: Return
 
-Hand control back to the parent skill. Do not summarize at the end -- the parent skill will pick up from its own Step 1.
+Hand control back to the caller. Do not summarize at the end -- the caller (assistant or parent skill) picks up from the routing step using the locked intent as the canonical request.
+
+## Routing after the pre-flight
+
+`optimise-prompt` runs FIRST -- BEFORE the assistant decides which entry-point skill to invoke. The order is:
+
+```
+raw user message
+   |
+   v
+pandahrms:optimise-prompt  ->  locks B2-English intent
+   |
+   v
+assistant analyses the locked intent
+   |
+   v
+assistant routes:
+   |
+   +--> pandahrms:atlas-pipeline-orchestrator  (new feature, refactor, bug fix, plan execution)
+   +--> pandahrms:debugging                    (failing tests, broken behavior, root-cause hunts)
+   +--> standalone Claude action               (trivial edits per the global trivial-edit
+                                                exception in ~/.claude/CLAUDE.md)
+   +--> Codex via codex:rescue                 (non-trivial code implementation per the global
+                                                HARD GATE in ~/.claude/CLAUDE.md)
+```
+
+Rules:
+
+- The entry-point skill is chosen by the assistant **after** the pre-flight returns, based on the **locked intent**.
+- The chosen entry-point skill MUST detect that optimise-prompt already ran on the same message and skip its own Step 0.
+- Trivial edits per the global trivial-edit exception may proceed standalone after the pre-flight.
+- Non-trivial code implementation MUST route to `codex:rescue` per the global HARD GATE.
 
 ## Follow-up Directives
 
@@ -214,20 +260,34 @@ The parent skill announces in B2 English which path it took:
 
 ### Anti-patterns
 
-- **Do NOT re-invoke optimise-prompt on every user turn.** That breaks flow and ignores the parent skill's dialogue.
-- **Do NOT silently absorb a fresh directive without re-running the gate.** A scope change like "also rename FooService" deserves the same explicit + declarative check the original request got.
+- **Do NOT re-invoke optimise-prompt on every user turn.**
+- **Do NOT silently absorb a fresh directive without re-running the gate.**
 - **Do NOT treat short messages as control acks when they introduce new intent.** `add tests` is short but it is a fresh verb + object -- it is a directive, not an ack.
 
 ## Hard Rules
 
 - This skill NEVER edits files, runs git, runs tests, or calls any other skill. It is read-only and dialogue-only.
 - This skill NEVER triggers itself recursively. If a parent skill detects it is already inside an optimise-prompt run, it skips Step 0.
-- The skill MUST finish in one round of AskUserQuestion at most. Two-question chains are forbidden -- they slow the pipeline and frustrate the user.
-- The skill MUST NOT change the user's intent. It clarifies; it does not redirect. If the user wants to do something the assistant thinks is wrong, that disagreement belongs in the parent skill, not here.
+- The skill MUST finish in one round of AskUserQuestion at most.
+- The skill MUST NOT change the user's intent. It clarifies; it does not redirect.
 
-## Calling Pattern (for parent skills)
+## Calling Pattern
 
-The user-facing entry-point skills listed in [When to Use](#when-to-use) start with a Pre-Flight block that reads:
+### Standalone pre-flight
+
+When the assistant receives a user message that requests a working-tree action (see [When to Use](#when-to-use), case 1), invoke `pandahrms:optimise-prompt` via the Skill tool BEFORE any other tool call. Wait for it to return, then act on the confirmed intent.
+
+Mandatory even when:
+
+- The change looks tiny (one-line, one-className, one-rename).
+- The user message is a short follow-up to the assistant's own recommendation in the previous turn.
+- Auto mode is active.
+
+After the pre-flight returns, route per the [Routing after the pre-flight](#routing-after-the-pre-flight) section.
+
+### Entry-point skill Step 0
+
+The user-facing entry-point skills listed in [When to Use](#when-to-use) (case 2) start with a Pre-Flight block that reads:
 
 ```markdown
 ## Step 0: Optimise the prompt (mandatory first step)
@@ -239,6 +299,8 @@ return, then continue from Step 1 using the confirmed intent as the canonical
 request.
 
 Skip Step 0 only when:
+- The standalone pre-flight already ran on the current user message and locked an
+  intent. Reuse that locked intent -- do not re-run the gate.
 - The current message is a direct reply to an AskUserQuestion the assistant
   just sent.
 - The current message is a one-word ack ("yes", "ok", "no", "go", "continue").
