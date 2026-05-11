@@ -10,8 +10,8 @@ This is the **pandahrms-skills** repository -- a Claude Code plugin containing P
 pandahrms-skills/
 ├── .claude-plugin/plugin.json   # Plugin metadata and version
 ├── skills/                      # Claude Code skills (SKILL.md files)
-│   │  # Pre-flight (auto-invoked by atlas, debugging, design-refinement only)
-│   ├── optimise-prompt/               # Rephrase user request in B2-English, confirm intent before an entry-point skill proceeds. Pipeline-node skills skip it.
+│   │  # Pre-flight (runs first on every user turn -- repeat-back / intent lock)
+│   ├── optimise-prompt/               # Rephrase user request in B2-English on every turn so the user can confirm Claude read it right. Pipeline-node skills skip it.
 │   │  # Pipeline orchestrator (entry point)
 │   ├── atlas-pipeline-orchestrator/   # Unified design -> spec -> plan -> execute pipeline
 │   │  # Pipeline components (used by atlas)
@@ -47,6 +47,42 @@ pandahrms-skills/
 - Skills use YAML frontmatter (`name`, `description`) followed by markdown content
 - The `description` field determines when Claude Code invokes the skill -- keep it precise
 - Test skill changes by invoking the skill in a Pandahrms project workspace
+- SKILL.md body content must NOT contain any of these three prose types:
+  - **WHY prose** -- rationale, justification, or reasoning for a rule. Body holds rules and instructions only; rationale belongs in commit messages, design docs, or chat replies
+  - **Upstream-flow prose** -- descriptions of which skill, step, or pipeline node invokes this one ("called by atlas Step 5", "triggered after spec-writing"). The invoker owns that knowledge; the invoked skill stays self-contained
+  - **Negative-trigger prose** -- "does NOT trigger on X", "skip when Y", or any mention of skills/contexts the current skill should ignore. Silence is the rule; only state what the skill does. (This applies to the body only -- the frontmatter `description` field still needs precise trigger language for the harness)
+
+## SKILL.md Prose Compression Rules
+
+SKILL.md bodies are loaded into Claude's context on every invocation, so prose is paying rent. Write skill bodies in compressed form. The frontmatter `description` field is exempt -- it stays in normal English so trigger language remains precise.
+
+**Drop:**
+- Articles: a, an, the (where omission is unambiguous)
+- Filler: just, really, basically, actually, simply, essentially
+- Pleasantries: "you should", "make sure to", "remember to", "it is important that"
+- Hedging: "it might be worth", "you could consider", "would be good to"
+- Redundant phrasing: "in order to" -> "to", "the reason is because" -> "because"
+- Connective fluff: "however", "furthermore", "additionally", "in addition"
+
+**Preserve EXACTLY (never modify):**
+- Frontmatter (`name`, `description`, any YAML keys)
+- Code blocks (fenced ``` and indented)
+- Inline code (`backtick content`)
+- File paths, commands, URLs, env vars, version numbers
+- Technical terms, library names, API names, error strings
+- Markdown structure: headings, list nesting, table layout
+- Proper nouns: skill names, project names, person names
+
+**Compress:**
+- Short synonyms: "use" not "utilize", "fix" not "implement a solution for", "big" not "extensive"
+- Fragments OK: "Run tests before commit" not "You should always run tests before committing"
+- One example where multiple show the same pattern
+- Merge bullets that say the same thing differently
+
+**Safety rails:**
+- If a fragment makes step order or scope ambiguous, keep the full sentence
+- Security warnings, destructive-action confirmations, and irreversible-op gates stay in full English
+- Tables: compress cell text but keep every column and row
 
 ## Conventions
 
