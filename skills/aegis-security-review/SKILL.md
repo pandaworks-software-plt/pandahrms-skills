@@ -1,52 +1,44 @@
 ---
 name: aegis-security-review
-description: Triggers when the user requests a security review of code or working-tree changes -- phrasings such as "/aegis-security-review", "run aegis", "do a security review", "audit this for vulnerabilities", "OWASP pass on this branch", "check this PR for security issues", "auth audit", "authz audit", "pen test this". Does NOT trigger on incidental mentions of security topics (CVE articles, threat-model discussion) without an action verb directed at the working tree. Audits auth, authz, input validation, injection, secrets, PII exposure, audit trails, and tenant isolation in working tree changes or a specified feature area. Reports findings and fixes approved issues. Does NOT commit, stage, push, or invoke any other skill except via an explicit user choice in Phase 8.
+description: Triggers when the user requests a security review of code or working-tree changes -- phrasings such as "/aegis-security-review", "run aegis", "do a security review", "audit this for vulnerabilities", "OWASP pass on this branch", "check this PR for security issues", "auth audit", "authz audit", "pen test this". Audits auth, authz, input validation, injection, secrets, PII exposure, audit trails, and tenant isolation in working tree changes or a specified feature area. Reports findings and fixes approved issues. Does NOT commit, stage, or push.
 ---
 
 # Aegis Security Review
 
 ## Overview
 
-Aegis Security Review is a focused security audit of the code under review. It scans working tree changes (or a specified feature area) for security vulnerabilities using the OWASP Top 10, Pandahrms-specific threat patterns (tenant isolation, audit trails, PII handling), and the standards in `~/.claude/rules/Security.md`. It reports findings grouped by severity, optionally fixes approved issues, and hands off to `/hermes-commit`. Aegis Security Review never commits on its own.
+Focused security audit of code under review. Scans working tree changes (or specified feature area) for vulnerabilities using OWASP Top 10, Pandahrms-specific threat patterns (tenant isolation, audit trails, PII handling), and `~/.claude/rules/Security.md`. Reports findings by severity and optionally fixes approved issues. Never commits on its own.
 
 ## Hard Prohibitions
 
-Aegis Security Review MUST NOT do any of the following at any phase:
+MUST NOT at any phase:
 
-- Run `git commit`, `git commit --amend`, `git push`, `git rebase`, `git reset --hard`, `git stash`, `git add`, or any other history-altering, staging, or remote-publishing command. Fixes are written to the working tree only; staging is the user's responsibility (or `/hermes-commit`'s).
-- Invoke `pandahrms:hermes-commit` or any other skill except through the explicit user choice in Phase 8.
-- Send working-tree contents, diffs, file paths, or finding details to any external service (WebFetch, WebSearch, MCP servers, paste services, gists). The only allowed network calls are dependency-audit invocations of the project's own package-manager CLI (`dotnet`, `pnpm`, `npm`).
-- Rotate, re-issue, or relocate secrets when fixing a leaked-credential finding. Aegis Security Review only removes the leaked value from the source file and reports the leak; rotation is a user responsibility.
+- Run `git commit`, `git commit --amend`, `git push`, `git rebase`, `git reset --hard`, `git stash`, `git add`, or any history-altering, staging, or remote-publishing command. Fixes go to working tree only; staging is user's responsibility.
+- Invoke any other skill except through explicit user choice in Phase 8.
+- Send working-tree contents, diffs, file paths, or finding details to any external service (WebFetch, WebSearch, MCP servers, paste services, gists). Only allowed network calls are dependency-audit invocations of project's own package-manager CLI (`dotnet`, `pnpm`, `npm`).
+- Rotate, re-issue, or relocate secrets when fixing leaked-credential findings. Only remove leaked value from source file and report leak; rotation is user responsibility.
 - Modify `appsettings.Production.json`, KeyVault references, GitHub Actions secrets, or any production configuration store as a "fix."
-- Apply a security fix without explicit user approval recorded in Phase 7.
-- Write a `Where:` reference (file:line) for a line that has not been opened with the Read tool in this run.
+- Apply security fix without explicit user approval recorded in Phase 7.
+- Write `Where:` reference (file:line) for a line not opened with Read tool in this run.
 - Cite CVE numbers from training-data memory. CVE knowledge comes only from package-manager audit output captured during Phase 3 (A06).
-- Dispatch parallel subagents. All work happens in the main thread.
+- Dispatch parallel subagents. All work in main thread.
 
-## When to Use
+## Skip Conditions
 
-- Before merging a branch that touches authentication, authorization, API endpoints, or data persistence
-- After adding or modifying any endpoint that accepts user input, handles secrets, or returns sensitive data
-- When the user explicitly asks for a security review, pen-test pass, or OWASP audit
-- As a follow-up to `/athena-code-review` when the change surface is security-sensitive (auth flows, payment, PII, file upload, cross-tenant operations)
-- Before a release cut when changes include public-facing endpoints or schema migrations that touch sensitive columns
+Skip ONLY when **every** condition holds. If any fails, run in full.
 
-## When NOT to Use
+- Diff contains no `dangerouslySetInnerHTML`, no `@Html.Raw`, no template/raw-HTML interpolation.
+- Diff contains no `localStorage`, `sessionStorage`, or cookie writes.
+- Diff contains no auth-route, middleware, filter, policy, or `[Authorize]` changes.
+- Diff contains no new API call, new fetch, new HTTP client usage, or new server-action declarations.
+- Diff contains no env-var reads (`process.env.*`, `IConfiguration[...]`, `appsettings.*`).
+- Diff is documentation-only (`*.md`, `*.mdx`, `*.txt`), spec-only (`*.feature`), or tooling-only (lint config, formatter config) not shipped to production.
 
-Skip aegis-security-review ONLY when **every** condition below holds. If any one fails, run aegis-security-review in full.
-
-- The diff contains no `dangerouslySetInnerHTML`, no `@Html.Raw`, no template/raw-HTML interpolation.
-- The diff contains no `localStorage`, `sessionStorage`, or cookie writes.
-- The diff contains no auth-route, middleware, filter, policy, or `[Authorize]` changes.
-- The diff contains no new API call, new fetch, new HTTP client usage, or new server-action declarations.
-- The diff contains no env-var reads (`process.env.*`, `IConfiguration[...]`, `appsettings.*`).
-- The diff is documentation-only (`*.md`, `*.mdx`, `*.txt`), spec-only (`*.feature`), or tooling-only (lint config, formatter config) that does not ship to production.
-
-Run `git diff` and grep for the tokens above before declaring a change out of scope. Pure styling/layout/dark-mode/responsiveness work that passes all six bullets above is the canonical skip case.
+Run `git diff` and grep for tokens above before declaring change out of scope.
 
 ## Workflow
 
-Phases run **strictly sequentially** in the order Phase 0 -> Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 -> Phase 5 -> Phase 6 -> Phase 7 -> Phase 8. Do not begin a phase until the previous phase has emitted its required output. Aegis Security Review does not dispatch parallel subagents; all work happens in the main thread.
+Phases run **strictly sequentially** Phase 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8. Do not begin a phase until previous emitted required output. No parallel subagents; all work in main thread.
 
 ```dot
 digraph aegis {
@@ -106,23 +98,23 @@ digraph aegis {
 
 ## Phase 0: Scope
 
-### 0.1 Resolve scope to a concrete file list
+### 0.1 Resolve scope to concrete file list
 
-- If the user supplied a literal path or glob (e.g. `/aegis-security-review src/auth`, `aegis on Pandahrms.Performance.Api/Controllers/LoginController.cs`), use exactly that path set.
-- If the user supplied a natural-language scope (e.g. "the new login endpoint", "the export feature"), resolve it to a concrete file list using `git status`, `grep`, and `find`. When more than 5 files match, or when zero files match, use `AskUserQuestion` to confirm the resolved list before proceeding.
-- If no scope was supplied, default to the git working tree captured by:
+- If user supplied literal path or glob (e.g. `/aegis-security-review src/auth`, `aegis on Pandahrms.Performance.Api/Controllers/LoginController.cs`), use exactly that path set.
+- If user supplied natural-language scope (e.g. "the new login endpoint", "the export feature"), resolve to concrete file list using `git status`, `grep`, `find`. When more than 5 files match, or zero match, use `AskUserQuestion` to confirm before proceeding.
+- If no scope supplied, default to git working tree captured by:
   - `git status` (untracked and modified files)
   - `git diff` and `git diff --cached` (unstaged and staged changes)
 
 ### 0.2 Empty working tree halt
 
-If no scope was supplied AND `git status` shows a clean tree (no staged, unstaged, or untracked changes), halt immediately with the single line: "No changes to audit. Pass an explicit scope (e.g. `/aegis-security-review src/auth`) to audit specific files." Do not audit the entire repository as a fallback.
+If no scope supplied AND `git status` shows clean tree (no staged, unstaged, or untracked changes), halt immediately with single line: "No changes to audit. Pass an explicit scope (e.g. `/aegis-security-review src/auth`) to audit specific files." Do not audit entire repository as fallback.
 
 ### 0.3 Read every in-scope file end-to-end
 
-Read the **full content** of every in-scope file using the Read tool. A diff alone is not enough for security analysis -- unchanged surrounding code (guards, middleware, filters) often determines whether a change is safe.
+Read **full content** of every in-scope file using Read tool. Diff alone is not enough for security analysis -- unchanged surrounding code (guards, middleware, filters) often determines whether change is safe.
 
-If a file exceeds 2000 lines, page through it with explicit `offset`/`limit` calls until you reach EOF. Maintain a per-file ledger:
+If file exceeds 2000 lines, page through with explicit `offset`/`limit` calls until EOF. Maintain per-file ledger:
 
 | Path | Total lines | Fully read |
 |------|-------------|------------|
@@ -131,7 +123,7 @@ Do not begin Phase 1 until every in-scope file shows "Fully read: yes".
 
 ## Phase 1: Detect Project Type
 
-Detect every project-type signal that appears in the in-scope file list. Run the checklist rows for **every** matching project type (a change that touches both `*.csproj` and `package.json` runs both checklists). Multiple matches are common and expected.
+Detect every project-type signal in the in-scope file list. Run checklist rows for **every** matching project type (a change touching both `*.csproj` and `package.json` runs both checklists). Multiple matches are common and expected.
 
 | Signal | Project type | Emphasis |
 |--------|--------------|----------|
@@ -143,42 +135,42 @@ Detect every project-type signal that appears in the in-scope file list. Run the
 
 ### No-signal fallback
 
-If **no** project-type signal matches in scope, halt and use `AskUserQuestion` to confirm whether to (a) abort aegis-security-review as out-of-scope, or (b) proceed using a user-specified checklist set. Do not infer a checklist from the absence of signals, and do not silently default to .NET.
+If **no** project-type signal matches in scope, halt and use `AskUserQuestion` to confirm whether to (a) abort as out-of-scope, or (b) proceed using user-specified checklist set. Do not infer checklist from absence of signals, and do not silently default to .NET.
 
 ## Phase 2: Threat Pass
 
-Before checklist work, produce a written **Trust Boundary Map** that will be emitted into the final report under "Phase 2: Trust Boundaries". The map is a required input to Phase 3.
+Before checklist work, produce written **Trust Boundary Map** emitted into final report under "Phase 2: Trust Boundaries". Map is required input to Phase 3.
 
-The map has exactly five labelled rows. Each row lists `file:line` references drawn from files actually opened in Phase 0 (do not invent line numbers):
+Map has exactly five labelled rows. Each row lists `file:line` references drawn from files actually opened in Phase 0 (do not invent line numbers):
 
 1. **Entry points** -- where does untrusted input enter? (HTTP body, query string, headers, cookies, file upload, message queue, webhook)
-2. **Validation / parameterization** -- what does the code do with it before trusting it? (validate, parameterize, escape, authorize)
+2. **Validation / parameterization** -- what does code do with it before trusting it? (validate, parameterize, escape, authorize)
 3. **Exit points** -- where does it leave the system? (response body, log, DB, external API, email, file)
-4. **Authorization gates** -- what gate protects the operation? Is it enforced on the server, or only the UI?
-5. **Ownership verification** -- what tenant/user/org owns the data? Is that ownership verified before read/write?
+4. **Authorization gates** -- what gate protects the operation? Enforced on server, or only UI?
+5. **Ownership verification** -- what tenant/user/org owns the data? Is ownership verified before read/write?
 
-Append a "weak spots" list at the end of the map -- specific concerns to feed into Phase 3 checklist findings. Do not begin Phase 3 until the map is written.
+Append "weak spots" list at end of map -- specific concerns feeding into Phase 3 checklist findings. Do not begin Phase 3 until map is written.
 
 ## Phase 3: OWASP Checklist
 
-Work the rows in **strict numeric order**: A01, A02, A03, A04, A05, A06, A07, A08. A09 and A10 are covered downstream as noted but must still be acknowledged in the report ("A09: see Phase 4 audit-trail row", "A10: see A03 SSRF row"). Do not skip a row because earlier rows produced findings.
+Work rows in **strict numeric order**: A01, A02, A03, A04, A05, A06, A07, A08. A09 and A10 are covered downstream as noted but must still be acknowledged in report ("A09: see Phase 4 audit-trail row", "A10: see A03 SSRF row"). Do not skip a row because earlier rows produced findings.
 
 For each row, do **one of two things explicitly**:
 
-- (a) Execute the check and report findings under that row, OR
-- (b) Mark the row "N/A" with a one-line reason (e.g. "A02 N/A: no crypto, password storage, token signing, or TLS code in scope").
+- (a) Execute check and report findings under that row, OR
+- (b) Mark row "N/A" with one-line reason (e.g. "A02 N/A: no crypto, password storage, token signing, or TLS code in scope").
 
-A row qualifies as N/A only when none of the file types or APIs it inspects appear in scope. Do not silently omit a row -- every row gets either findings or an N/A reason in the report.
+Row qualifies as N/A only when none of the file types or APIs it inspects appear in scope. Do not silently omit a row -- every row gets either findings or N/A reason in report.
 
 ### A01 - Broken Access Control
 
 | Check | What to look for |
 |-------|------------------|
 | **Missing `[Authorize]` / auth guard** | New controller, action, route handler, or server action without auth enforcement. `AllowAnonymous` used intentionally? |
-| **IDOR** | Endpoint takes an id from the client and loads by that id without verifying the caller owns/has access to the resource. Always scope queries by `TenantId`, `OrgId`, or `UserId`. |
+| **IDOR** | Endpoint takes id from client and loads by that id without verifying caller owns/has access. Always scope queries by `TenantId`, `OrgId`, or `UserId`. |
 | **Role/policy bypass** | Role/policy strings typo'd, hardcoded `true`, or commented out. Policies registered in DI? |
-| **Mass assignment** | Request DTO binds directly to entity with fields the client should not set (`IsAdmin`, `TenantId`, `Status`). Use explicit mapping. |
-| **Server-side enforcement** | UI hides a button but the endpoint does not re-check permission. Every check must exist on the server. |
+| **Mass assignment** | Request DTO binds directly to entity with fields client should not set (`IsAdmin`, `TenantId`, `Status`). Use explicit mapping. |
+| **Server-side enforcement** | UI hides button but endpoint does not re-check permission. Every check must exist on server. |
 | **Path traversal** | File/blob paths built from user input without sanitization (`..`, absolute paths). |
 
 ### A02 - Cryptographic Failures
@@ -217,24 +209,24 @@ A row qualifies as N/A only when none of the file types or APIs it inspects appe
 |-------|------------------|
 | **CORS** | `AllowAnyOrigin` with credentials. Origin allowlist explicit. |
 | **CSP / security headers** | Missing `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`. |
-| **Verbose errors** | Stack traces, SQL errors, internal paths leaked to the client in production. |
+| **Verbose errors** | Stack traces, SQL errors, internal paths leaked to client in production. |
 | **Default creds / sample data** | Demo users, `admin:admin`, seed credentials shipped to prod. |
 | **Env vs appsettings** | Production secrets in committed `appsettings.json` instead of env/KeyVault. |
 
 ### A06 - Vulnerable and Outdated Components
 
-Detect the package manager from the in-scope files and run the matching command:
+Detect package manager from in-scope files and run matching command:
 
-- If any `*.csproj` is in scope, run `dotnet list package --vulnerable --include-transitive`.
-- If `package.json` is in scope and `pnpm-lock.yaml` exists at the project root, run `pnpm audit --prod`.
-- If `package.json` is in scope and `package-lock.json` exists at the project root, run `npm audit --production`.
-- If `package.json` is in scope and `yarn.lock` exists at the project root, run `yarn npm audit --recursive --severity high`.
+- If any `*.csproj` in scope, run `dotnet list package --vulnerable --include-transitive`.
+- If `package.json` in scope and `pnpm-lock.yaml` exists at project root, run `pnpm audit --prod`.
+- If `package.json` in scope and `package-lock.json` exists at project root, run `npm audit --production`.
+- If `package.json` in scope and `yarn.lock` exists at project root, run `yarn npm audit --recursive --severity high`.
 
-If the relevant CLI is not installed (command not found), report "dependency audit skipped: <command> not installed" in the Phase 6 report. Do not silently skip.
+If relevant CLI not installed (command not found), report "dependency audit skipped: <command> not installed" in Phase 6 report. Do not silently skip.
 
-CVE knowledge comes **only** from the captured audit output. Do not cite CVE IDs from training-data memory. If audit output is unavailable for any reason, report "lockfile changed; CVE check skipped" rather than inferring vulnerability status from prior knowledge.
+CVE knowledge comes **only** from captured audit output. Do not cite CVE IDs from training-data memory. If audit output unavailable for any reason, report "lockfile changed; CVE check skipped" rather than inferring vulnerability status from prior knowledge.
 
-Report any **High** or **Critical** advisories tied to changed `*.csproj` or `package.json`. If a lockfile changed, diff it and flag new packages that the audit output reports as vulnerable.
+Report any **High** or **Critical** advisories tied to changed `*.csproj` or `package.json`. If a lockfile changed, diff it and flag new packages the audit output reports as vulnerable.
 
 ### A07 - Identification and Authentication Failures
 
@@ -243,7 +235,7 @@ Report any **High** or **Critical** advisories tied to changed `*.csproj` or `pa
 | **Session handling** | Cookies `HttpOnly`, `Secure`, `SameSite=Lax` or `Strict`. Token refresh / revocation implemented. |
 | **MFA / lockout** | Brute-force protections on login and OTP endpoints. Account lockout thresholds. |
 | **Password policy** | Minimum length, complexity, breached-password check where applicable. |
-| **Token storage (FE)** | Access tokens in `localStorage` is a red flag -- prefer secure cookies or in-memory. |
+| **Token storage (FE)** | Access tokens in `localStorage` is red flag -- prefer secure cookies or in-memory. |
 
 ### A08 - Software and Data Integrity Failures
 
@@ -266,23 +258,23 @@ Covered in A03 above.
 | Check | What to look for |
 |-------|------------------|
 | **Tenant isolation** | Every DB query involving tenant-scoped tables filters by `TenantId`/`OrganisationId`. Global query filters in `DbContext.OnModelCreating` present and not bypassed with `IgnoreQueryFilters()` without justification. |
-| **Audit fields** | Entities that need tracking have `CreatedBy`, `CreatedAt`, `ModifiedBy`, `ModifiedAt`. Populated via base entity or middleware, not hand-set. |
-| **Audit trail on state-changing endpoints** | Every POST / PUT / PATCH / DELETE writes an audit log record (who, what, when, which resource). New endpoints must use the same audit mechanism as existing ones. Missing audit trail is a **High** severity finding. |
-| **PII in responses** | Response DTOs do not leak fields like `PasswordHash`, `SecurityStamp`, internal `Id` of other tenants' records, or salary/bank info not needed by the caller. |
+| **Audit fields** | Entities needing tracking have `CreatedBy`, `CreatedAt`, `ModifiedBy`, `ModifiedAt`. Populated via base entity or middleware, not hand-set. |
+| **Audit trail on state-changing endpoints** | Every POST / PUT / PATCH / DELETE writes audit log record (who, what, when, which resource). New endpoints must use same audit mechanism as existing ones. Missing audit trail is **High** severity finding. |
+| **PII in responses** | Response DTOs do not leak fields like `PasswordHash`, `SecurityStamp`, internal `Id` of other tenants' records, or salary/bank info not needed by caller. |
 | **PII in logs** | No logging of passwords, tokens, full credit card, full NRIC/SSN. Redaction in place. |
-| **Cross-project contract** | If this is a FE change calling a BE endpoint, verify the BE actually enforces the authorization the FE assumes. If this is a BE change, verify downstream FE / mobile is not relying on removed checks. |
-| **EF migrations** | New columns holding PII are marked for encryption / masking. `DROP COLUMN` on sensitive columns reviewed for data retention policy. No unfiltered `UPDATE`/`DELETE` in migration SQL. |
+| **Cross-project contract** | If FE change calling BE endpoint, verify BE actually enforces the authorization FE assumes. If BE change, verify downstream FE / mobile is not relying on removed checks. |
+| **EF migrations** | New columns holding PII marked for encryption / masking. `DROP COLUMN` on sensitive columns reviewed for data retention policy. No unfiltered `UPDATE`/`DELETE` in migration SQL. |
 | **Bridge / external keys** | No API keys, service account tokens, or bridge secrets committed. Check `.env*`, `appsettings.*.json`, `launchSettings.json`, `.github/workflows/*`. |
 
 ## Phase 5: Secret and Credential Scan
 
-Phase 5 runs as a discrete pass after Phase 4 completes. Do not merge it into Phase 3 or Phase 4 even if those phases noticed potential secrets.
+Phase 5 runs as discrete pass after Phase 4 completes. Do not merge into Phase 3 or Phase 4 even if those phases noticed potential secrets.
 
-On the full set of changed files (including untracked):
+On full set of changed files (including untracked):
 
 1. Grep for common patterns: `password\s*=`, `secret\s*=`, `api[_-]?key`, `Bearer `, `AKIA`, `-----BEGIN`, `ConnectionString`, `eyJ` (JWT prefix).
 2. Flag any committed `.env`, `.pem`, `.pfx`, `.key`, `.p12`, `id_rsa`, `credentials.json`, `service-account*.json`.
-3. For any hit, treat as **Critical** until proven false, and emit a top-of-report warning block in this exact form:
+3. For any hit, treat as **Critical** until proven false, and emit top-of-report warning block in this exact form:
 
    ```
    ## CRITICAL: POSSIBLE SECRET LEAKED
@@ -292,7 +284,7 @@ On the full set of changed files (including untracked):
    - Matched substring (redacted): <first 4 chars>...<last 4 chars>
    ```
 
-   This block appears at the very top of the Phase 6 report, above the Counts table, in addition to (not instead of) the regular Critical entry under Findings.
+   This block appears at very top of Phase 6 report, above Counts table, in addition to (not instead of) regular Critical entry under Findings.
 
 ## Phase 6: Categorize and Report
 
@@ -300,33 +292,33 @@ Group findings into four buckets:
 
 - **Critical** - exploitable now, data loss / account takeover / RCE class. Must fix before merge.
 - **High** - clear vulnerability with plausible exploit path. Fix before merge unless explicitly accepted.
-- **Medium** - weakness that raises risk (e.g., weak logging, missing rate limit on non-auth endpoint). Fix soon.
+- **Medium** - weakness raising risk (e.g., weak logging, missing rate limit on non-auth endpoint). Fix soon.
 - **Low / Info** - hardening suggestion, defense-in-depth. Fix opportunistically.
 
 ### Mandatory report structure
 
-The Phase 6 report is a single message containing, in this exact order:
+Phase 6 report is single message containing, in this exact order:
 
-1. Any `## CRITICAL: POSSIBLE SECRET LEAKED` blocks emitted by Phase 5 (zero or more, at the very top).
+1. Any `## CRITICAL: POSSIBLE SECRET LEAKED` blocks emitted by Phase 5 (zero or more, at very top).
 2. `## Aegis Report -- <scope summary>`
-3. `### Counts` -- a table with one row per severity (Critical, High, Medium, Low, Info) and an integer count for each.
-4. `### Phase 2: Trust Boundaries` -- the Trust Boundary Map produced in Phase 2.
+3. `### Counts` -- table with one row per severity (Critical, High, Medium, Low, Info) and integer count for each.
+4. `### Phase 2: Trust Boundaries` -- Trust Boundary Map produced in Phase 2.
 5. `### Findings` -- one block per finding using **exactly** this four-bullet template:
 
    > **[Severity] [Short title]**
    > - **Where:** `path/to/file.cs:lineno`
-   > - **What:** the vulnerability in one sentence
+   > - **What:** vulnerability in one sentence
    > - **Why it matters:** concrete attacker scenario
    > - **Fix:** concrete remediation (code sketch if non-trivial)
 
 6. `### Phase 3 row coverage` -- one line per OWASP row (A01-A08) marked either "executed" or "N/A: <reason>".
-7. `### Phases / checks skipped` -- list any other check that was N/A or skipped (e.g. dependency audit, project-type checklist) with a one-line reason.
+7. `### Phases / checks skipped` -- list any other check that was N/A or skipped (e.g. dependency audit, project-type checklist) with one-line reason.
 
-Deviation from this structure is a defect. Do not omit a section because it would be empty -- emit the heading with "(none)" instead.
+Deviation from this structure is defect. Do not omit a section because empty -- emit heading with "(none)" instead.
 
 ### No invented references
 
-Every `Where:` reference must come from a file actually opened by the Read tool in this run. Do not write a line number unless you have read that line. If a finding spans a concept rather than a single line, write `path/to/file.cs (whole file)` instead of guessing.
+Every `Where:` reference must come from file actually opened by Read tool in this run. Do not write line number unless you have read that line. If finding spans a concept rather than single line, write `path/to/file.cs (whole file)` instead of guessing.
 
 ## Phase 7: Fix (Optional)
 
@@ -345,29 +337,29 @@ Options:
 - **Fix now** -- apply remediations for approved findings.
 - **Skip** -- report stays as-is, user decides what to do.
 
-Never silently apply a security fix without user approval. Security fixes can change behavior.
+Never silently apply security fix without user approval. Security fixes can change behavior.
 
 ### What "fix" means in Phase 7
 
-A "fix" is the **minimum code change** that closes the specific finding. In Phase 7, Aegis Security Review MUST NOT:
+A "fix" is **minimum code change** that closes specific finding. In Phase 7, MUST NOT:
 
 - Refactor unrelated code or rename symbols.
-- Add new tests or test files (the user owns test coverage decisions for security fixes).
+- Add new tests or test files (user owns test coverage decisions for security fixes).
 - Restructure files or move code between files.
-- Change formatting, indentation, or whitespace outside the touched lines.
+- Change formatting, indentation, or whitespace outside touched lines.
 - Modify dependency versions or lockfiles.
 
-If the minimum fix is non-local (touches multiple files or requires architectural changes), do not auto-apply -- report it as a finding-with-recommendation and let the user decide.
+If minimum fix is non-local (touches multiple files or requires architectural changes), do not auto-apply -- report as finding-with-recommendation and let user decide.
 
 ### Re-verification
 
 After applying fixes, re-verify each fix by:
 
-1. Re-reading the **entire file** containing the fix end-to-end (not just the diff).
-2. Re-running the OWASP rows that originally produced the finding.
-3. **Plus** re-running A01 (access control) and the Phase 4 tenant-isolation row, even if those did not flag the original finding -- a fix can introduce new access-control or tenant-scoping defects.
+1. Re-reading **entire file** containing fix end-to-end (not just diff).
+2. Re-running OWASP rows that originally produced finding.
+3. **Plus** re-running A01 (access control) and Phase 4 tenant-isolation row, even if those did not flag original finding -- a fix can introduce new access-control or tenant-scoping defects.
 
-Record re-verification results inline under each fixed finding in the report ("Re-verified: clean" or "Re-verified: new finding -- [details]").
+Record re-verification results inline under each fixed finding in report ("Re-verified: clean" or "Re-verified: new finding -- [details]").
 
 ## Phase 8: Handoff
 
@@ -380,29 +372,29 @@ Then use `AskUserQuestion` to ask:
 
 > "Security review complete. Would you like to proceed to /hermes-commit, or test first?"
 
-- **Commit** -- invoke `pandahrms:hermes-commit` via the Skill tool, then end the aegis-security-review turn immediately upon dispatch. Do not produce additional output, additional findings, or extra commentary after the dispatch.
-- **Test first** -- emit exactly the single line "Sounds good. Run /hermes-commit when you're ready." and end the turn. Do not add any further text.
+- **Commit** -- invoke `pandahrms:hermes-commit` via Skill tool, then end aegis-security-review turn immediately upon dispatch. Do not produce additional output, findings, or commentary after dispatch.
+- **Test first** -- emit exactly the single line "Sounds good. Run /hermes-commit when you're ready." and end turn. Do not add further text.
 
-After Phase 8 ends, aegis-security-review is complete. Do not continue executing aegis-security-review behavior (no further audits, no follow-up advice, no additional checks) in the same turn.
+After Phase 8 ends, aegis-security-review is complete. Do not continue executing aegis-security-review behavior (no further audits, follow-up advice, or additional checks) in same turn.
 
 ## Red Flags - STOP
 
-- Applying a security fix without explicit user approval
-- Reporting "no issues" without actually reading the full changed files
-- Skipping tenant-isolation checks on any DB query in a tenant-scoped project
-- Declaring a hardcoded credential "probably fine" - always flag as Critical until disproven
-- Using a narrow diff view to judge a security question - always read the full file to see the surrounding guards
+- Applying security fix without explicit user approval
+- Reporting "no issues" without actually reading full changed files
+- Skipping tenant-isolation checks on any DB query in tenant-scoped project
+- Declaring hardcoded credential "probably fine" - always flag as Critical until disproven
+- Using narrow diff view to judge security question - always read full file to see surrounding guards
 - Running `/hermes-commit` automatically after fixes - always ask commit vs test first
-- Treating a missing audit trail as Low - it is High severity in Pandahrms
+- Treating missing audit trail as Low - it is High severity in Pandahrms
 
 ## Common Mistakes
 
 | Mistake | Fix |
 |---------|-----|
-| Judging auth from the route handler alone | Trace the middleware/filter pipeline too; the guard may be upstream -- or missing there. |
-| Assuming the ORM prevents injection | LINQ is safe; raw SQL, dynamic LINQ, and string interpolation into `FromSqlRaw` are not. |
+| Judging auth from route handler alone | Trace middleware/filter pipeline too; guard may be upstream -- or missing there. |
+| Assuming ORM prevents injection | LINQ is safe; raw SQL, dynamic LINQ, and string interpolation into `FromSqlRaw` are not. |
 | Accepting "it's only reachable internally" | Internal-only endpoints still need authz -- insiders and compromised services exist. |
-| Treating frontend validation as sufficient | FE validation is UX; the server must re-validate every input. |
-| Ignoring a removed check | If a `[Authorize]` or tenant filter was deleted, treat it as a Critical finding until shown to be intentional. |
-| Skipping dependency audit because "it's just a patch bump" | Run the audit anyway; transitive CVEs hide in minor bumps. |
-| Not reading the full file | Security depends on context -- the vulnerability may live in the unchanged block next to the edit. |
+| Treating frontend validation as sufficient | FE validation is UX; server must re-validate every input. |
+| Ignoring a removed check | If `[Authorize]` or tenant filter was deleted, treat as Critical finding until shown intentional. |
+| Skipping dependency audit because "it's just a patch bump" | Run audit anyway; transitive CVEs hide in minor bumps. |
+| Not reading full file | Security depends on context -- vulnerability may live in unchanged block next to edit. |

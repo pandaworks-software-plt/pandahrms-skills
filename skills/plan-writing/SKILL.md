@@ -1,17 +1,17 @@
 ---
 name: plan-writing
-description: Triggers when an approved design and (optionally) Gherkin specs need to be turned into a bite-sized implementation plan. Each task carries exact file paths, complete code, a Red-before-Green TDD step pair, a spec scenario reference (when specs exist), a test file/case reference, and a dependency marker so atlas-pipeline-orchestrator can parallel-dispatch. Tasks reference shared code by file path rather than duplicating it inline; atlas-pipeline-orchestrator always uses pandahrms:execute-plan to run them.
+description: Triggers when an approved design and (optionally) Gherkin specs need to be turned into a bite-sized implementation plan. Each task carries exact file paths, complete code, a Red-before-Green TDD step pair, a spec scenario reference (when specs exist), a test file/case reference, and a dependency marker for parallel dispatch. Tasks reference shared code by file path rather than duplicating it inline.
 ---
 
 # Pandahrms Plan Writing
 
 ## Overview
 
-Write a comprehensive implementation plan that an enthusiastic junior engineer with no project context could execute end-to-end. Each task has exact file paths, complete code, and verification steps. Plans are bite-sized (2-5 min per step), Red-Green-Refactor by default, and frequent-commit. DRY, YAGNI, TDD.
+Write an implementation plan that a junior engineer with no project context could execute end-to-end. Each task has exact file paths, complete code, and verification steps. Plans are bite-sized (2-5 min per step), Red-Green-Refactor by default, and frequent-commit. DRY, YAGNI, TDD.
 
 **Announce at start:** "I'm using Pandahrms plan-writing to turn the design into an implementation plan."
 
-**Save plans to:** `docs/pandahrms/plans/YYYY-MM-DD-<feature-name>.md` using today's date. Use a different path ONLY when the project's `CLAUDE.md` declares a different `plans/` location, in which case use that. Do not infer paths from any other source.
+**Save plans to:** `docs/pandahrms/plans/YYYY-MM-DD-<feature-name>.md` using today's date. Use a different path ONLY when the project's `CLAUDE.md` declares a different `plans/` location; then use that. Do not infer paths from any other source.
 
 ## Execution Order
 
@@ -20,49 +20,49 @@ Run these steps strictly in order. Do not parallelize, reorder, or skip any step
 1. Verify Prerequisites (next section). If any check fails, follow that section's remedy and stop.
 2. Run the Scope Check.
 3. Emit the Plan Document Header (see "Plan Document Header" section).
-4. Emit the File Structure block (see "File Structure" section). You MUST emit this block before writing any `### Task N:` heading.
-5. Emit every `### Task N:` block with required references and Red-Green steps. Insert Auto Gates / Manual Gates between tasks per the placement rule in "Gates".
+4. Emit the File Structure block (see "File Structure" section). MUST emit this block before writing any `### Task N:` heading.
+5. Emit every `### Task N:` block with required references and Red-Green steps. Insert Auto Gates / Manual Gates between tasks per placement rule in "Gates".
 6. Run the 8-item Self-Review checklist top to bottom; fix issues inline per its sequencing rule.
-7. Save the plan to its path with the Write tool. Do NOT print the plan inline to the user. Do NOT skip the Write call.
-8. Print the Hand Off announcement, then emit the Copyable Execute Instruction (fenced code block with `/pandahrms:execute-plan <path>`), then end the turn. Do NOT begin implementing any task. Do NOT modify any source files. Do NOT run any tests.
+7. Save plan to its path with the Write tool. Do NOT print plan inline to user. Do NOT skip the Write call.
+8. Print Hand Off announcement, then emit Copyable Execute Instruction (fenced code block with `/pandahrms:execute-plan <path>`), then end the turn. Do NOT begin implementing any task. Do NOT modify any source files. Do NOT run any tests.
 
 ## Prerequisites
 
 Verify ALL of the following before emitting any plan content. If any check fails, STOP and follow the listed remedy.
 
-1. **Design doc exists.** A design doc MUST live at `docs/pandahrms/designs/<feature-name>.md`. If it does not, output `No design doc found at docs/pandahrms/designs/. Run pandahrms:design-refinement first.` and stop.
-2. **Design doc is approved.** Approval is signaled by either (a) atlas-pipeline-orchestrator routing this skill the design after its approval gate, or (b) a `Status: approved` line in the design doc's frontmatter or top section. If neither signal is present, output `Cannot confirm design approval. Confirm explicitly before continuing.` and wait for an explicit user reply before continuing.
-3. **Design doc is complete.** The design doc MUST contain a Goal section, a Functional Requirements list, and a Tech Stack section. If any are missing, output `Design doc is incomplete. Missing sections: [list].` and stop. Do not invent content for missing sections.
+1. **Design doc exists.** Design doc MUST live at `docs/pandahrms/designs/<feature-name>.md`. If not, output `No design doc found at docs/pandahrms/designs/. Run pandahrms:design-refinement first.` and stop.
+2. **Design doc is approved.** Approval is signaled by `Status: approved` line in the design doc's frontmatter or top section, or by explicit caller signal. If neither is present, output `Cannot confirm design approval. Confirm explicitly before continuing.` and wait for explicit user reply before continuing.
+3. **Design doc is complete.** Design doc MUST contain Goal section, Functional Requirements list, and Tech Stack section. If any are missing, output `Design doc is incomplete. Missing sections: [list].` and stop. Do not invent content for missing sections.
 4. **Specs exist OR skip-specs path is declared.** If business behavior is in scope, spec files MUST exist under `pandahrms-spec/features/<area>/`. If neither is true, output `No specs found and skip-specs path not declared. Run pandahrms:spec-writing first or confirm UI-only / skip-specs path explicitly.` and stop.
-5. **Scope Profile is set.** The orchestrator sets `lightweight | standard | heavyweight` after design approval. If absent, default to `standard` and announce: `Scope Profile not set; defaulting to standard.`
+5. **Scope Profile is set.** Caller provides `lightweight | standard | heavyweight`. If absent, default to `standard` and announce: `Scope Profile not set; defaulting to standard.`
 
 ## Scope Check
 
-If the design covers multiple independent subsystems, STOP. Do not write any tasks. Output: `Design covers N subsystems: [list]. Cannot proceed -- ask the design author to split into separate plans, or reply confirming a single combined plan.` Wait for an explicit user reply before continuing. Each plan must produce working, testable software on its own.
+If design covers multiple independent subsystems, STOP. Do not write any tasks. Output: `Design covers N subsystems: [list]. Cannot proceed -- ask the design author to split into separate plans, or reply confirming a single combined plan.` Wait for explicit user reply before continuing. Each plan must produce working, testable software on its own.
 
 ## File Structure
 
-Before defining tasks, map out which files will be created or modified and what each one is responsible for. This is where decomposition decisions get locked in.
+Before defining tasks, map which files will be created or modified and what each is responsible for. This is where decomposition decisions get locked in.
 
 - Design units with clear boundaries and well-defined interfaces. Each file should have one clear responsibility.
-- You reason best about code you can hold in context at once, and your edits are more reliable when files are focused. Prefer smaller, focused files over large ones that do too much.
+- Prefer smaller, focused files over large ones that do too much.
 - Files that change together should live together. Split by responsibility, not by technical layer.
 - In existing codebases, follow established patterns. If the codebase uses large files, don't unilaterally restructure. If a file you would modify exceeds 400 lines AND your changes touch a distinct responsibility from the rest of the file, add a `Split-File` task that extracts the new responsibility into its own file. Otherwise, do not propose a split.
 
-This structure informs the task decomposition. Each task should produce self-contained changes that make sense independently.
+This structure informs task decomposition. Each task should produce self-contained changes that make sense independently.
 
 ## Bite-Sized Task Granularity
 
 Each step is one action (2-5 minutes):
 - "Write the failing test" -- step
-- "Run it to make sure it fails" -- step
-- "Implement the minimal code to make the test pass" -- step
-- "Run the tests and make sure they pass" -- step
+- "Run it to confirm it fails" -- step
+- "Implement minimal code to make the test pass" -- step
+- "Run tests and confirm they pass" -- step
 - "Stage changes (`git add ...`)" -- step. Do NOT include `git commit` -- see "No Commits in Plan Steps".
 
 ## Task Decomposition Heuristics
 
-atlas-pipeline-orchestrator sets a Scope Profile after design approval. Use it to right-size the plan:
+Use Scope Profile to right-size the plan:
 
 | Scope Profile | Target task count | Decomposition rule |
 |---------------|-------------------|---------------------|
@@ -70,17 +70,17 @@ atlas-pipeline-orchestrator sets a Scope Profile after design approval. Use it t
 | `standard` | 8-15 tasks | Default decomposition -- one task per logical concern. |
 | `heavyweight` | 15+ tasks | Decompose aggressively to keep parallel-dispatch wide. |
 
-If no Scope Profile is set (rare), default to `standard`.
+If no Scope Profile is set, default to `standard`.
 
 ### Collapse Rule
 
-When the work is small enough that decomposition produces fake granularity, collapse strictly-sequential tasks that:
+When work is small enough that decomposition produces fake granularity, collapse strictly-sequential tasks that:
 
 - Are causally chained (each must complete before the next starts), AND
 - Touch the same logical concern (e.g. "persist X" = entity property + EF mapping + migration), AND
 - Cannot run in parallel even with a `Depends on:` graph
 
-...into a single task with all the steps inside it. The combined task still gets ONE `Spec ref:`, ONE `Test ref:` (or `Verification:` slot), and a single Red-Green-Refactor cycle covering the whole concern.
+...into a single task with all steps inside. The combined task still gets ONE `Spec ref:`, ONE `Test ref:` (or `Verification:` slot), and a single Red-Green-Refactor cycle covering the whole concern.
 
 **Example -- collapse:**
 - Task A: Add `PromotionProbation` property to `Appraisal` entity
@@ -98,14 +98,14 @@ These touch different concerns (validation vs persistence) even when sequential 
 
 ### Gates (not tasks)
 
-Some steps are not implementer work -- they are commands the orchestrator runs between tasks. Gates come in two flavors:
+Some steps are not implementer work -- they are commands run between tasks. Gates come in two flavors:
 
-**Auto Gate** -- mechanical, idempotent local commands. The orchestrator announces and runs them automatically; no user pause. Use Auto Gate for:
+**Auto Gate** -- mechanical, idempotent local commands. Announced and run automatically; no user pause. Use Auto Gate for:
 - `pnpm openapi-ts` (or equivalent FE OpenAPI regen)
-- `dotnet ef database update` against the local DB
+- `dotnet ef database update` against local DB
 - Local BE redeploy (e.g. `docker compose up -d --build performance-api`) so swagger reflects new endpoints before FE work begins
 
-**Manual Gate** -- operator action that genuinely requires human judgment or out-of-band steps. The orchestrator pauses and waits for the user to confirm. Use Manual Gate only for:
+**Manual Gate** -- operator action that requires human judgment or out-of-band steps. Pause and wait for user to confirm. Use Manual Gate only for:
 - Production deploys
 - Database migrations against shared/prod environments
 - Schema review by a DBA
@@ -128,7 +128,7 @@ Run: `cd apps/performance-fe && pnpm openapi-ts`
 
 Why: Backend types must be regenerated before any FE task that imports the new endpoint.
 
-Behavior: orchestrator announces and runs automatically; no pause.
+Behavior: announce and run automatically; no pause.
 
 ---
 ```
@@ -176,9 +176,9 @@ Every plan MUST start with this header:
 Each task carries four required references when business behavior is in scope:
 
 - **Files** -- exact create/modify/test paths
-- **Spec ref** -- the Gherkin scenario(s) the task implements (omit only when no specs exist)
-- **Test ref** -- the test file and case names the task adds or modifies
-- **Depends on** -- task IDs this one waits for, or `none` if independent (atlas-pipeline-orchestrator uses this to parallel-dispatch)
+- **Spec ref** -- Gherkin scenario(s) the task implements (omit only when no specs exist)
+- **Test ref** -- test file and case names the task adds or modifies
+- **Depends on** -- task IDs this one waits for, or `none` if independent (used for parallel dispatch)
 
 ````markdown
 ### Task N: [Component Name]
@@ -231,7 +231,7 @@ Expected: PASS
 
 If duplication appeared with `approveGoal`, extract a shared `mutateApprovalState(goalId, patch)` helper. Re-run the test after each refactor step. Skip this step if no refactor opportunity exists.
 
-- [ ] **Step 6: Stage changes (do NOT commit -- atlas-pipeline-orchestrator defers commits to /hermes-commit)**
+- [ ] **Step 6: Stage changes (do NOT commit)**
 
 Run: `git add tests/services/goal-approval.test.ts src/services/goal-approval.ts`
 ````
@@ -245,10 +245,10 @@ Each task that touches production code or specs MUST carry:
 1. **Spec ref** -- one or more Gherkin scenarios the task satisfies. Omit only when no specs exist for the area (UI-only or skip-specs path). If specs exist for the area but you cannot link a task to one, the plan is incomplete -- update the spec or rewrite the task.
    - If an in-scope spec scenario describes a manual operator action with no production code (e.g. "Admin runs DB script", "DBA applies migration"), mark it as a Manual Gate, NOT a task. Do not create a task with placeholder code for manual procedures.
 2. **Test ref** OR **Verification** -- TDD is the workflow default; one of the two MUST be present on every production-code task:
-   - **Test ref** -- the test file path and the new/changed test case name(s). Required for any task that does NOT match a [No-Test-Pattern Category](#no-test-pattern-categories).
-   - **Verification** -- only allowed for tasks in the No-Test-Pattern Categories below. The Verification slot accepts ONLY these category labels in parentheses: `(EF mapping)`, `(EF migration)`, `(read DTO + projection)`, `(API regen)`, `(pure config)`. Any other label is invalid and forces the task to use a Test ref. State the category in parens, then describe how the task is actually verified (e.g. `Verification: (EF mapping) -- no unit-test pattern in this codebase; verified via integration test of the consuming endpoint + runtime`). Tasks using a Verification slot do NOT run a Red-Green-Refactor cycle and skip the RED/GREEN markers in implementer reports.
+   - **Test ref** -- test file path and the new/changed test case name(s). Required for any task that does NOT match a [No-Test-Pattern Category](#no-test-pattern-categories).
+   - **Verification** -- only allowed for tasks in No-Test-Pattern Categories below. Verification slot accepts ONLY these category labels in parentheses: `(EF mapping)`, `(EF migration)`, `(read DTO + projection)`, `(API regen)`, `(pure config)`. Any other label is invalid and forces the task to use a Test ref. State the category in parens, then describe how the task is verified (e.g. `Verification: (EF mapping) -- no unit-test pattern in this codebase; verified via integration test of the consuming endpoint + runtime`). Tasks using a Verification slot do NOT run a Red-Green-Refactor cycle and skip the RED/GREEN markers in implementer reports.
 3. **Red-before-Green ordering** -- when a Test ref is used, the failing-test step always precedes the implementation step. No production code without a failing test. (Verification-slot tasks are exempt -- they have no test to write.)
-4. **Depends on** -- explicit task IDs, or `none`. Independent tasks let atlas-pipeline-orchestrator parallel-dispatch and cut wall-clock time.
+4. **Depends on** -- explicit task IDs, or `none`. Independent tasks enable parallel dispatch.
 
 ### No-Test-Pattern Categories
 
@@ -256,13 +256,13 @@ Tasks in these categories may use the `Verification:` slot in lieu of a `Test re
 
 | Category | Why no test ref | Required verification |
 |----------|-----------------|----------------------|
-| **EF mapping** (configuring a property/relationship in `IEntityTypeConfiguration<T>`) | This codebase has no unit-test pattern for EF mappings. They are exercised by integration tests of the consuming endpoint and at runtime. | Name the integration test or endpoint that exercises the mapping; runtime smoke is acceptable when no integration test exists. |
-| **EF migration** (an `Add-Migration` artifact) | This codebase has no automated migration test pattern. The convention is inspect the generated migration, apply locally, verify with `sqlcmd` or equivalent. | "Inspect generated migration + apply locally + verify schema with sqlcmd" -- name the verification command and the table/column to inspect. |
-| **Read DTO + projection** (a DTO with a pure projection from an EF query, no business logic) | No unit-test pattern in this codebase for projections. They are verified through Swagger inspection + integration test of the consuming endpoint. | Name the integration test or Swagger endpoint that exercises the projection. |
-| **API regen / generated types** (`pnpm openapi-ts`, swagger-typescript-api, etc.) | Purely mechanical -- the generator produces the file. | `pnpm tsc --noEmit` (or the equivalent type-check command) is the verification. |
-| **Pure config change** (appsettings flag, tsconfig path alias, env var) with no behavior branch | No code path to test directly. | The build command and a runtime check that the config is honored. |
+| **EF mapping** (configuring a property/relationship in `IEntityTypeConfiguration<T>`) | This codebase has no unit-test pattern for EF mappings. Exercised by integration tests of the consuming endpoint and at runtime. | Name the integration test or endpoint that exercises the mapping; runtime smoke is acceptable when no integration test exists. |
+| **EF migration** (an `Add-Migration` artifact) | This codebase has no automated migration test pattern. Convention: inspect generated migration, apply locally, verify with `sqlcmd` or equivalent. | "Inspect generated migration + apply locally + verify schema with sqlcmd" -- name the verification command and the table/column to inspect. |
+| **Read DTO + projection** (a DTO with a pure projection from an EF query, no business logic) | No unit-test pattern in this codebase for projections. Verified through Swagger inspection + integration test of the consuming endpoint. | Name the integration test or Swagger endpoint that exercises the projection. |
+| **API regen / generated types** (`pnpm openapi-ts`, swagger-typescript-api, etc.) | Purely mechanical -- generator produces the file. | `pnpm tsc --noEmit` (or equivalent type-check command) is the verification. |
+| **Pure config change** (appsettings flag, tsconfig path alias, env var) with no behavior branch | No code path to test directly. | Build command and runtime check that the config is honored. |
 
-A task that combines a no-test-pattern category WITH custom logic (e.g. an EF mapping that has a `HasConversion` lambda doing real work) is NOT a no-test-pattern task -- it needs a real Test ref against the conversion logic.
+A task that combines a no-test-pattern category WITH custom logic (e.g. an EF mapping with a `HasConversion` lambda doing real work) is NOT a no-test-pattern task -- it needs a real Test ref against the conversion logic.
 
 ## No Placeholders
 
@@ -274,26 +274,26 @@ Every step must contain the actual content an engineer needs. These are **plan f
 - Steps that describe what to do without showing how (code blocks required for code steps)
 - References to types, functions, or methods not defined in any task
 
-When two tasks share similar code, choose between repeating the code or referencing an earlier task using these concrete rules:
+When two tasks share similar code, choose between repeating code or referencing an earlier task using these rules:
 
-- **Repeat the code in full** when ANY of these is true:
-  - The task's `Depends on:` is `none` (it can be parallel-dispatched).
-  - The referenced task is more than 3 tasks earlier in the plan.
-  - The two tasks live in different files.
+- **Repeat code in full** when ANY of these is true:
+  - Task's `Depends on:` is `none` (can be parallel-dispatched).
+  - Referenced task is more than 3 tasks earlier in the plan.
+  - Two tasks live in different files.
 - **Reference an earlier task** ONLY when ALL of these are true:
-  - The dependent task is the immediately following task in the plan.
-  - It lives in the same file as the referenced task.
-  - The difference is a single named field, argument, or value, statable in one sentence.
+  - Dependent task is the immediately following task in the plan.
+  - It lives in same file as the referenced task.
+  - Difference is a single named field, argument, or value, statable in one sentence.
 
-Format for a valid reference: `"Same shape as Task 3 Step 3, but with field 'archivedAt' instead of 'approvedAt'."` Atlas-pipeline-orchestrator dispatches independent tasks to fresh subagents that read the plan with no prior context, so repetition is safer than reference whenever the rules above don't unambiguously authorize a reference.
+Format for valid reference: `"Same shape as Task 3 Step 3, but with field 'archivedAt' instead of 'approvedAt'."` When the rules above don't unambiguously authorize a reference, repeat the code.
 
 ## No Commits in Plan Steps
 
-The plan MUST NOT include a `git commit` step in any task. Atlas-pipeline-orchestrator defers commits to `/hermes-commit` after the user has tested. Each task ends with:
+The plan MUST NOT include a `git commit` step in any task. Each task ends with:
 
 - **Stage changes** -- `git add <files>` only
 
-Never write `git commit -m "..."` into a plan. The user runs `/hermes-commit` after testing, which plans and executes atomic commits across the full set of changes.
+Never write `git commit -m "..."` into a plan.
 
 ## Self-Review
 
@@ -301,15 +301,15 @@ After writing the complete plan, re-read the design doc and every in-scope spec 
 
 **Sequencing rule.** For each item: (a) write the gap list to a scratch block at the bottom of the plan titled `<!-- Self-Review Scratch -->`; (b) fix every listed gap inline by editing the relevant task; (c) once all 8 items have been processed and every gap fixed, delete the scratch block. Do NOT save the plan with the scratch block still present.
 
-**Boundary rule.** Self-Review may only edit the plan. Do NOT edit the design doc or any `.feature` file from this skill. If a gap exposes a defect in the design or spec that cannot be closed by editing the plan, see the unresolvable-gap rule below.
+**Boundary rule.** Self-Review may only edit the plan. Do NOT edit the design doc or any `.feature` file from this skill. If a gap exposes a defect in design or spec that cannot be closed by editing the plan, see the unresolvable-gap rule below.
 
 1. **Spec coverage** -- read each in-scope spec scenario in full. For each scenario, write the task ID that implements it. If no task implements a scenario, list it as a gap.
 2. **Design coverage** -- read each functional requirement in the design doc in full. For each requirement, write the task ID that delivers it. If none, list it as a gap.
 3. **Test ref or Verification completeness** -- every production-code task carries either a `Test ref:` or a `Verification:` (only when the task is in a [No-Test-Pattern Category](#no-test-pattern-categories)). List any tasks missing both. A task with `Verification:` whose category label is NOT one of `(EF mapping)`, `(EF migration)`, `(read DTO + projection)`, `(API regen)`, `(pure config)` is also a gap -- either move it to a real test ref or discuss adding the category with the user.
 4. **Red-before-Green** -- every production-code task with a `Test ref:` has a failing-test step before any implementation step. Flag any task that puts implementation first. (Tasks using `Verification:` are exempt -- they do not run a TDD loop.)
-5. **Placeholder scan** -- search the plan for the red-flag patterns from "No Placeholders" above. List every match.
-6. **Type consistency** -- do the types, method signatures, and property names you used in later tasks match what you defined in earlier tasks? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a gap.
-7. **Dependency markers** -- every task has a `Depends on:` line, even if it's `none`. List any task missing the line.
+5. **Placeholder scan** -- search the plan for red-flag patterns from "No Placeholders" above. List every match.
+6. **Type consistency** -- do types, method signatures, and property names used in later tasks match those defined in earlier tasks? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a gap.
+7. **Dependency markers** -- every task has a `Depends on:` line, even if `none`. List any task missing the line.
 8. **No commit steps** -- search for `git commit`, `git push`, `git tag`, and `git rebase` in the plan. List every match.
 
 **Closing the review.**
@@ -319,25 +319,17 @@ After writing the complete plan, re-read the design doc and every in-scope spec 
 
 ## Hand Off
 
-The plan MUST already be saved to its path with the Write tool (Execution Order step 7) before this section runs. Do NOT print the plan inline as a chat response in lieu of saving.
+Plan MUST already be saved to its path with the Write tool (Execution Order step 7) before this section runs. Do NOT print the plan inline as chat response in lieu of saving.
 
-After the plan is saved and Self-Review is complete, announce:
+After plan is saved and Self-Review is complete, announce:
 
-> "Plan complete and saved to `<path>`. Atlas-pipeline-orchestrator will run Plan ↔ Spec cross-review next, then dispatch tasks to pandahrms:execute-plan."
+> "Plan complete and saved to `<path>`."
 
 Then emit the Copyable Execute Instruction (see below).
 
-Do NOT ask the user to choose between inline and subagent execution. Atlas-pipeline-orchestrator always uses pandahrms:execute-plan with parallel dispatch.
-
-When invoked outside atlas-pipeline-orchestrator (rare), announce instead:
-
-> "Plan complete and saved to `<path>`. Run pandahrms:execute-plan to implement, or hand the file to atlas-pipeline-orchestrator via `/atlas-pipeline-orchestrator <path>` for the full pipeline."
-
-Then emit the Copyable Execute Instruction.
-
 ### Copyable Execute Instruction
 
-After the announcement, emit a fenced code block containing the slash command the user can copy into a new session to start execution there. The user may also reply with `continue` in the current session to proceed with execution here. Use the exact format `/{execute-skill-name} {plan file path}` inside the fence -- one line, no surrounding prose.
+After the announcement, emit a fenced code block containing the slash command the user can copy into a new session to start execution there. User may also reply with `continue` in the current session to proceed with execution here. Use the exact format `/{execute-skill-name} {plan file path}` inside the fence -- one line, no surrounding prose.
 
 Default skill is `pandahrms:execute-plan`. The fenced block MUST be the last content of the turn:
 
@@ -353,24 +345,23 @@ Or reply `continue` to execute in this session.
 
 Substitute `<path>` with the absolute or workspace-relative path the plan was saved to (whichever you used in the Hand Off announcement -- be consistent). Do NOT add any text after this block.
 
-If the user's next message is exactly `continue` (case-insensitive, with or without surrounding whitespace), invoke `pandahrms:execute-plan` against the saved plan path in the current session. Any other reply is treated as new input -- do NOT auto-invoke execute-plan from ambiguous replies like "ok", "go", "yes".
+If user's next message is exactly `continue` (case-insensitive, with or without surrounding whitespace), invoke `pandahrms:execute-plan` against the saved plan path in the current session.
 
-**End of skill.** After printing the Copyable Execute Instruction, end your turn. Do NOT begin implementing any task. Do NOT modify any source files. Do NOT run any tests. Do NOT invoke pandahrms:execute-plan, /hermes-commit, or any follow-up skill from this skill.
+**End of skill.** After printing the Copyable Execute Instruction, end your turn. Do NOT begin implementing any task. Do NOT modify any source files. Do NOT run any tests.
 
 ## Red Flags
 
 | Thought | Reality |
 |---------|---------|
 | "I'll write 'add validation here' to keep tasks short" | No placeholders. Show the actual validation code. |
-| "Tasks 4 and 6 are nearly identical, I'll just say 'similar to Task 4'" | Default to repeating the code. Reference earlier tasks only when execution is strictly sequential. |
-| "I'll add a `git commit` at the end of each task" | Never. Atlas-pipeline-orchestrator + /hermes-commit own the commit step. Plans only stage changes. |
+| "Tasks 4 and 6 are nearly identical, I'll just say 'similar to Task 4'" | Default to repeating code. Reference earlier tasks only when execution is strictly sequential. |
+| "I'll add a `git commit` at the end of each task" | Never. Plans only stage changes. |
 | "This task touches production code but the test is 'obvious'" | Every production-code task carries either a Test ref or, if it falls in a recognized No-Test-Pattern Category (EF mapping, migration, read DTO + projection, API regen, pure config), a Verification slot. "Obvious" is not a category. |
-| "This EF mapping has a HasConversion lambda doing real work, but it's still 'just a mapping'" | No -- once there's behavior in the mapping, it needs a real Test ref against that behavior. The Verification slot is for mechanical mapping only. |
-| "I'll invent a new no-test-pattern category since this task feels mechanical" | The category list is closed. If you think a new one belongs there, surface the discussion to the user before using a Verification slot. |
+| "This EF mapping has a HasConversion lambda doing real work, but it's still 'just a mapping'" | No -- once there's behavior in the mapping, it needs a real Test ref against that behavior. Verification slot is for mechanical mapping only. |
+| "I'll invent a new no-test-pattern category since this task feels mechanical" | Category list is closed. If you think a new one belongs there, surface the discussion to the user before using a Verification slot. |
 | "I'll skip the spec ref for this small task" | If specs exist for the area, every task has a spec ref. If no specs exist (UI-only / skip-specs), say so in the header. |
-| "I'll let the engineer figure out task dependencies" | Mark dependencies explicitly. Atlas-pipeline-orchestrator parallel-dispatches based on this -- missing markers serialize the run. |
-| "I'll let writing-plans-style mandate decide whether to duplicate code" | Pandahrms plan-writing picks pragmatically: reference earlier tasks when sequential, repeat code when parallel-dispatched. Default to repeating. |
-| "I'll ask the user to choose inline vs subagent at the end" | No. Atlas-pipeline-orchestrator always uses pandahrms:execute-plan. Don't add the choice. |
+| "I'll let the engineer figure out task dependencies" | Mark dependencies explicitly. Missing markers serialize the run. |
+| "I'll let writing-plans-style mandate decide whether to duplicate code" | Pick pragmatically: reference earlier tasks when sequential, repeat code when parallel-dispatched. Default to repeating. |
 
 ## Remember
 
@@ -380,16 +371,11 @@ If the user's next message is exactly `continue` (case-insensitive, with or with
 - Red-before-Green ordering, no exceptions
 - `Depends on:` line on every task (even if `none`)
 - Stage changes only -- never commit
-- DRY, YAGNI, TDD, frequent commits (committed by /hermes-commit, not by the plan)
+- DRY, YAGNI, TDD
 
-## When to Use
-
-- After `pandahrms:design-refinement` and (optionally) `pandahrms:spec-writing` have completed
-- Invoked by atlas-pipeline-orchestrator in step 4, or directly when the user hands you a design + spec set
-
-## When NOT to Use
+## Refuse Conditions
 
 Refuse and abort with the listed message when ANY of the following are true:
 
-- **Design not approved.** No design doc exists at the expected design path (default `docs/pandahrms/designs/` for Pandahrms projects, `docs/designs/` otherwise), or the design's approval cannot be confirmed per Prerequisites item 2. Output: `Design not approved. Run pandahrms:design-refinement first.` and stop.
-- **Trivial single-file fix.** The change touches a single file with at most 30 modified lines, no new public API, and no new spec scenarios. Output: `Change is too small for a full plan. Do the fix directly with TDD.` and stop.
+- **Design not approved.** No design doc exists at the expected design path (default `docs/pandahrms/designs/` for Pandahrms projects, `docs/designs/` otherwise), or design's approval cannot be confirmed per Prerequisites item 2. Output: `Design not approved. Run pandahrms:design-refinement first.` and stop.
+- **Trivial single-file fix.** Change touches a single file with at most 30 modified lines, no new public API, and no new spec scenarios. Output: `Change is too small for a full plan. Do the fix directly with TDD.` and stop.
