@@ -11,6 +11,19 @@ Random fixes waste time and create new bugs. Quick patches mask the underlying c
 
 **Core principle:** find the root cause before attempting any fix. A symptom fix is a failed debug.
 
+## Pre-Flight: Optimise the prompt (mandatory before any other step)
+
+Before any other action in this skill, invoke `pandahrms:optimise-prompt` via the Skill tool with no arguments. It will either echo a one-line restatement (CLEAR) or ask the user to confirm intent (AMBIGUOUS / UNDER-SPECIFIED). Wait for it to return, then continue using the confirmed intent as the canonical request.
+
+Skip this pre-flight only when:
+- The current message is a direct reply to an AskUserQuestion the assistant just sent.
+- The current message is a one-word ack ("yes", "ok", "no", "go", "continue").
+- optimise-prompt is already running in the current call stack.
+
+**Re-invoke on mid-investigation fresh directives.** After the pre-flight, every user message received between debugging phases MUST be classified per the [Follow-up Directives](../optimise-prompt/SKILL.md#follow-up-directives) section of optimise-prompt. Continuation replies, control acks, and small evidence-additions are absorbed by the current phase. Fresh directives (new failing test, a different bug, "actually look at X instead", "stop debugging and patch") MUST pause the current phase and re-invoke `pandahrms:optimise-prompt` before debugging acts on them.
+
+See [optimise-prompt](../optimise-prompt/SKILL.md) for the full algorithm.
+
 ## The Iron Law
 
 ```

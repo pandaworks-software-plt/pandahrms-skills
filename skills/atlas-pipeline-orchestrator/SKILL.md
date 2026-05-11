@@ -33,6 +33,20 @@ Atlas runs single-stage review by default and only opts into a second-stage spec
 
 **Announce at start:** "I'm using Pandahrms atlas-pipeline-orchestrator to orchestrate design through execution."
 
+## Pre-Flight: Optimise the prompt (mandatory before any other step)
+
+Before the start announcement above and before any other action in this skill, invoke `pandahrms:optimise-prompt` via the Skill tool with no arguments. It will either echo a one-line restatement (CLEAR) or ask the user to confirm intent (AMBIGUOUS / UNDER-SPECIFIED). Wait for it to return, then emit the start announcement and continue using the confirmed intent as the canonical request for the rest of the pipeline.
+
+Skip this pre-flight only when:
+- The current message is a direct reply to an AskUserQuestion the assistant just sent.
+- The current message is a one-word ack ("yes", "ok", "no", "go", "continue").
+- optimise-prompt is already running in the current call stack.
+- Atlas is on the Fast Path or Resume Path AND the plan file already contains a confirmed intent line (no re-confirmation needed).
+
+**Re-invoke on mid-pipeline fresh directives.** After the pre-flight, every user message received between Atlas steps MUST be classified per the [Follow-up Directives](../optimise-prompt/SKILL.md#follow-up-directives) section of optimise-prompt. Continuation replies, control acks, and in-flight clarifications are absorbed by the current step. Fresh directives (new verb, new top-level object, scope expansion, contradiction of the locked intent, mid-pipeline redirect) MUST pause the current step and re-invoke `pandahrms:optimise-prompt` before Atlas acts on them. Announce in B2 English which path Atlas took: replace-and-restart, add-and-continue, or switch-skill.
+
+See [optimise-prompt](../optimise-prompt/SKILL.md) for the full algorithm.
+
 ## Fast Path (plan provided)
 
 When `/atlas-pipeline-orchestrator` is invoked with a positional argument that is NOT `--resume` or `--skip-e2e`, treat it as a plan file path. Before skipping any steps:

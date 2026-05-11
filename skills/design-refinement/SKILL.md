@@ -13,6 +13,20 @@ This skill is invoked by atlas-pipeline-orchestrator in step 1, and can be invok
 
 **Announce at start:** "I'm using Pandahrms design-refinement to refine this into a spec."
 
+## Pre-Flight: Optimise the prompt (mandatory before any other step)
+
+Before the start announcement above and before any other action in this skill, invoke `pandahrms:optimise-prompt` via the Skill tool with no arguments. It will either echo a one-line restatement (CLEAR) or ask the user to confirm intent (AMBIGUOUS / UNDER-SPECIFIED). Wait for it to return, then emit the announcement and continue using the confirmed intent as the canonical request.
+
+Skip this pre-flight only when:
+- The current message is a direct reply to an AskUserQuestion the assistant just sent.
+- The current message is a one-word ack ("yes", "ok", "no", "go", "continue").
+- optimise-prompt is already running in the current call stack.
+- This skill is invoked from inside atlas-pipeline-orchestrator (atlas already ran its own pre-flight).
+
+**Re-invoke on mid-refinement fresh directives.** After the pre-flight, every user message received between design sections MUST be classified per the [Follow-up Directives](../optimise-prompt/SKILL.md#follow-up-directives) section of optimise-prompt. Continuation replies to refinement questions, control acks, and small refinements ("the cap is 50 not 100") are absorbed by the current section. Fresh directives (new top-level feature, scope expansion to a different module, "redo the design with X approach instead") MUST pause the current section and re-invoke `pandahrms:optimise-prompt` before refinement acts on them.
+
+See [optimise-prompt](../optimise-prompt/SKILL.md) for the full algorithm.
+
 <HARD-GATE>
 Do NOT invoke any implementation skill, write any code, scaffold any project, or take any implementation action until you have presented a design and the user has approved it. This applies to EVERY project regardless of perceived simplicity.
 

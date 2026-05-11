@@ -10,6 +10,8 @@ This is the **pandahrms-skills** repository -- a Claude Code plugin containing P
 pandahrms-skills/
 ├── .claude-plugin/plugin.json   # Plugin metadata and version
 ├── skills/                      # Claude Code skills (SKILL.md files)
+│   │  # Pre-flight (auto-invoked by atlas, debugging, design-refinement only)
+│   ├── optimise-prompt/               # Rephrase user request in B2-English, confirm intent before an entry-point skill proceeds. Pipeline-node skills skip it.
 │   │  # Pipeline orchestrator (entry point)
 │   ├── atlas-pipeline-orchestrator/   # Unified design -> spec -> plan -> execute pipeline
 │   │  # Pipeline components (used by atlas)
