@@ -309,11 +309,19 @@ Create a task for each item and complete in order. Apply [Time Tracking](#time-t
 
 7. **Playwright e2e (conditional)** -- if Playwright MCP toolset is available in current session, run an e2e pass on this session's changes. See [Playwright E2E Step](#playwright-e2e-step) for detection and execution rules. Skip silently when Playwright MCP tools are not available.
 
-8. **User test pause** -- present Development Summary. If plan file's `## Atlas Progress` section has an `### Acknowledged Gaps` block, surface each gap with: `"**Acknowledged gaps to verify manually:** [gap list]."` Then ask via AskUserQuestion: `"Please test your changes locally. What did you find?"` with canonical options: `"Looks good -- proceed to code review"`, `"Found issues -- I'll describe them"`, `"Abort -- discard this run"`.
+8. **User test pause** -- present Development Summary. If plan file's `## Atlas Progress` section has an `### Acknowledged Gaps` block, surface each gap with: `"**Acknowledged gaps to verify manually:** [gap list]."` Mark Step 8 row in Atlas Progress table with status `awaiting-user-test` (Write plan file). Then announce verbatim and STOP the turn -- no AskUserQuestion, no further tool calls:
 
-   - On `"Looks good -- proceed to code review"`: proceed directly to Step 10 (Step 9 bypassed).
-   - On `"Found issues -- I'll describe them"`: wait for user's next message describing the issue, then proceed to Step 9.
-   - On `"Abort -- discard this run"`: announce `"Atlas aborted at user-test stage. Staged changes remain uncommitted. Use git restore --staged to discard or hermes-commit later to keep them."` and terminate.
+   ```
+   Development complete. Please test your changes locally.
+
+   When done, reply with what you found, or run /atlas-pipeline-orchestrator --resume.
+   ```
+
+   On atlas re-entry (next user message or `/atlas-pipeline-orchestrator --resume`), if Step 8 status is `awaiting-user-test`, classify user's most recent message:
+   - **Looks good** (positive confirmation, e.g. "looks good", "all working", "ship it", "proceed"): proceed directly to Step 10 (Step 9 bypassed).
+   - **Issues described** (concrete bug, mismatch, or behavioral problem in the reply): proceed to Step 9 with the described issue.
+   - **Abort** (e.g. "abort", "discard", "drop this", "cancel"): announce `"Atlas aborted at user-test stage. Staged changes remain uncommitted. Use git restore --staged to discard or hermes-commit later to keep them."` and terminate.
+   - **Ambiguous** (cannot classify with confidence): ask via AskUserQuestion `"How would you like to proceed?"` with canonical options `"Looks good -- proceed to code review"`, `"Found issues -- I'll describe them"`, `"Abort -- discard this run"`. On `"Found issues -- I'll describe them"`, wait for user's next message describing the issue, then proceed to Step 9.
 
 9. **Follow-up loop** -- user has described issues. Classify scope of change:
    - **Scope change** (user's report implies a new feature, removed feature, changed business rule, or different approach) -- loop back to Step 1. Before re-invoking design-refinement, run a context-refresh: re-read the design doc and any spec/test/code files that may have changed since execute. If files have changed since original Step 1 gather, re-run gather; otherwise jump straight to brainstorm. Announce: `"Looping back to design -- scope change detected: [one-line summary]."`
