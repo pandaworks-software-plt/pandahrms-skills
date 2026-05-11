@@ -100,24 +100,51 @@ If invoked with `/atlas-pipeline-orchestrator --resume`:
 
 After design is approved (end of Step 1), classify the work into a **Scope Profile** so downstream steps scale ceremony to feature size.
 
-Two profiles. Apply in order, first match wins.
+Three profiles. Classification has two stages, applied in order: hard promotors first, then a risk score.
 
-| Profile | Triggers (ALL must match for `small`) | What scales down |
-|---------|---------------------------------------|------------------|
-| **small** | • Touches <3 production source files (see [Production Source File](#production-source-file)), AND<br>• No schema migration / EF migration, AND<br>• No auth, multi-tenant boundary, billing, payment, or PII change, AND<br>• No breaking API change (additive endpoints/fields are fine), AND<br>• Plan estimate <8 tasks | • design-refinement skips the forced second-clarify (user lifecycle Step 4) and uses a single-question approve flow<br>• Spec<->Code audit (Step 5) runs sample-based instead of full sweep<br>• Simplify (Step 6) auto-skips unless Execute reported `DONE_WITH_CONCERNS` for any task<br>• Plan tightening: target 5-7 tasks, collapse strictly-sequential wiring, mechanical commands become Auto Gates (or Manual Gates if operator action is required) not tasks<br>• Design clarifying questions MUST batch into a single AskUserQuestion call when 2-4 are causally independent<br>• Aegis security review at Step 10 auto-skips (athena still runs) unless the design touched validation, permission, or data-state code |
-| **normal** | Anything that doesn't match `small`. Includes auth, multi-tenant data, billing, payment, PII, schema migrations, breaking API changes, or >=3 production files. | Default ceremony: every step runs as documented. Tasks touching auth, multi-tenant, billing, schema, or PII get `Risk: high` tagging at plan-writing time. |
+### Stage 1 -- hard promotors (any one match -> `heavyweight`)
+
+If ANY of these hold, profile is `heavyweight` regardless of score:
+
+- Touches existing auth/authz logic (modifies a `requireRole`, permission check, JWT/session middleware, login flow, or any pre-existing authorization rule). Adding a `requireRole(...)` guard to a brand-new route does NOT match -- that is additive.
+- Destructive schema change: `DROP COLUMN`, `DROP TABLE`, type change on a populated column, or NOT NULL added to an existing column with rows.
+- Schema change to a multi-tenant boundary table (organisations, users, memberships, permissions, roles).
+- Touches billing, payment, invoicing, or subscription code paths.
+- Touches PII serialization, export, or audit-log content.
+- Breaking API change: removed/renamed endpoint, removed required field, or added required field to an existing request shape.
+
+### Stage 2 -- risk score (only when no hard promotor hit)
+
+Sum points across every row that applies. Score 0-3 -> `lightweight`. Score 4+ -> `standard`.
+
+| Trigger | Points |
+|---------|--------|
+| Production source files (see [Production Source File](#production-source-file)): 1-3 / 4-8 / 9-15 / 16+ | 0 / 1 / 2 / 3 |
+| Plan task estimate: <6 / 6-9 / 10-14 / 15+ | 0 / 1 / 2 / 3 |
+| Schema: none / additive column on existing table / additive new table | 0 / 1 / 1 |
+| New form with validation rules (FE) | 1 |
+| Touches hot-path handler (auth login, signup, primary list endpoints, order/ticket create, payment) | 2 |
+| New cross-package boundary (touches `packages/shared-*` for shared-types / shared-constants) | 1 |
+
+### Tier behaviour
+
+| Profile | Design approval cadence | Plan + execute ceremony | Step 5 audit | Step 6 Simplify | Step 10 Aegis |
+|---------|------------------------|-------------------------|--------------|-----------------|---------------|
+| **lightweight** | 1 gate (end-of-design) | Plan targets 5-7 tasks, strict-wiring collapse, design batches 2-4 causally independent multiple-choice questions into one AskUserQuestion call | Sample mode (up to 5 scenarios per file) | Auto-skip unless any task returned `DONE_WITH_CONCERNS`; severity-filtered when concerns flagged | Auto-skip unless design touched validation, permission, or data-state code |
+| **standard** | 3 grouped gates (see Question Pacing > Section approval gates in [design-refinement](../design-refinement/SKILL.md#question-pacing)) | Default plan decomposition (8-15 tasks); default execute behaviour | Full sweep | Run normally | Run normally |
+| **heavyweight** | 8 per-section gates | Default plan decomposition; mandatory `Risk: high` tagging on every task touching auth/schema/PII/billing | Full sweep | Run normally | Always runs (never skipped) |
 
 ### How to set it
 
-1. After Step 1 approval, before invoking spec routing, estimate file count and check trigger criteria. Announce verbatim: `"Scope Profile: <profile> (<rationale>)."` -- always include rationale.
-2. Persist to plan's Atlas Progress section once plan is created (Step 3): `Scope Profile: small|normal`. Resumed runs read it back; do not re-classify on resume.
+1. After Step 1 approval, before invoking spec routing, run Stage 1 then Stage 2. Announce verbatim: `"Scope Profile: <profile> (<rationale>)."` -- always include rationale. Rationale names the promotor that hit (heavyweight) OR the score breakdown (lightweight/standard) -- e.g. `"Scope Profile: lightweight (score 2: 4-8 files +1, additive new table +1, no hot path)."`
+2. Persist to plan's Atlas Progress section once plan is created (Step 3): `Scope Profile: lightweight|standard|heavyweight`. Resumed runs read it back; do not re-classify on resume.
 3. Do NOT proactively offer override via AskUserQuestion. Only re-classify if user explicitly objects to the announced profile in their next message.
 
 ### Production Source File
 
-For Scope Profile classification (the `small` criterion above), "production source file" means any file under the project's source tree (`src/`, `Pandahrms.*/` for BE) EXCLUDING:
+For Scope Profile classification (the file-count row of the Stage 2 risk score), "production source file" means any file under the project's source tree (`src/`, `Pandahrms.*/` for BE) EXCLUDING:
 
-- Generated types (`*.d.ts`, OpenAPI client output)
+- Generated types (`*.d.ts`, OpenAPI client output, `routeTree.gen.ts`)
 - Test files (`*.test.*`, `*.spec.*`, `*Tests.cs`)
 - `.feature` spec files
 - Storybook stories (`*.stories.*`)
@@ -130,7 +157,7 @@ EF migration files COUNT as production source files for this rule. CSS/Tailwind 
 Step 8 displays the profile in the summary header so user can see why ceremony was tightened or expanded:
 
 ```
-Development Summary [Scope: small] (active work time, ...)
+Development Summary [Scope: lightweight] (active work time, ...)
 ```
 
 ## Codex Usage
@@ -301,9 +328,9 @@ Create a task for each item and complete in order. Apply [Time Tracking](#time-t
 
 6. **Simplify (conditional)** -- once Step 5 has passed, decide whether to run `simplify` using these conditions in this exact precedence order (first match wins):
    - **Auto-skip** when Step 4 was aborted with no completed tasks. Announce: `"Skipping Simplify -- Step 4 aborted with no completed tasks."`
-   - **Auto-skip** when Scope Profile is `small` AND no implementer returned `Status: DONE_WITH_CONCERNS`. Announce: `"Skipping Simplify -- small scope with no concerns flagged."`
-   - **Run with severity filter** when Scope Profile is `small` AND at least one task returned `DONE_WITH_CONCERNS`. Tell simplify subagents to report only severity >= medium findings; ignore cosmetic-only suggestions (comment trims, helper extractions of <10 lines, file-level reorderings).
-   - **Run normally** when Scope Profile is `normal`, regardless of `DONE_WITH_CONCERNS` status.
+   - **Auto-skip** when Scope Profile is `lightweight` AND no implementer returned `Status: DONE_WITH_CONCERNS`. Announce: `"Skipping Simplify -- lightweight scope with no concerns flagged."`
+   - **Run with severity filter** when Scope Profile is `lightweight` AND at least one task returned `DONE_WITH_CONCERNS`. Tell simplify subagents to report only severity >= medium findings; ignore cosmetic-only suggestions (comment trims, helper extractions of <10 lines, file-level reorderings).
+   - **Run normally** when Scope Profile is `standard` or `heavyweight`, regardless of `DONE_WITH_CONCERNS` status.
 
    All resulting changes remain uncommitted -- commits happen at Step 11.
 
@@ -331,11 +358,12 @@ Create a task for each item and complete in order. Apply [Time Tracking](#time-t
 
 10. **Code review (athena + aegis)** -- run code review explicitly before commit:
     - **athena-code-review** -- invoke `pandahrms:athena-code-review`. Reviews changed files against the standard checklist (TDD compliance, SOLID, quality, format/lint/tests). Can fix issues directly (no commits) and runs `/simplify` on its own findings.
-    - **aegis-security-review** -- invoke `pandahrms:aegis-security-review` if EITHER:
-      - Scope Profile is `normal`, OR
+    - **aegis-security-review** -- invoke `pandahrms:aegis-security-review` if ANY:
+      - Scope Profile is `standard`, OR
+      - Scope Profile is `heavyweight` (always runs at heavyweight; never skipped), OR
       - Design touched auth, multi-tenant, billing, payment, PII, validation, permission, or data-state code.
 
-      Otherwise auto-skip with announcement: `"Skipping Aegis -- small scope with no security-sensitive touches."`
+      Otherwise (Scope Profile is `lightweight` and design did not touch sensitive areas) auto-skip with announcement: `"Skipping Aegis -- lightweight scope with no security-sensitive touches."`
 
     Both reviewers stage fixes but do not commit. If either reviewer reports unresolved findings the user must decide on, prompt via AskUserQuestion with findings and canonical options: `"Apply the suggested fixes and re-run review"`, `"Accept findings as known limitations"`, `"Abort atlas"`. On `"Apply the suggested fixes and re-run review"`, re-dispatch the relevant reviewer; on accept, persist findings to plan's `### Acknowledged Gaps` block and proceed to Step 11. On abort, terminate with announcement: `"Atlas aborted at code-review stage. Staged changes remain uncommitted."`
 
@@ -361,7 +389,7 @@ Track **active work time** across the full atlas run -- time spent by Claude doi
 5. **At Step 8 (user-test handoff)** -- display summary:
 
 ```
-Development Summary [Scope: small] (active work time, excludes user-wait)
+Development Summary [Scope: lightweight] (active work time, excludes user-wait)
 ===========================
 Design                       --  12m 34s
 Spec routing                 --   8m 21s
@@ -373,7 +401,7 @@ Execute                      --  18m 14s
     Risk:high tasks          --   0 of 7
     Idle-wait observed       --     1m 19s (Batch 2: T3 waited on T2)
 Spec <-> Code audit          --   1m 30s
-Simplify                     --     skipped (small, no concerns)
+Simplify                     --     skipped (lightweight, no concerns)
 Playwright e2e               --   2m 06s
 ===========================
 Through user-test (active)   --     58m 47s
@@ -431,7 +459,7 @@ Atlas started: 1718000000
 Codex enabled: true
 Codex execution mode: full
 Playwright e2e: auto-detect
-Scope Profile: small
+Scope Profile: lightweight
 
 ### Acknowledged Gaps
 
@@ -449,7 +477,7 @@ Scope Profile: small
 
 For skipped steps, Duration column shows exactly one of these canonical strings (substitute bracketed value where indicated):
 
-- `skipped (small)` -- Scope Profile is small and step's small-skip rule applied
+- `skipped (lightweight)` -- Scope Profile is lightweight and step's lightweight-skip rule applied
 - `skipped (no specs)` -- no specs exist or were created in this session
 - `skipped (BE-only)` -- session changes have no FE-visible surface (Step 7 only)
 - `skipped (Playwright MCP not available)` -- Step 7 only
@@ -525,17 +553,17 @@ Skip only when NO specs in the affected area. Detect by:
 
 Covers UI-only work and "skip specs" path. Announce: `"Skipping Spec <-> Code audit -- no specs for this feature."`
 
-### Sample mode (small scope)
+### Sample mode (lightweight scope)
 
-When [Scope Profile](#scope-profile) is `small`, run audit in sample mode:
+When [Scope Profile](#scope-profile) is `lightweight`, run audit in sample mode:
 
 - Read every in-scope `.feature` file.
 - Sample up to 5 scenarios per file (first 3 + any 2 tagged `validation`, `permission`, or `boundary`).
 - For each sampled scenario, locate code path that should implement it and verify implementation covers the Given/When/Then.
 
-Announce when sample mode is in effect: `"Spec <-> Code audit running in sample mode (small scope) -- sampling up to 5 scenarios per file."`
+Announce when sample mode is in effect: `"Spec <-> Code audit running in sample mode (lightweight scope) -- sampling up to 5 scenarios per file."`
 
-For `normal` profile, run full sweep (every scenario in every in-scope file).
+For `standard` and `heavyweight` profiles, run full sweep (every scenario in every in-scope file).
 
 ### How to audit
 
@@ -543,7 +571,7 @@ Spec <-> Code audit is an audit task -- ALWAYS run inline via local `Agent` tool
 
 Inline review steps:
 
-1. Read every in-scope `.feature` file (full content for `normal`; sampled per rule above for `small`).
+1. Read every in-scope `.feature` file (full content for `standard` and `heavyweight`; sampled per rule above for `lightweight`).
 2. For each scenario, identify the production code path it covers. Use test file names from plan's Test refs as a starting point; the spec scenario -> test -> code chain is the audit trail.
 3. Read relevant code files (via Read) and verify implementation matches Given/When/Then steps. Look specifically for:
    - **Missing branches** -- scenario covers an error path the code never enters.
@@ -639,14 +667,14 @@ Skip Step 7 entirely (with announcement) when any of these hold:
 | "I'll just invoke pandahrms:execute-plan on a plan that has no Depends on: markers" | Reject the plan and loop back to pandahrms:plan-writing. Missing markers serialize the run -- atlas can't parallel-dispatch. |
 | "I'll mark every task Risk: high to be safe" | Atlas defaults to single-stage review. Tag `Risk: high` only on auth, multi-tenant, billing, schema, PII, or design-flagged risky tasks. |
 | "I'll skip Scope Profile classification -- it's obvious" | No. Always announce profile after Step 1 with rationale. Profile gates design's forced second-clarify, Spec<->Code audit sample mode, Simplify, and aegis-at-Step-10 -- silent classification means downstream behavior changes without an audit trail. |
-| "Plan has 12 numbered tasks for a 1-property feature -- looks thorough" | Over-decomposition. Use the Collapse Rule in pandahrms:plan-writing: strictly-sequential wiring tasks merge into one. For small scope, target 5-7 tasks. |
+| "Plan has 12 numbered tasks for a 1-property feature -- looks thorough" | Over-decomposition. Use the Collapse Rule in pandahrms:plan-writing: strictly-sequential wiring tasks merge into one. For lightweight scope, target 5-7 tasks. |
 | "I'll number `pnpm openapi-ts` as Task 9" | Mechanical commands are Gates, not tasks. They don't run through implementer subagents. Use Auto Gate for local mechanical commands (regen, local EF migrate, local docker rebuild) and Manual Gate only for genuine operator actions (prod deploy, DBA-led migration). |
 | "I'll mark `pnpm openapi-ts` as Manual Gate so user can confirm the regen finished" | No. Local mechanical commands are Auto Gates -- orchestrator runs them automatically with a one-line announcement. User's BE-then-deploy-then-FE rule is a sequencing rule, not a pause rule. |
 | "Discussion decided X but spec still says Y, I'll implement X" | Stop. Update spec to reflect the decision FIRST (Step 2 spec routing), then plan. Never leave the spec outdated. |
 | "Spec exists -- I'll ask user whether to update it" | No. When spec exists, Step 2 ALWAYS updates it from design decisions. Only ask user when spec is missing. |
 | "Spec <-> Code audit found a missing scenario -- I'll AskUserQuestion how to resolve" | Don't ask. Code-missing-scenario auto-loops back to Step 4 with a fix-task list. Only ask user when spec and code disagree on outcome (irreconcilable conflict). |
 | "User said the feature works -- I'll skip code review and commit directly" | No. Step 10 runs athena (and aegis when applicable) regardless of user satisfaction. User-test pass at Step 8 covers behavior; Step 10 covers code quality and security. |
-| "I'll silently invoke aegis at Step 10 even on small scope" | No. Aegis at Step 10 auto-skips on `small` scope UNLESS design touched validation, permission, or data-state code. Announce skip with canonical string. |
+| "I'll silently invoke aegis at Step 10 even on lightweight scope" | No. Aegis at Step 10 auto-skips on `lightweight` scope UNLESS design touched validation, permission, or data-state code. On `standard` and `heavyweight` it always runs. Announce skip with canonical string. |
 | "hermes-commit will re-run athena on the diff, so Step 10 is optional" | No. hermes-commit only commits. Step 10 is the only place athena runs in the pipeline. Skipping it commits unreviewed code. |
 | "I'll let an implementer commit since the plan says to commit" | Plans should not contain `git commit` steps. pandahrms:execute-plan strips them on dispatch. Step 11 owns commits. |
 | "Codex is installed -- I'll route the Spec<->Code audit through codex too, for second-opinion depth" | No. Reviews always run on Claude (per Codex Usage role split). Codex never reviews its own output. |

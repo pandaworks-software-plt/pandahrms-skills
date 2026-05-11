@@ -1,6 +1,6 @@
 ---
 name: design-refinement
-description: Triggers ONLY when atlas-pipeline-orchestrator invokes its design step (atlas Step 1 or Step 9 follow-up). Does NOT run standalone -- direct invocation is rejected with a STOP guard. Runs four phases in order: gather (read spec/test/code) -> forced repeat-back clarify (skipped on small scope) -> brainstorm 2-3 approaches -> impact section (code/DB/BL before-vs-after). Atlas Step 5 (Spec <-> Code audit) handles post-execute validation; this skill does not gate on a separate user review of the saved spec.
+description: Triggers ONLY when atlas-pipeline-orchestrator invokes its design step (atlas Step 1 or Step 9 follow-up). Does NOT run standalone -- direct invocation is rejected with a STOP guard. Runs four phases in order: gather (read spec/test/code) -> forced repeat-back clarify (skipped on lightweight scope) -> brainstorm 2-3 approaches -> impact section (code/DB/BL before-vs-after). Atlas Step 5 (Spec <-> Code audit) handles post-execute validation; this skill does not gate on a separate user review of the saved spec.
 ---
 
 # Pandahrms Design Refinement
@@ -20,7 +20,7 @@ If neither holds, STOP immediately. Emit verbatim: `"design-refinement runs insi
 Turn a rough idea into a fully formed design through a four-phase flow:
 
 1. **Gather** -- load existing spec, test, and code context so the design respects current behavior contracts.
-2. **Forced repeat-back clarify** -- after context is loaded, repeat the user's intent in B2 English and ask the user to confirm or correct. Always runs on `normal` Scope Profile; skipped on `small`.
+2. **Forced repeat-back clarify** -- after context is loaded, repeat the user's intent in B2 English and ask the user to confirm or correct. Always runs on `standard` and `heavyweight` Scope Profile; skipped on `lightweight`.
 3. **Brainstorm** -- propose 2-3 approaches with trade-offs and let the user pick.
 4. **Impact section** -- list before/after for code paths, DB schema/migrations, and business logic / business rules so the user understands what changes. Also fold coverage thinking (spec scenarios the design implies but does not yet write) into this section.
 
@@ -101,7 +101,7 @@ Create a task for each item and complete them in order.
 ```dot
 digraph design {
     "Phase 1: Gather context" [shape=box, style=filled, fillcolor=lightblue];
-    "Phase 2: Forced repeat-back clarify\n(skipped on small scope)" [shape=box, style=filled, fillcolor=lightyellow];
+    "Phase 2: Forced repeat-back clarify\n(skipped on lightweight scope)" [shape=box, style=filled, fillcolor=lightyellow];
     "Scope check" [shape=diamond];
     "Decompose into sub-projects" [shape=box];
     "Phase 3: Clarifying questions\n(one at a time)" [shape=box];
@@ -111,8 +111,8 @@ digraph design {
     "Write design doc (uncommitted)" [shape=box];
     "Hand off" [shape=doublecircle];
 
-    "Phase 1: Gather context" -> "Phase 2: Forced repeat-back clarify\n(skipped on small scope)";
-    "Phase 2: Forced repeat-back clarify\n(skipped on small scope)" -> "Scope check";
+    "Phase 1: Gather context" -> "Phase 2: Forced repeat-back clarify\n(skipped on lightweight scope)";
+    "Phase 2: Forced repeat-back clarify\n(skipped on lightweight scope)" -> "Scope check";
     "Scope check" -> "Decompose into sub-projects" [label="multi-subsystem"];
     "Decompose into sub-projects" -> "Phase 3: Clarifying questions\n(one at a time)" [label="first sub-project"];
     "Scope check" -> "Phase 3: Clarifying questions\n(one at a time)" [label="single-scope"];
@@ -132,8 +132,8 @@ After Phase 1 (gather) completes, before any other refinement question, repeat t
 ### When to run
 
 - **Always** run when no Scope Profile is yet set in conversation context (atlas classifies Scope Profile AFTER Step 1 approval, so this is the normal first-invocation state).
-- **Always** run when `Scope Profile: normal` is set.
-- **Skip** when `Scope Profile: small` is set. Announce: `"Skipping forced repeat-back -- small scope, original intent is clear."`
+- **Always** run when `Scope Profile: standard` or `Scope Profile: heavyweight` is set.
+- **Skip** when `Scope Profile: lightweight` is set. Announce: `"Skipping forced repeat-back -- lightweight scope, original intent is clear."`
 
 On re-entry from atlas Step 9 (follow-up loop), Scope Profile is already locked in conversation context; honor it.
 
@@ -150,7 +150,7 @@ On re-entry from atlas Step 9 (follow-up loop), Scope Profile is already locked 
 
 ### Why it exists
 
-The forced repeat-back catches divergence between the optimise-prompt pre-flight (which only saw the raw prompt) and the now-loaded context (which reveals what the area actually looks like). On normal scope, the cost of one extra prompt is far smaller than discovering 30 minutes into design that the user meant something different.
+The forced repeat-back catches divergence between the optimise-prompt pre-flight (which only saw the raw prompt) and the now-loaded context (which reveals what the area actually looks like). On `standard` or `heavyweight` scope, the cost of one extra prompt is far smaller than discovering 30 minutes into design that the user meant something different.
 
 ## The Process
 
@@ -182,7 +182,17 @@ Ask exactly one question per AskUserQuestion call. The only exception is the exp
 - You're in section-approval mode (presenting a design section -- one approval at a time).
 - Approach selection (2-3 approaches with trade-offs) -- this gets its own dedicated AskUserQuestion since it shapes everything downstream.
 
-**Section approval gates** for `small` Scope Profile: a single end-of-design approval is enough; do not gate per-section. For `normal` (and the first-invocation case where Scope Profile is not yet set), keep the per-section approval flow. Small-scope gating applies ONLY when Scope Profile = small is explicitly set in conversation context; do not infer small from project size or vibe.
+**Section approval gates** scale to Scope Profile. Atlas classifies AFTER Step 1 approval, so the first-ever Step 1 run (before classification) follows the `standard` 3-gate flow. Scope Profile applies from the next design or atlas Step 9 follow-up.
+
+| Scope Profile | Gate count | What each gate covers | Approval option label |
+|---------------|------------|----------------------|-----------------------|
+| `lightweight` | 1 end-of-design gate | All 8 sections presented in order, then a single approval for the whole design | `"Approve this design"` |
+| `standard` | 3 grouped gates | Direction (sections 1-3: Spec impact + Test impact + Architecture); Detail (sections 4-6: Components + Data flow + Error handling); Impact (sections 7-8: Testing approach + Impact section) | `"Approve this direction"` / `"Approve this detail"` / `"Approve this impact"` |
+| `heavyweight` | 8 per-section gates | One approval after each of the 8 sections in the standard order | `"Approve this section"` |
+
+Within a gate, sections still present in order. The approval question fires once per gate, not once per section, with the option label from the table above. The other two options stay the same across all tiers: `"Revise -- I will tell you what to change"`, `"Stop -- rethink approach"`. Tier gating applies ONLY when the named Scope Profile is explicitly set in conversation context; do not infer scope from project size or vibe.
+
+Revisions still scope to the originating section. If a later gate reveals an earlier-section flaw, return to that section, mark it `Revising`, restate the change, then re-request approval for the current gate (which now includes the revised section).
 
 **Exploring approaches:**
 
@@ -197,7 +207,7 @@ Ask exactly one question per AskUserQuestion call. The only exception is the exp
 
 - Begin design presentation only after: (a) Phase 1 (gather) is complete, (b) Phase 2 (forced repeat-back, when applicable) is confirmed, (c) scope check is complete, (d) clarifying questions have answered every Unknown listed during the question round, (e) the chosen approach from the 2-3 proposals is selected by the user. If any of those are still open, ask the next blocking question instead.
 - Each section: 2-6 sentences by default. Expand to a maximum of 300 words ONLY if the section contains: more than one architectural component, a non-obvious trade-off, OR an externally-visible API contract. State which of those triggered the expansion in one line.
-- After each section, call AskUserQuestion with a single multiple-choice question: `{ 'Approve this section', 'Revise -- I will tell you what to change', 'Stop -- rethink approach' }`. Treat anything other than the first option as not-approved and act accordingly.
+- After each approval gate (gate boundaries depend on Scope Profile -- see **Section approval gates** above in Question Pacing), call AskUserQuestion with a single multiple-choice question: `{ <tier-specific Approve label>, 'Revise -- I will tell you what to change', 'Stop -- rethink approach' }`. Treat anything other than the first option as not-approved and act accordingly.
 - Present sections in this exact order: (1) Spec impact, (2) Test impact, (3) Architecture, (4) Components, (5) Data flow, (6) Error handling, (7) Testing approach, (8) **Impact section** (code/DB/BL before-vs-after + coverage). Skip a section only when it does not apply, and state the skip reason in one line. Do NOT reorder.
 - If a later section reveals that an earlier section's assumption is wrong, return to the earlier section, mark it "Revising", restate the change, and re-request approval before continuing.
 - Do NOT call the Write tool on the design doc path until every section has received an explicit "Approve this section" answer. If section approvals are still pending, the design doc MUST NOT exist on disk.
@@ -307,8 +317,8 @@ After self-review, hand off per Phase 8 of the [Checklist](#checklist) using thi
 - **Multiple choice required** -- open-ended only when no exhaustive 2-5 option set exists.
 - **YAGNI ruthlessly** -- remove unnecessary features from all designs.
 - **Explore alternatives** -- always propose 2-3 approaches before settling.
-- **Incremental validation** -- present design in sections, get approval after each via the structured AskUserQuestion call (normal scope) or once at the end (small scope).
-- **Approval requires a structured selection** -- approval requires an explicit "Approve this section" selection from the AskUserQuestion call. Free-text replies like "ok", "sure", "go on", "next" do NOT count as approval. If the user replies that way, restate the approval question via AskUserQuestion.
+- **Incremental validation** -- present design in sections, then call AskUserQuestion at every approval gate per Scope Profile (lightweight: 1 end-of-design gate; standard: 3 grouped gates; heavyweight: 8 per-section gates).
+- **Approval requires a structured selection** -- approval requires an explicit selection of the tier-specific Approve option (`"Approve this design"` / `"Approve this direction"` / `"Approve this detail"` / `"Approve this impact"` / `"Approve this section"`) from the AskUserQuestion call. Free-text replies like "ok", "sure", "go on", "next" do NOT count as approval. If the user replies that way, restate the approval question via AskUserQuestion.
 - **Impact section is mandatory** -- the design must show code/DB/BL before-vs-after plus coverage thinking. This is what spec-writing uses to draft scenarios downstream.
 - **No commits** -- the design doc stays uncommitted until the user reviews.
 
@@ -317,7 +327,7 @@ After self-review, hand off per Phase 8 of the [Checklist](#checklist) using thi
 | Thought | Reality |
 |---------|---------|
 | "I'll skip Phase 1 (gather) since the user already described the change" | Required. Phase 1 (gather) is a HARD-GATE. Designs without that grounding miss compatibility issues with existing specs/tests/code. |
-| "Phase 2 (forced repeat-back) feels redundant when the prompt is clear" | Default behavior is to ALWAYS run it on normal scope. Only `Scope Profile: small` skips it. The cost of one extra prompt is far smaller than discovering wrong intent 30 minutes into design. |
+| "Phase 2 (forced repeat-back) feels redundant when the prompt is clear" | Default behavior is to ALWAYS run it on `standard` and `heavyweight` scope. Only `Scope Profile: lightweight` skips it. The cost of one extra prompt is far smaller than discovering wrong intent 30 minutes into design. |
 | "I'll batch a 5+ question survey to be efficient" | Cap at 2-4 batched questions, and only when they're causally independent and have clear multiple-choice options. 5+ means the design isn't refined enough yet -- ask the most-blocking question first and let the answer narrow the rest. |
 | "These two questions feel related, but I'll batch them anyway to save a round-trip" | If the second question's framing depends on the first's answer, ask sequentially. Batching dependent questions produces shallow or contradictory answers. |
 | "pandahrms-spec is on main but the project is on a feature branch -- close enough" | No. Align the spec repo to the project's branch BEFORE reading specs. Reading from the wrong branch hides in-flight spec edits and produces designs that contradict them. See [Spec Branch Alignment](#spec-branch-alignment). |
