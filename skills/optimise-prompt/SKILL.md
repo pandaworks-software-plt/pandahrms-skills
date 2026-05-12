@@ -1,17 +1,19 @@
 ---
 name: optimise-prompt
-description: ALWAYS run this as the very first step of every user-facing turn -- BEFORE any other tool call. Acts as a repeat-back step so the user can confirm Claude read their message correctly. Rephrases the user's request in clear B2-Level English and ALWAYS emits the restatement as a visible chat message to the user. When intent is unambiguous, emits the one-line restatement and returns; when the request is ambiguous, contradictory, or missing critical info, asks the user to confirm via AskUserQuestion. Triggers on read-only questions, diagnostic questions, working-tree actions (write/edit/refactor/fix/add/remove/rename/drop/run/build/commit/migrate/deploy), one-line tweaks, single-file edits, single-className removals, config touches, and short follow-up directives -- nothing exempts the request. Mechanical skips only: short acks that carry no new verb or object (e.g. "yes", "ok", "got it", "sounds good", "go ahead", "continue", "stop", "skip", "cancel", "nevermind"), direct replies to an in-flight AskUserQuestion, and recursive self-calls when the skill is already running. Also triggers on direct user invocation -- "/optimise-prompt", "rephrase this", "what do you think I'm asking", "clarify my prompt". Returns a single normalized intent statement that the caller uses as the canonical request from that point forward.
+description: ALWAYS run this as the very first step of every user-facing turn -- BEFORE any other tool call. Acts as a repeat-back step so the user can confirm Claude read their message correctly. Rephrases the user's request in clear B2-Level English and ALWAYS emits the restatement as a visible chat message, then pauses inline for the user to confirm before any downstream skill or agent acts. When intent is unambiguous, emits the one-line restatement plus an inline confirm prompt and waits; when the request is ambiguous, contradictory, or missing critical info, asks the user to pick from candidate intents via AskUserQuestion. Triggers on read-only questions, diagnostic questions, working-tree actions (write/edit/refactor/fix/add/remove/rename/drop/run/build/commit/migrate/deploy), one-line tweaks, single-file edits, single-className removals, config touches, and short follow-up directives -- nothing exempts the request. Mechanical skips only: short acks that carry no new verb or object (e.g. "yes", "ok", "got it", "sounds good", "go ahead", "continue", "stop", "skip", "cancel", "nevermind"), direct replies to an in-flight AskUserQuestion, and recursive self-calls when the skill is already running. Also triggers on direct user invocation -- "/optimise-prompt", "rephrase this", "what do you think I'm asking", "clarify my prompt". Returns a single normalized intent statement that the caller uses as the canonical request from that point forward.
 ---
 
 # Optimise Prompt
 
 ## Overview
 
-Rephrase user's request in clear B2-Level English. ALWAYS emit the restatement to the user as a visible chat message. Confirm intent whenever input is not both **explicit** and **declarative**.
+Rephrase user's request in clear B2-Level English. ALWAYS emit the restatement to the user as a visible chat message AND pause for confirmation before returning control. Confirm intent whenever input is not both **explicit** and **declarative**.
 
-**Hard rule -- always echo:** every run of this skill MUST end with a one-line restatement printed in chat. Silent return is forbidden. The restatement is the artefact the user reads to confirm Claude understood them.
+**Hard rule -- always echo:** every run of this skill MUST emit a one-line restatement printed in chat. Silent return is forbidden. The restatement is the artefact the user reads to confirm Claude understood them.
 
-**Hard gate -- restate vs ask:** take the CLEAR path (echo restatement and return) only when request is BOTH explicit (every key field named -- verb, object, qualifier) AND declarative (full statement of intent, not a question, fragment, or hedged guess). If user wrote a question, single noun, pronoun, or hedged guess ("maybe", "i think", "should we"), ask via AskUserQuestion -- the AskUserQuestion `question` text itself carries the rephrased intent and serves as the restatement.
+**Hard rule -- always pause:** every run of this skill MUST end with an inline confirm prompt and wait for the user to reply before returning control to the caller. No path is allowed to skip the pause. Downstream skills and agents only proceed after the user replies with a yes-style confirmation.
+
+**Hard gate -- restate vs ask:** take the CLEAR path (echo restatement + inline confirm prompt) only when request is BOTH explicit (every key field named -- verb, object, qualifier) AND declarative (full statement of intent, not a question, fragment, or hedged guess). If user wrote a question, single noun, pronoun, or hedged guess ("maybe", "i think", "should we"), ask via AskUserQuestion with candidate intents -- the AskUserQuestion `question` text itself carries the rephrased intent and serves as the restatement.
 
 ## B2-Level English Rules
 
@@ -44,14 +46,14 @@ Treat scope rule as hard floor for rest of turn. Subsequent skills do not need t
 ```
 1. Read user's raw input
 2. Classify clarity: CLEAR | AMBIGUOUS | UNDER-SPECIFIED
-3. CLEAR        -> print one-line restatement to chat, return
+3. CLEAR        -> print one-line restatement + inline confirm prompt, wait for reply
    AMBIGUOUS    -> AskUserQuestion with 2-4 candidate intents (question text = restatement)
    UNDER-SPEC   -> AskUserQuestion to fill missing field (question text = restatement)
 4. Lock the confirmed intent as the canonical request
-5. Return control to the caller -- restatement already visible to the user
+5. Return control to the caller -- user has confirmed the intent
 ```
 
-Every path produces a user-visible restatement. The CLEAR path prints it as plain chat text; the AMBIGUOUS / UNDER-SPECIFIED paths embed it in the AskUserQuestion `question` field.
+Every path produces a user-visible restatement AND a user confirmation. The CLEAR path prints the restatement plus an inline confirm prompt as plain chat text and waits for the user's reply. The AMBIGUOUS / UNDER-SPECIFIED paths embed the restatement in the AskUserQuestion `question` field and the user's option pick acts as the confirmation.
 
 **Phase 1: Read raw input**
 
@@ -105,15 +107,16 @@ Then apply these checks in order. First match wins.
 
 **Phase 3a: CLEAR path**
 
-Print a single B2-English line as plain chat text to the user. This MUST be a visible assistant message -- not an internal log, not a thinking block, not a tool argument. Without this line, the skill has failed its core job.
+Print one B2-English chat message containing the restatement AND an inline confirm prompt, then stop and wait for the user's reply. This MUST be a visible assistant message -- not an internal log, not a thinking block, not a tool argument. Without this message, the skill has failed its core job.
 
-Template:
+Template (two short lines in one message):
 
 ```
-Got it -- you want to <verb> <object> [<qualifier>]. Starting now.
+Got it -- you want to <verb> <object> [<qualifier>].
+Reply "yes" to proceed, or rephrase the request if I got it wrong.
 ```
 
-Rephrase rules for the restatement:
+Rephrase rules for the restatement line:
 
 - Use B2 vocabulary -- swap rare or formal words for common ones.
 - Make the verb and object explicit so the user can spot a misread in one glance.
@@ -122,11 +125,14 @@ Rephrase rules for the restatement:
 
 Examples:
 
-- `Got it -- you want to fix the failing test in UserServiceTests.cs. Starting now.`
-- `Got it -- you want to create a new branch off main for the performance overtime feature. Starting now.`
-- `Got it -- you want me to review the working-tree changes before commit. Starting now.`
+- `Got it -- you want to fix the failing test in UserServiceTests.cs.`
+- `Got it -- you want to create a new branch off main for the performance overtime feature.`
+- `Got it -- you want me to review the working-tree changes before commit.`
 
-Do NOT call AskUserQuestion. After the restatement line is printed, return control to the caller.
+After printing the message, return control to the caller WITHOUT calling any other tool. The caller waits for the user's reply. Treat the next user turn as the confirmation:
+
+- A yes-style reply (`yes`, `ok`, `go ahead`, `continue`, `sounds good`, `correct`, `right`) -- lock the restated intent as the canonical request; the caller resumes.
+- A no-style reply or a rephrased request -- run Phase 2 on the new message. If still not confirmed after one extra round, stop and tell user: "I am still not sure I have it right. Please write the request again in a different way."
 
 **Phase 3b: AMBIGUOUS / UNDER-SPECIFIED path**
 
@@ -166,7 +172,7 @@ If user picks "Other" and writes free text, run Phase 2 once more on that free t
 
 **Phase 5: Return**
 
-Hand control back to caller. Do not summarize at the end -- caller picks up from locked intent as canonical request.
+Hand control back to caller only after the user has confirmed (CLEAR-path yes reply, or AskUserQuestion option pick on the AMBIGUOUS / UNDER-SPECIFIED paths). Do not summarize at the end -- caller picks up from locked intent as canonical request.
 
 ## Follow-up Directives
 
@@ -192,6 +198,7 @@ A mid-skill message is a **fresh directive** when ANY hold:
 ## Hard Rules
 
 - Skill NEVER edits files, runs git, runs tests, or calls any other skill. Read-only and dialogue-only.
-- Skill MUST finish in one round of AskUserQuestion at most.
+- Skill MUST finish in one round of AskUserQuestion at most (AMBIGUOUS / UNDER-SPECIFIED paths only).
 - Skill MUST NOT change user's intent. Clarifies; does not redirect.
 - Skill MUST always emit a visible restatement -- plain chat on CLEAR path, AskUserQuestion `question` text on AMBIGUOUS / UNDER-SPECIFIED. Silent return is forbidden.
+- Skill MUST always pause for user confirmation before returning control -- inline reply on CLEAR path, option pick on AMBIGUOUS / UNDER-SPECIFIED. Returning without a user confirmation is forbidden.
