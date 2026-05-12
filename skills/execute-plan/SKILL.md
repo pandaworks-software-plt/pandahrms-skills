@@ -169,7 +169,7 @@ For each batch (smallest batch number first):
 8. Collect each subagent's report. Extract optional `Test runtime: <s>` field from each TDD log entry if subagent reported it.
 9. **Persist per-task timing row** to plan file's `### Step 6 Task Timing` table (see [Step 6 Timing Breakdown](#step-6-timing-breakdown) for format). Update once per batch, not per task.
 
-If a subagent fails (build error, test failure, merge conflict, non-zero exit), stop dispatching further batches. Do NOT silently retry, skip, or guess. Print a structured failure report (failed task ID, batch number, status returned, blocker details) and ask user via AskUserQuestion how to proceed (Retry / Skip task / Abort run). Do NOT decide on user's behalf.
+If a subagent fails (build error, test failure, merge conflict, non-zero exit), stop dispatching further batches. Do NOT silently retry, skip, or guess. Print a structured failure report (failed task ID, batch number, status returned, blocker details) inline in chat, then ask the user inline in plain text how to proceed, listing these options for the user to type back: Retry / Skip task / Abort run. Do NOT decide on user's behalf.
 
 Timing row for the failed task records `Wall-clock: <duration>` and `Status: <failure status>`. **Also append a row to Execution Log** with failure category (`blocker` for hard failures, `redispatch` if user chose Retry, etc.) and the one-line detail. If user provided guidance during failure handling, append a `user-correction` row capturing both what was wrong AND the corrected behavior.
 
@@ -183,7 +183,7 @@ Between completing one batch and starting the next, check whether the plan has a
 2. Announce one line to user: `"Auto Gate: <name> -- running: <command>"`.
 3. Execute the gate's `Run:` command via Bash. Use working directory implied by the command (e.g. `cd apps/performance-fe && pnpm openapi-ts` runs in FE app dir; `dotnet ef database update` runs in migrations project; `docker compose ...` runs in `_docker/`).
 4. On success: mark the gate's checkbox `- [x]` in the plan with a completion timestamp (same format as task completion), flip TodoWrite entry to `completed`, and append an `auto-gate` row to Execution Log with command + duration. Proceed to next gate or next batch.
-5. On failure (non-zero exit, build error, migration error, regen error): stop. Do NOT retry silently. Append a `blocker` row to Execution Log with failing command + exit code + last 20 lines of output. Ask user via AskUserQuestion (Retry / Skip / Abort).
+5. On failure (non-zero exit, build error, migration error, regen error): stop. Do NOT retry silently. Append a `blocker` row to Execution Log with failing command + exit code + last 20 lines of output. Display the failure inline in chat and ask the user inline in plain text, listing these options for the user to type back: Retry / Skip / Abort.
 
 **Manual Gate** -- pause for user:
 
@@ -428,7 +428,7 @@ When an implementer subagent returns:
 |--------|-------------------|-------------------|
 | `DONE` | Mark batch task complete (with completion timestamp per Step 4); proceed to second-stage review (if `Risk: high`) or next batch. | None -- the checkbox + Step 6 timing row already cover clean completions. |
 | `DONE_WITH_CONCERNS` | Surface the concerns to the user before marking the task complete. The user decides: accept (mark complete), re-dispatch with guidance, or escalate. | Append a `concern` row capturing the concern and the user's decision (accept / re-dispatch / escalate). If the user re-dispatched with guidance, also append a `user-correction` row with the guidance verbatim. |
-| `NEEDS_CONTEXT` | Re-dispatch the same implementer with the missing context filled in. Cap at 2 re-dispatches per task (3 attempts total). After the third `NEEDS_CONTEXT` return, stop dispatching this task and report `BLOCKED -- repeated NEEDS_CONTEXT after 3 attempts`. If the missing context isn't available before reaching the cap, escalate to the user via AskUserQuestion. Do NOT guess. | Append a `redispatch` row each attempt with the missing-context detail and attempt number. After the third failed attempt, append a `blocker` row before handing off. |
+| `NEEDS_CONTEXT` | Re-dispatch the same implementer with the missing context filled in. Cap at 2 re-dispatches per task (3 attempts total). After the third `NEEDS_CONTEXT` return, stop dispatching this task and report `BLOCKED -- repeated NEEDS_CONTEXT after 3 attempts`. If the missing context isn't available before reaching the cap, escalate to the user inline in plain text so the user can type the missing context. Do NOT guess. | Append a `redispatch` row each attempt with the missing-context detail and attempt number. After the third failed attempt, append a `blocker` row before handing off. |
 | `BLOCKED` | Stop dispatching further batches. Report the blocker details. | Append a `blocker` row with the blocker details. |
 
 ## Spec Reviewer Prompt Template
@@ -552,7 +552,7 @@ Never silently absorb a correction. Plan file must show user intervened, what th
 
 ## When to Stop and Ask
 
-Stop dispatching and ask user via AskUserQuestion when:
+Stop dispatching and ask the user inline in plain text when:
 
 - Any subagent reports a failure (build/test/merge)
 - A subagent reports a plan <-> spec conflict
@@ -587,7 +587,7 @@ User decides whether to retry, skip, or abort. Don't decide on your own.
 | "I'll skip the TodoWrite tracker -- the plan file already records progress" | No. The plan file is the durable audit; TodoWrite is the user's *live* progress view. Without it the user cannot see how many tasks are in flight, queued, or done. Section 1 step 8 is a hard gate before Section 2. |
 | "I'll create the TodoWrite tracker after the first batch returns -- it's just for visibility" | No. Create it BEFORE dispatching Batch 0. The user must see queued tasks while subagents are still running, not after. |
 | "I'll pause on every gate to be safe -- even Auto Gates" | No. Auto Gates run automatically with a one-line announcement. Only Manual Gates pause. |
-| "The Auto Gate command failed -- I'll retry it once silently" | No. Stop on failure. Append a `blocker` row to the Execution Log and ask the user via AskUserQuestion. The user decides retry vs skip vs abort. |
+| "The Auto Gate command failed -- I'll retry it once silently" | No. Stop on failure. Append a `blocker` row to the Execution Log and ask the user inline in plain text. The user decides retry vs skip vs abort. |
 | "I'll downgrade this Manual Gate to Auto Gate because the command looks safe" | No. The plan author chose Manual Gate deliberately. Do not change the kind at runtime. If the plan kind looks wrong, surface it to the user before dispatching. |
 
 ## Refuse Conditions

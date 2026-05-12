@@ -34,9 +34,9 @@ Step 1 is sequential. Do not parallelize the two sub-steps; sub-step 2 depends o
 
 - List all `*-design.md` files in `<project>/docs/plans/`.
 - If exactly one exists, use it.
-- If multiple exist, use AskUserQuestion to ask user which file to use; list every candidate by full path. Do not pick automatically based on mtime, file name keywords, or git status.
+- If multiple exist, list every candidate by full path inline in chat and ask the user inline in plain text which file to use. Do not pick automatically based on mtime, file name keywords, or git status.
 - Do not search outside `<project>/docs/plans/`.
-- Read chosen design doc and capture its declared module and feature path (e.g. `specs/auth/onboarding-mobile`). If path is not stated in doc, use AskUserQuestion to request it.
+- Read chosen design doc and capture its declared module and feature path (e.g. `specs/auth/onboarding-mobile`). If path is not stated in doc, ask the user inline in plain text so they can type the path.
 
 #### 1b. Resolve the spec directory (runs only after 1a completes)
 
@@ -106,7 +106,7 @@ Classify each EXTRA as exactly one of:
 
 Mark each EXTRA as `Defensive` or `Drift` in Extras table. Do not leave any EXTRA unclassified.
 
-If more than 10 EXTRAs are found, stop classifying and present count to user via AskUserQuestion before continuing. Do not silently process a large extras set.
+If more than 10 EXTRAs are found, stop classifying and present the count and EXTRA list inline in chat, then ask the user inline in plain text before continuing. Do not silently process a large extras set.
 
 **Step 5: Report**
 
@@ -149,7 +149,7 @@ Branch on findings.
 
 **Pass condition (zero GAPs AND zero Drift extras):** announce "Design and specs are aligned." Defensive EXTRAs do not block alignment. Proceed to Skill Exit.
 
-**Any GAPs OR any Drift extras present:** use AskUserQuestion with text `"Spec review found {N} gap(s) and {M} drift extra(s). How would you like to resolve?"` and options below. Apply matching action exactly:
+**Any GAPs OR any Drift extras present:** ask inline in plain text `"Spec review found {N} gap(s) and {M} drift extra(s). How would you like to resolve?"` and list the options below for the user to type back. Apply matching action exactly:
 
 - `Fix gaps and remove drift` -- re-invoke `pandahrms:spec-writing` via Skill tool, passing GAP table and Drift EXTRA table as input. Do not edit `.feature` files directly from this skill.
 - `Fix gaps only` -- re-invoke `pandahrms:spec-writing` via Skill tool, passing GAP table only.

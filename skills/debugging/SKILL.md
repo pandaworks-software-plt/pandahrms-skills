@@ -228,7 +228,7 @@ The failing test is proof you understood the bug. Without it, "the fix worked" o
 STOP. Count attempts.
 
 - **< 3 attempts:** Return to Phase 1 with new information from this attempt. Do NOT layer another fix.
-- **>= 3 attempts:** STOP and surface to the user via `AskUserQuestion`. Three failed fixes in the same area signals architecture is wrong, not that the next fix needs to be cleverer.
+- **>= 3 attempts:** STOP and surface to the user inline in plain text. Three failed fixes in the same area signals architecture is wrong, not that the next fix needs to be cleverer.
 
 ### 5. Architectural escalation (after 3+ failed fixes)
 
@@ -315,5 +315,5 @@ This skill does NOT:
 | Leaving `console.log` / `Console.WriteLine` / dump statements in the commit | Remove all diagnostic instrumentation in hand-off step. |
 | Fixing FE side first when the bug is in the API | Per global rule: settle backend first, deploy, then frontend. |
 | Editing types in FE OpenAPI client to "match" a buggy backend | Never. Fix backend, regenerate types, then FE. |
-| Continuing past 3 failed fixes | Stop. Architectural escalation via `AskUserQuestion`. |
+| Continuing past 3 failed fixes | Stop. Architectural escalation via inline plain-text message. |
 | Running `/hermes-commit` when the fix is verified | This skill hands off; user invokes `/athena-code-review` next. |

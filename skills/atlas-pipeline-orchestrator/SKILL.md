@@ -220,7 +220,7 @@ AUTHORITY HIERARCHY:
 
 **Post-execution audit (Step 5):** Spec is source of truth for what behavior must exist. Code is audited against the spec, not against the plan. If code and spec diverge, fix the code (loop back to Step 4) or update the spec (loop back to Step 2) per rules in [Spec<->Code Audit](#spec-code-audit).
 
-**Never silently reconcile.** When authority sources disagree and loop-back rules cannot resolve them, STOP and prompt via AskUserQuestion: "Authority sources disagree -- [describe the conflict]. How would you like to resolve?" with canonical options: "Update spec to match implementation", "Fix code to match spec", "Abort atlas". Never silently pick a side; never just print a warning and continue.
+**Never silently reconcile.** When authority sources disagree and loop-back rules cannot resolve them, STOP and present the conflict inline in chat (with file:line references for spec and code), then ask inline in plain text "How would you like to resolve?" listing the canonical options for the user to type back: "Update spec to match implementation", "Fix code to match spec", "Abort atlas". Never silently pick a side; never just print a warning and continue.
 </HARD-GATE>
 
 <HARD-GATE>
@@ -365,7 +365,7 @@ Create a task for each item and complete in order. Apply [Time Tracking](#time-t
 
       Otherwise (Scope Profile is `lightweight` and design did not touch sensitive areas) auto-skip with announcement: `"Skipping Aegis -- lightweight scope with no security-sensitive touches."`
 
-    Both reviewers stage fixes but do not commit. If either reviewer reports unresolved findings the user must decide on, prompt via AskUserQuestion with findings and canonical options: `"Apply the suggested fixes and re-run review"`, `"Accept findings as known limitations"`, `"Abort atlas"`. On `"Apply the suggested fixes and re-run review"`, re-dispatch the relevant reviewer; on accept, persist findings to plan's `### Acknowledged Gaps` block and proceed to Step 11. On abort, terminate with announcement: `"Atlas aborted at code-review stage. Staged changes remain uncommitted."`
+    Both reviewers stage fixes but do not commit. If either reviewer reports unresolved findings the user must decide on, present the findings inline in chat, then ask inline in plain text listing these canonical options for the user to type back: `"Apply the suggested fixes and re-run review"`, `"Accept findings as known limitations"`, `"Abort atlas"`. On `"Apply the suggested fixes and re-run review"`, re-dispatch the relevant reviewer; on accept, persist findings to plan's `### Acknowledged Gaps` block and proceed to Step 11. On abort, terminate with announcement: `"Atlas aborted at code-review stage. Staged changes remain uncommitted."`
 
 11. **Commit** -- invoke `pandahrms:hermes-commit`. The skill verifies a clean working tree (0 test failures, 0 lint errors, 0 format errors), plans atomic commits across staged changes, and executes them. hermes-commit only commits; review already ran at Step 10. Time tracking ends when hermes-commit returns.
 
@@ -530,14 +530,14 @@ When a subagent returns `Status: BLOCKED`, `Status: NEEDS_CONTEXT`, or any non-s
    - **Task too large** -- subagent partially completed work but scope exceeds what fits in one dispatch. Resolution: return to `pandahrms:plan-writing` to split the task; do not retry as-is.
    - **Plan or spec error** (typically `Status: BLOCKED` with conflict details) -- plan and spec disagree, spec is internally contradictory, or plan references something that doesn't exist. Resolution: escalate to user; loop back to `pandahrms:spec-writing` or `pandahrms:plan-writing` as appropriate.
 4. **Present error and classification** -- show failing subagent's name, task description, returned status, error output, classification, and current retry count for that task.
-5. **Ask the user** via AskUserQuestion: "Subagent '[task name]' returned [status] -- classified as [missing context / insufficient reasoning / task too large / plan or spec error]. How would you like to proceed?" with options matched to classification (omit retry options if 3-retry cap has been hit):
+5. **Ask the user inline in plain text**: present the failing subagent's name, task, status, error output, classification, and retry count, then on a new line ask "How would you like to proceed?" listing the options below for the user to type back (omit retry options if 3-retry cap has been hit):
    - **"Re-dispatch with added context"** (missing context) -- user provides missing piece, atlas re-dispatches same task and increments retry counter.
    - **"Re-dispatch with stronger model"** (insufficient reasoning) -- atlas re-dispatches via codex per resolution rule above and increments retry counter.
    - **"Send back to plan/spec"** (task too large or plan/spec error) -- atlas pauses execute, loops back to relevant skill, then resumes; resets retry counter for that task.
    - **"Skip and continue"** -- note failed task in conversation and proceed with remaining tasks.
    - **"Abort atlas"** -- stop execution, display Development Summary with Execute step marked failed, and end with: "Atlas aborted. Completed tasks remain uncommitted. Run /hermes-commit when ready or discard with git restore."
 
-When the implementer returns `Status: DONE_WITH_CONCERNS`, do NOT silently mark the task complete. Surface concerns via AskUserQuestion using these canonical option labels: "Accept (mark complete)", "Re-dispatch with guidance", "Escalate to design/plan".
+When the implementer returns `Status: DONE_WITH_CONCERNS`, do NOT silently mark the task complete. Present the concerns inline in chat, then ask inline in plain text listing these canonical option labels for the user to type back: "Accept (mark complete)", "Re-dispatch with guidance", "Escalate to design/plan".
 
 Failures do not alter the step-level Development Summary other than annotating Execute step's outcome (e.g. `Execute -- 18m 14s (1 task failed, skipped)`).
 

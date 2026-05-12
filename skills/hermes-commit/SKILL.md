@@ -208,7 +208,7 @@ Show a numbered table:
 | 4 | test(widget) | HandlerTests.cs | add CreateWidget handler unit tests |
 ```
 
-After presenting the plan, ask via AskUserQuestion: "Proceed with this commit plan?" with two canonical options:
+After presenting the plan, ask inline in plain text: "Proceed with this commit plan?" listing the two canonical options inline for the user to type back:
 
 - **"Approve -- execute the commits"** -> Phase 4.
 - **"Abort -- leave the working tree untouched"** -> STOP. Do not commit.

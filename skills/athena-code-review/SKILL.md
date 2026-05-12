@@ -292,7 +292,7 @@ Work from merged finding set (Claude checklist + Codex second opinion, if dispat
 
 1. **Auto-fix minor issues** silently - apply fixes, then list what was changed in a summary (with attribution).
 2. **Report major issues** clearly - for each, explain: what the issue is, why it matters, proposed fix, and attribution.
-3. **Ask user** via `AskUserQuestion` whether to fix major issues or skip them. After emitting the question, STOP and wait for user's response. Do NOT stage, edit, or pre-write any major fix in same turn as question. Edit tool may be used only after user explicitly approves a specific finding.
+3. **Ask user inline in plain text** whether to fix major issues or skip them. After emitting the question, STOP and wait for user's response. Do NOT stage, edit, or pre-write any major fix in same turn as question. Edit tool may be used only after user explicitly approves a specific finding.
 4. Apply approved fixes (still bound by scope-of-edits rule above).
 
 If user's answer does not match offered options, re-ask same question once. If second response still off-list, stop skill and let user direct next steps.
@@ -400,7 +400,7 @@ If **outdated or missing specs**, report discrepancies clearly:
 > - [Missing/Outdated]: [description of behavior not covered or out of date]
 > - ...
 
-Then use `AskUserQuestion` to ask:
+Then ask inline in plain text:
 
 > "Specs are out of sync with your changes. Would you like to create/update specs now? (This will invoke /spec-writing)"
 
@@ -419,7 +419,7 @@ Run `/simplify` automatically. Launches three parallel review agents (Code Reuse
 1. Does not contradict a fix already applied in Phase 3.
 2. Fix is mechanical (rename, dead-code removal, single-helper extraction).
 
-For findings involving behavior changes, surface them to user via `AskUserQuestion` before applying.
+For findings involving behavior changes, surface them inline in chat and wait for the user to type a decision before applying.
 
 If `/simplify` exits with an error or times out, record `Simplify: failed - <reason>` in Phase 7 summary and proceed to Phase 7. Do not retry.
 

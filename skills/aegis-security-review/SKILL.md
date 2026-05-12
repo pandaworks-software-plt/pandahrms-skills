@@ -101,7 +101,7 @@ digraph aegis {
 ### 0.1 Resolve scope to concrete file list
 
 - If user supplied literal path or glob (e.g. `/aegis-security-review src/auth`, `aegis on Pandahrms.Performance.Api/Controllers/LoginController.cs`), use exactly that path set.
-- If user supplied natural-language scope (e.g. "the new login endpoint", "the export feature"), resolve to concrete file list using `git status`, `grep`, `find`. When more than 5 files match, or zero match, use `AskUserQuestion` to confirm before proceeding.
+- If user supplied natural-language scope (e.g. "the new login endpoint", "the export feature"), resolve to concrete file list using `git status`, `grep`, `find`. When more than 5 files match, or zero match, list the matched files inline in chat and ask the user inline in plain text to confirm before proceeding.
 - If no scope supplied, default to git working tree captured by:
   - `git status` (untracked and modified files)
   - `git diff` and `git diff --cached` (unstaged and staged changes)
@@ -329,11 +329,11 @@ Every `Where:` reference must come from file actually opened by Read tool in thi
 
 ### Approval prompt
 
-If Critical or High findings exist, use `AskUserQuestion` to ask:
+If Critical or High findings exist, ask inline in plain text:
 
 > "Aegis Security Review found [N Critical / M High] issues. Fix them now, or report and let you handle them?"
 
-Options:
+Options the user can type back:
 - **Fix now** -- apply remediations for approved findings.
 - **Skip** -- report stays as-is, user decides what to do.
 
