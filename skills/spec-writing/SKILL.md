@@ -425,10 +425,28 @@ Split features by **functional concerns/bounded contexts**, not by CRUD operatio
 
 **Step 5: Review**
 
-1. Present complete spec (new or updated) to user for review.
+1. Present complete spec (new or updated) to user for review. Output MUST include a scenario index table -- one table per spec file written or updated, grouped by file, in this exact shape:
+
+   ```markdown
+   ### [<filename>.feature](<relative-path-from-working-project>)
+
+   | # | Line | Scenario |
+   |---|---|---|
+   | 1 | <line> | <scenario title> |
+   | 2 | <line> | <scenario title> |
+   ```
+
+   Rules for the table:
+   - One table per `.feature` file changed or added in this Step 5 pass.
+   - File heading uses markdown link form `[<filename>](<relative-path>)` so user can click straight to the file.
+   - Every `Scenario:` and `Scenario Outline:` in the file gets one row. Skip `Background`.
+   - `Line` column is the source line of the `Scenario:` / `Scenario Outline:` keyword.
+   - `Scenario` column is the title text after the keyword, verbatim. Do not paraphrase.
+   - Numbering restarts at 1 per file.
+   - End with a one-line totals footer: `**Totals:** <N> files, <M> scenarios (<per-file counts>).`
 2. Highlight any assumptions made or gaps in understanding.
 3. Wait for explicit approval from user before advancing.
-4. If user requests changes, return to Step 4 and apply ONLY requested changes -- do not rewrite unaffected scenarios, do not add new scenarios that were not requested, do not refactor unrelated specs. Re-present and wait for approval again. Loop this revise-and-re-present cycle until user explicitly approves.
+4. If user requests changes, return to Step 4 and apply ONLY requested changes -- do not rewrite unaffected scenarios, do not add new scenarios that were not requested, do not refactor unrelated specs. Re-present (including the refreshed scenario index table) and wait for approval again. Loop this revise-and-re-present cycle until user explicitly approves.
 5. Do NOT commit, write to disk in spec repository, or proceed to Step 6 without explicit approval.
 6. **Only after approval:** proceed to Step 6 (commit). Step 5 ends at approval; "implementation planning/coding" is handled by downstream skills, not this one.
 
@@ -485,6 +503,6 @@ Before exiting skill, verify each item below is complete. If any item is uncheck
 - [ ] Data tables used for structured input
 - [ ] Each `.feature` file is at most 200 lines, with at most 6 files per feature
 - [ ] Consistent role names used (HR administrator, employee, reviewer, manager)
-- [ ] Presented to user for review and explicitly approved
+- [ ] Presented to user for review with scenario index table (file + line + title rows) per Step 5, and explicitly approved
 - [ ] Only `.feature` files this skill produced were staged (no other paths)
 - [ ] Committed to spec repository after approval (no push, no PR, no branch creation)
