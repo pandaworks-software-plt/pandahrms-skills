@@ -25,7 +25,7 @@ Pandahrms-specific skills plugin for Claude Code.
 1. Launch Claude Code
 2. Add the marketplace:
    ```
-   /plugins marketplace add pandaworks-software-plt/pandahrms-skills
+   /plugins marketplace add https://github.com/pandaworks-software-plt/pandahrms-skills.git
    ```
 3. Install the plugin:
    ```
