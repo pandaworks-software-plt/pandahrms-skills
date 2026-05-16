@@ -1,6 +1,6 @@
 ---
 name: hermes-commit
-description: Triggers when the user explicitly requests a git commit of the current working tree -- phrases like "commit my changes", "git commit", "ready to commit", "/hermes-commit", or "make atomic commits". Pure commit step: verifies a clean working tree (0 test failures, 0 lint errors, 0 format errors -- even pre-existing or unrelated to the current session) by auto-fixing mechanical issues and stopping on the rest, then plans and executes atomic commits.
+description: Triggers when the user explicitly requests a git commit of the current working tree -- phrases like "commit my changes", "git commit", "ready to commit", "/hermes-commit", or "make atomic commits". Pure commit step: verifies a clean working tree (0 test failures, 0 lint errors, 0 format errors -- even pre-existing or unrelated to the current session) by auto-fixing mechanical issues and stopping on the rest, then plans and executes atomic commits. Supports `/hermes-commit --skip` to bypass the Phase 1 gate (format, lint, tests) and go straight to commit planning.
 ---
 
 # Hermes (Commit)
@@ -19,11 +19,24 @@ This applies **even when the failures are pre-existing or unrelated to the curre
 
 The skill auto-fixes mechanical violations by invoking formatter and linter in write mode (`dotnet format`, `biome check --write`, `eslint --fix`, etc.); those fixes get pulled into the commit plan in Phase 3. For non-mechanical failures (failing tests, lint diagnostics that cannot be auto-fixed), the skill STOPS and tells the user what to fix -- it does not make judgment-call code edits itself.
 
+## Skip Mode
+
+`/hermes-commit --skip` bypasses Phase 1 entirely. Skill starts at Phase 2 (Gather Changes), then Phase 3, 4, 5 as normal.
+
+Detection: enter skip mode when the user's invocation message contains the literal token `--skip` (whitespace-delimited, case-sensitive).
+
+In skip mode:
+
+- Skip Phase 1A (format auto-fix), 1B (lint auto-fix), 1C (test suite). No formatter, linter, or test runner is invoked.
+- Before Phase 2, emit verbatim: `Skip mode: Phase 1 gate bypassed. Format, lint, and tests will NOT run. Proceeding directly to commit planning.`
+- All other phases run unchanged. Every Red Flag still applies -- no `git add -A`, no committing secrets, no `--amend`, no `--no-verify`, no destructive git commands.
+
 ## Workflow
 
 ```dot
 digraph commit {
     "User triggers /hermes-commit" [shape=doublecircle];
+    "Skip mode?" [shape=diamond];
     "Auto-fix format" [shape=box];
     "Auto-fix lint" [shape=box];
     "Run tests" [shape=box];
@@ -36,7 +49,9 @@ digraph commit {
     "Execute commits" [shape=box];
     "Done" [shape=doublecircle];
 
-    "User triggers /hermes-commit" -> "Auto-fix format";
+    "User triggers /hermes-commit" -> "Skip mode?";
+    "Skip mode?" -> "Auto-fix format" [label="no"];
+    "Skip mode?" -> "Gather changes" [label="yes -- --skip flag"];
     "Auto-fix format" -> "Auto-fix lint";
     "Auto-fix lint" -> "Run tests";
     "Run tests" -> "All gates pass?";
@@ -55,15 +70,22 @@ digraph commit {
 
 Phases execute strictly in order: Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 -> Phase 5. Do not begin a phase until the prior phase has fully completed.
 
+If `--skip` is set per the Skip Mode section, skip Phase 1 entirely and start at Phase 2.
+
 Within Phase 1, sub-steps run strictly in this order: Phase 1A (format auto-fix) -> Phase 1B (lint auto-fix) -> Phase 1C (test suite). Tests run last so they execute on final post-fix code state.
 
 Within Phase 2, the four `git` commands listed run in parallel; that is the only parallelism allowed in this workflow.
 
 **Phase 1: Hard Gate (Format + Lint + Tests)**
 
-This phase is a **HARD GATE**. The skill cannot proceed past Phase 1 unless all three checks (format, lint, tests) report 0 errors and 0 failures. The gate applies **even when failures are pre-existing or unrelated to the current session's changes** -- if the working tree is broken, the commit does not happen until the working tree is fixed.
+This phase is a **HARD GATE** unless `--skip` is set. The skill cannot proceed past Phase 1 unless all three checks (format, lint, tests) report 0 errors and 0 failures. The gate applies **even when failures are pre-existing or unrelated to the current session's changes** -- if the working tree is broken, the commit does not happen until the working tree is fixed.
 
-There is no skip option for the gate itself. The only escape hatch is the explicit "Tool missing" branch in the Failure Handling section below; that branch only applies when a required tool is not installed.
+Two documented escape hatches exist:
+
+1. `--skip` flag -- bypasses the entire phase. See Skip Mode section.
+2. "Tool missing" branch in Failure Handling -- bypasses a single sub-step when a required tool is not installed.
+
+No other bypass is allowed.
 
 ### Detection
 
@@ -239,7 +261,7 @@ Then STOP. Do not push, do not offer to push, do not propose follow-up work, do 
 Each item below is a HARD rule. Hitting any of them means STOP in the current response.
 
 - About to make a logic / judgment-call code edit during commit -> STOP. Mechanical auto-fix via formatter or linter (`dotnet format`, `biome check --write`, `eslint --fix`) is allowed and expected; hand-editing source to silence a lint diagnostic or pass a test is NOT.
-- About to bypass the Phase 1 gate (skip tests, skip lint, skip format, "just this once") -> STOP. The gate is a HARD gate. The only branch that allows skipping a sub-step is the explicit Tool-missing branch.
+- About to bypass the Phase 1 gate (skip tests, skip lint, skip format, "just this once") -> STOP, unless the user explicitly invoked `/hermes-commit --skip` or the Tool-missing branch applies. Those two branches are the only documented escape hatches; no other bypass is allowed.
 - About to `git add -A` or `git add .` -> stage specific files only.
 - Committing `.env`, credentials, or secrets -> warn the user and STOP.
 - Committing `settings.json`, `appsettings.*.json`, `config.json`, `application.yml`, `.npmrc`, or similar config files -> scan file content for API keys, tokens, passwords, connection strings, OAuth client secrets, or other sensitive values BEFORE staging. If any are found, STOP and surface the exact line(s) to the user to redact (move to env var, secret manager, or local-only file ignored by git). Do not commit "I'll redact it later" placeholders.
