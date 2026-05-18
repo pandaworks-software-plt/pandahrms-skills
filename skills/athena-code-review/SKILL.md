@@ -136,6 +136,28 @@ Run matched linter scoped to changed files. Failure handling:
 
 Never skip linter silently when one was matched but failed.
 
+### Run Build / Type-check
+
+After the linter, run a full workspace build to catch type-contract drift the linter cannot see. Two structural reasons this matters:
+
+1. JS/TS test runners (vitest, jest) only transform files reachable from the test graph -- type errors in unrelated source files slip past tests.
+2. `tsc --noEmit` against a workspace consumer resolves shared-package types via `package.json#exports.types`, which usually points at compiled `dist/*.d.ts`. So `tsc --noEmit` cannot detect drift between a shared package's source and its built artifact. A full build rebuilds dependency `dist/` outputs first, then compiles consumers against the fresh artifact -- the only reliable way to catch this drift.
+
+Build precedence (run only the FIRST matching command, never multiple):
+
+1. Root `package.json` has a `build` script -> `pnpm build` (or `yarn build` / `npm run build` based on lockfile). Preferred.
+2. Root `package.json` has a `type-check` script but no `build` script -> `pnpm type-check`. Weaker (may consult stale `dist/*.d.ts`) -- record in Phase 7 summary that the gate ran in fallback mode.
+3. `*.csproj` files present -> `dotnet build --no-restore` on the solution.
+4. No matching project type -> skip silently, record `Build: not configured` in Phase 7 summary.
+
+Failure handling:
+
+- **Build binary missing, OR command exits with infrastructure errors (not compile errors):** record `Build: failed (<exit code or reason>)` in Phase 7 summary, then continue. Do not block the review.
+- **Build runs and emits compile/type errors:** treat each error as a **must-fix** Phase 2 finding. Compile errors are not stylistic -- they will break the next deploy. Include them alongside lint findings in Phase 2 review output.
+- **Build runs clean:** record `Build: clean` in Phase 7 summary, proceed.
+
+Never skip build silently when one was matched but failed. Build runs once per review pass -- do NOT re-run after applying fixes; the user re-runs athena if they want a re-verify.
+
 ### Second Opinion: Dispatch Codex Reviewer (if installed)
 
 If Codex plugin is installed in this session, dispatch a parallel review by Codex. Gives a cross-model second opinion on the same diff before Claude runs its own checklist in Phase 2.
@@ -148,7 +170,8 @@ If Codex plugin is installed in this session, dispatch a parallel review by Code
 
 1. Phase 1 file reads complete first.
 2. Phase 1 linter run completes (or is skipped per linter rules above).
-3. Single message that begins Phase 2 contains, in parallel: (a) Codex Agent dispatch tool call, AND (b) any additional grep/read calls Claude needs for Phase 2 checklist context.
+3. Phase 1 build / type-check run completes (or is skipped per build rules above).
+4. Single message that begins Phase 2 contains, in parallel: (a) Codex Agent dispatch tool call, AND (b) any additional grep/read calls Claude needs for Phase 2 checklist context.
 
 Do not dispatch Codex during Phase 1. Do not wait for Codex before starting Claude's own checklist.
 
@@ -430,6 +453,8 @@ After `/simplify` completes and fixes are applied, show user a summary of what c
 Summarize all changes made during review:
 - Minor issues auto-fixed (with `[Claude]` / `[Codex]` / `[Claude + Codex]` attribution)
 - Major issues fixed (if any, with attribution)
+- Linter status (clean, fixes applied, failed, or not configured)
+- Build / type-check status (clean, fallback to type-check, failed, or not configured)
 - Codex review status (dispatched and merged, unavailable, or not installed)
 - Security review outcome (skipped, clean, fixes applied, or findings acknowledged)
 - Spec discrepancy status (in sync, updated, or skipped)
@@ -455,7 +480,7 @@ Then use `AskUserQuestion` to ask:
 - Waiting for Codex before starting Claude's own checklist - dispatch Codex in same tool-call batch as first Phase 2 read, so both reviews run in parallel
 - Blocking review when Codex fails or times out - note failure and proceed with Claude-only findings
 - Announcing "Codex not installed" when it isn't - silent skip only
-- Running tests, builds, migrations, dev servers, or any side-effecting commands during this skill - only commands this skill runs are `git status`, `git diff`, `git diff --cached`, file reads, matched linter scoped to changed files, and sub-skill invocations defined in phases (`/simplify`, `/aegis-security-review`, `/spec-writing`, `/hermes-commit`). Anything else requires explicit user instruction mid-flow.
+- Running tests, migrations, dev servers, or any side-effecting commands during this skill - only commands this skill runs are `git status`, `git diff`, `git diff --cached`, file reads, matched linter scoped to changed files, a single workspace build / type-check pass (Phase 1 "Run Build / Type-check"), and sub-skill invocations defined in phases (`/simplify`, `/aegis-security-review`, `/spec-writing`, `/hermes-commit`). Anything else requires explicit user instruction mid-flow.
 - Dispatching multiple Codex agents (per file, per category, per phase) - exactly ONE Codex agent for entire diff
 - Editing files outside `git status` changed set when applying fixes - only touch changed files plus single file needed to wire up a finding (e.g., DI registration)
 - Writing `.feature` files yourself in Phase 5 - only path to spec creation/update is `/spec-writing`
@@ -480,7 +505,7 @@ Then use `AskUserQuestion` to ask:
 | Editing AND asking in same turn | After AskUserQuestion in Phase 3, STOP. No Edit calls until user approves. |
 | "Tidying up" files opened only for context | Only touch files in `git status` plus DI-registration wiring file |
 | Drafting `.feature` content as a courtesy | Spec writes go through `/spec-writing` only; never inline |
-| Running tests/builds/migrations to "verify" | Out of scope; athena-code-review reads only |
+| Running tests / migrations to "verify" | Out of scope. The Phase 1 build / type-check pass is the only side-effecting verification allowed; everything else is read-only. |
 
 ## Out of Scope
 
