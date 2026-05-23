@@ -1,13 +1,30 @@
 ---
 name: athena-code-review
-description: Triggers on mentions of code review of working-tree changes -- "review my changes", "check my changes", "review the diff", "review before commit", or "lint check on my changes". If the user is ambiguous between working-tree review and PR review, ask which one they mean. Reads all changed files, reviews against the checklist, fixes issues, and runs /simplify. Does NOT commit.
+description: Triggers on mentions of code review of working-tree changes -- "review my changes", "check my changes", "review the diff", "review before commit", or "lint check on my changes". If the user is ambiguous between working-tree review and PR review, ask which one they mean. Reads all changed files, reviews against the checklist, fixes issues, and runs /simplify. Does NOT commit directly. Supports `--approve` to auto-pick the "proceed" choice at every AskUserQuestion, and `--skip` to forward to `/hermes-commit --skip` at Phase 7 -- e.g., `/athena-code-review --skip --approve` runs the full pipeline and commits without pausing.
 ---
 
 # Athena Code Review
 
 ## Overview
 
-Review all git working tree changes against code quality standards, fix issues, and run /simplify. Changes code but never commits.
+Review all git working tree changes against code quality standards, fix issues, and run /simplify. Changes code but never commits directly. May invoke `/hermes-commit` in Phase 7.
+
+## Flags
+
+- `--approve` -- auto-pick the "proceed" choice at every AskUserQuestion in this skill. No pauses for confirmation. See per-phase defaults below.
+- `--skip` -- forwarded to `/hermes-commit` at Phase 7. Athena calls `/hermes-commit --skip` so the commit step bypasses its own Phase 1 gate. No effect on athena phases themselves.
+
+Per-phase `--approve` defaults:
+
+| Phase | Prompt | `--approve` choice |
+|-------|--------|--------------------|
+| 0 | Small change: review or commit? | review (full review) |
+| 3 | Apply major fixes? | yes, fix all |
+| 4 | Run /aegis-security-review? | yes |
+| 5 | Create/update specs? | skip (record gap, do not invoke /spec-writing) |
+| 7 | Commit or test first? | commit (invoke /hermes-commit, forwarding `--skip` if passed) |
+
+When `--approve` is set, announce the auto-pick on one line at each phase (e.g., `--approve: running full review`) before proceeding. Do NOT call AskUserQuestion for any prompt covered by the table above.
 
 ## Workflow
 
@@ -105,6 +122,8 @@ Run `git diff` and `git diff --cached` to assess change size.
 - **review** -> proceed to Phase 1
 - **commit** -> invoke `/hermes-commit` and end flow
 - If answer off-list, re-ask once with same options. If second response still off-list, stop skill, summarize state in one line, let user direct next steps.
+
+If `--approve` set, skip the question, announce `--approve: running full review` and proceed to Phase 1.
 
 **If not small**: proceed directly to Phase 1 (no question asked).
 
@@ -320,6 +339,8 @@ Work from merged finding set (Claude checklist + Codex second opinion, if dispat
 
 If user's answer does not match offered options, re-ask same question once. If second response still off-list, stop skill and let user direct next steps.
 
+If `--approve` set, skip the question, announce `--approve: applying all major fixes` and apply every major finding (still bound by scope-of-edits rule).
+
 **Phase 4: Security Review (/aegis-security-review)**
 
 Phase 2 catches obvious security issues. Aegis Security Review is the deeper pass: OWASP Top 10, tenant isolation, PII handling, audit-trail completeness, and dependency scanning.
@@ -362,6 +383,8 @@ Options:
 - **Run /aegis-security-review** -> invoke `aegis-security-review` skill against working tree. Aegis Security Review reports findings, optionally applies approved fixes, returns control here.
 - **Skip** -> note skip in review summary and proceed to Phase 5.
 - If answer off-list, re-ask once. If still off-list, stop skill.
+
+If `--approve` set, skip the question, announce `--approve: running /aegis-security-review` and invoke the skill.
 
 When aegis-security-review returns, treat any approved fixes as already applied (aegis-security-review does not commit). Do not re-ask about committing -- control returns here, not to aegis-security-review's own commit prompt. If aegis-security-review exits with an error or times out, see "Sub-Skill Failure Handling" below.
 
@@ -431,6 +454,8 @@ Then ask inline in plain text:
 - **skip** -> record gap in Phase 7 summary and move to Phase 6
 - If answer off-list, re-ask once. If still off-list, stop skill.
 
+If `--approve` set, skip the question, announce `--approve: skipping spec update, recording gap` and proceed to Phase 6. Do NOT invoke `/spec-writing` under `--approve`.
+
 **Never write `.feature` files yourself in this skill.** Only path to spec creation/update is invoking `/spec-writing`. If user declines, do NOT draft spec content as a courtesy. If `/spec-writing` exits with an error, see "Sub-Skill Failure Handling" below.
 
 **Phase 6: Simplify**
@@ -467,6 +492,8 @@ Then use `AskUserQuestion` to ask:
 - **commit** -> invoke `/hermes-commit` skill. When `/hermes-commit` returns control, **athena-code-review skill is complete**. Do not produce further output, do not re-summarize, do not offer next steps.
 - **test** -> end flow with: "Sounds good. Run /hermes-commit when you're ready."
 - If answer off-list, re-ask once. If still off-list, stop skill.
+
+If `--approve` set, skip the question, announce `--approve: invoking /hermes-commit` and invoke the commit skill. Forward `--skip` if the athena invocation included it: call `/hermes-commit --skip` when both flags were passed, `/hermes-commit` otherwise. When `/hermes-commit` returns, athena ends -- same termination rule as the **commit** branch above.
 
 ## Red Flags - STOP
 
