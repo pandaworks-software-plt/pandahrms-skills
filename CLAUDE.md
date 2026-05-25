@@ -23,6 +23,7 @@ pandahrms-skills/
 │   ├── spec-review/                   # Cross-check design docs against Gherkin specs
 │   ├── athena-code-review/            # Code review, fix issues, /simplify (no commits)
 │   ├── aegis-security-review/         # Security review (OWASP + Pandahrms-specific), no commits
+│   ├── simplify/                      # 3-agent parallel reuse/quality/efficiency pass on working-tree changes (no commits)
 │   ├── hermes-commit/                 # Verify clean, plan and execute atomic commits
 │   │  # Standalone skills
 │   ├── branching/                     # Safe branch creation with upstream protection
