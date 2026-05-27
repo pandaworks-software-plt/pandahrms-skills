@@ -30,7 +30,8 @@ pandahrms-skills/
 │   ├── bridge-file/                   # Communication between FE/BE Claude sessions
 │   ├── ef-migrations/                 # Entity Framework Core migrations
 │   ├── debugging/                     # 4-phase root-cause-first debugging for bugs/test failures
-│   └── retrospective/                 # Manual /pandahrms:retrospective on a completed atlas plan file -> markdown retro
+│   ├── retrospective/                 # Manual /pandahrms:retrospective on a completed atlas plan file -> markdown retro
+│   └── tool-harness-bootstrap/        # Manual /pandahrms:tool-harness-bootstrap -- studies project, recommends + installs mechanical-check tools (Reqnroll, Semgrep, gitleaks, ESLint rules, PreToolUse hooks); per-project, per-tool approval
 ├── hooks/                       # Claude Code hooks (session-start, etc.)
 └── docs/                        # Plans and documentation
 ```
