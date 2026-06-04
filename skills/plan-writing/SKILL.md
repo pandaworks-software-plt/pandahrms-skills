@@ -33,7 +33,7 @@ Verify ALL of the following before emitting any plan content. If any check fails
 1. **Design doc exists.** Design doc MUST live at `docs/pandahrms/designs/<feature-name>.md`. If not, output `No design doc found at docs/pandahrms/designs/. Run pandahrms:design-refinement first.` and stop.
 2. **Design doc is approved.** Approval is signaled by `Status: approved` line in the design doc's frontmatter or top section, or by explicit caller signal. If neither is present, output `Cannot confirm design approval. Confirm explicitly before continuing.` and wait for explicit user reply before continuing.
 3. **Design doc is complete.** Design doc MUST contain Goal section, Functional Requirements list, and Tech Stack section. If any are missing, output `Design doc is incomplete. Missing sections: [list].` and stop. Do not invent content for missing sections.
-4. **Specs exist OR skip-specs path is declared.** If business behavior is in scope, spec files MUST exist under `pandahrms-spec/features/<area>/`. If neither is true, output `No specs found and skip-specs path not declared. Run pandahrms:spec-writing first or confirm UI-only / skip-specs path explicitly.` and stop.
+4. **Specs exist OR skip-specs path is declared.** If business behavior is in scope, spec files MUST exist under `pandahrms-spec/specs/<module>/`. If neither is true, output `No specs found and skip-specs path not declared. Run pandahrms:spec-writing first or confirm UI-only / skip-specs path explicitly.` and stop.
 5. **Scope Profile is set.** Caller provides `lightweight | standard | heavyweight`. If absent, default to `standard` and announce: `Scope Profile not set; defaulting to standard.`
 
 ## Scope Check
@@ -166,7 +166,7 @@ Every plan MUST start with this header:
 
 **Design doc:** [path to docs/pandahrms/designs/<...>.md]
 
-**Spec files:** [list of pandahrms-spec/features/<...>.feature paths, or "no specs (UI-only / skip-specs path)"]
+**Spec files:** [list of pandahrms-spec/specs/<module>/<...>.feature paths, or "no specs (UI-only / skip-specs path)"]
 
 ---
 ```
@@ -188,7 +188,7 @@ Each task carries four required references when business behavior is in scope:
 - Modify: `exact/path/to/existing.ts:123-145`
 - Test: `tests/exact/path/to/file.test.ts`
 
-**Spec ref:** `features/performance/goal-approval.feature:Scenario: approver revokes approval`
+**Spec ref:** `specs/performance/goal-approval.feature:Scenario: approver revokes approval`
 
 **Test ref:** `tests/services/goal-approval.test.ts::"approver revokes approval clears approved_at and notifies submitter"`
 

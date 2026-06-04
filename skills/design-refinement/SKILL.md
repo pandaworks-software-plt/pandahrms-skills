@@ -1,6 +1,6 @@
 ---
 name: design-refinement
-description: Triggers ONLY when atlas-pipeline-orchestrator invokes its design step (atlas Step 1 or Step 9 follow-up). Does NOT run standalone -- direct invocation is rejected with a STOP guard. Runs four phases in order: gather (read spec/test/code) -> forced repeat-back clarify (skipped on lightweight scope) -> brainstorm 2-3 approaches -> impact section (code/DB/BL before-vs-after). Atlas Step 5 (Spec <-> Code audit) handles post-execute validation; this skill does not gate on a separate user review of the saved spec.
+description: Triggers ONLY when atlas-pipeline-orchestrator invokes its design step (atlas Step 1 or Step 9 follow-up). Does NOT run standalone -- direct invocation is rejected with a STOP guard. Two phases always run: gather (read spec/test/code) and the impact section (code/DB/BL before-vs-after). Two phases are conditional: repeat-back clarify and brainstorm-alternatives run only on heavyweight scope or genuine ambiguity. Atlas Step 5 (Spec <-> Code audit) handles post-execute validation; this skill does not gate on a separate user review of the saved spec.
 ---
 
 # Pandahrms Design Refinement
@@ -17,12 +17,15 @@ If neither holds, STOP immediately. Emit verbatim: `"design-refinement runs insi
 
 ## Overview
 
-Turn a rough idea into a fully formed design through a four-phase flow:
+Turn a rough idea into a fully formed design. Two phases always run; two are conditional.
 
+**Always:**
 1. **Gather** -- load existing spec, test, and code context so the design respects current behavior contracts.
-2. **Forced repeat-back clarify** -- after context is loaded, repeat the user's intent in B2 English and ask the user to confirm or correct. Always runs on `standard` and `heavyweight` Scope Profile; skipped on `lightweight`.
-3. **Brainstorm** -- propose 2-3 approaches with trade-offs and let the user pick.
-4. **Impact section** -- list before/after for code paths, DB schema/migrations, and business logic / business rules so the user understands what changes. Also fold coverage thinking (spec scenarios the design implies but does not yet write) into this section.
+2. **Impact section** -- list before/after for code paths, DB schema/migrations, and business logic / business rules so the user understands what changes. Also fold coverage thinking (spec scenarios the design implies but does not yet write) into this section.
+
+**Conditional** (run only on `heavyweight` scope or genuine ambiguity -- see each section for the exact rule; otherwise reason inline and proceed):
+3. **Repeat-back clarify** -- repeat the user's intent in B2 English and confirm.
+4. **Brainstorm** -- propose 2-3 approaches with trade-offs and let the user pick.
 
 Save the design doc uncommitted and hand back to atlas.
 
@@ -50,7 +53,7 @@ Run substeps 1-5 strictly sequentially. Do NOT issue Read/Grep/Glob calls for sp
 3. **Read related specs** -- every `.feature` file in `pandahrms-spec` for that area (use Grep/Glob). If none exist, note "no existing specs".
 4. **Read related tests** -- every unit/integration test file in the affected codebase (`*.test.ts`, `*.spec.ts`, `*Tests.cs`, `*_test.go`, etc.). If none exist, note "no existing tests".
 5. **Read related code** -- every production source file directly relevant to the request (handler, service, validator, route, component, repository). Use Grep to locate by symbol name and Read the matches. If the area is greenfield, note "no existing code".
-6. **Summarize and confirm scope** -- emit one short message: `"Loaded N spec scenarios, M test files, and K code files for this area (pandahrms-spec on branch <name>). Key behaviors covered: [1-2 line summary]."` Then ask inline in plain text, listing these three options for the user to type back: 'Scope is correct, proceed to clarify', 'Scope is wrong -- I will correct it', 'Add more files/specs to the load'. Proceed to Phase 2 only on the first option. Free-text replies like "ok", "sure", "go on" do NOT count as confirmation -- restate the question inline instead.
+6. **Summarize and confirm scope** -- emit one short message: `"Loaded N spec scenarios, M test files, and K code files for this area (pandahrms-spec on branch <name>). Key behaviors covered: [1-2 line summary]."` Then ask inline in plain text, listing these three options for the user to type back: 'Scope is correct, proceed to clarify', 'Scope is wrong -- I will correct it', 'Add more files/specs to the load'. Proceed past gather only on the first option. Free-text replies like "ok", "sure", "go on" do NOT count as confirmation -- restate the question inline instead.
 
 Run substeps 1-6 in full. atlas may have surfaced area hints earlier in the conversation, but design-refinement still owns the gather pass -- the early HARD-GATE guarantees this skill is atlas-invoked, so confirm by stating what was loaded (including the spec branch) before asking the first refinement question.
 </HARD-GATE>
@@ -87,12 +90,12 @@ Every project goes through this process. A todo list, a single-function utility,
 
 Create a task for each item and complete them in order.
 
-1. **Phase 1 -- Gather context** -- per the HARD-GATE above. Output: a short summary of N spec scenarios, M test files, K code files loaded.
-2. **Phase 2 -- Forced repeat-back clarify** -- after context is loaded, repeat the user's intent in B2 English and confirm via AskUserQuestion. See [Forced Repeat-Back Clarify](#forced-repeat-back-clarify) for the exact procedure and skip rule.
+1. **Gather context (always)** -- per the HARD-GATE above. Output: a short summary of N spec scenarios, M test files, K code files loaded.
+2. **Repeat-back clarify (conditional)** -- run only per [Repeat-Back Clarify](#repeat-back-clarify) when-to-run rule (heavyweight scope or gather-revealed divergence). Otherwise skip with the canonical announcement.
 3. **Scope check** -- if the request describes multiple independent subsystems, decompose first; do not refine details of a project that needs to be split.
-4. **Phase 3 -- Ask clarifying questions** -- one at a time by default; batched into a single AskUserQuestion when 2-4 are causally independent and multiple-choice. Focused on purpose / constraints / success criteria.
-5. **Phase 3 -- Propose 2-3 approaches** -- with trade-offs and your recommendation. Let the user pick one.
-6. **Phase 4 -- Present design** -- in sections scaled to complexity. Each section covered below. The **impact section** is required and MUST include code/DB/BL before-vs-after plus coverage thinking.
+4. **Clarifying questions (as needed)** -- ask only the questions whose answers actually change the design. One at a time by default; batched into a single AskUserQuestion when 2-4 are causally independent and multiple-choice. Focused on purpose / constraints / success criteria. Skip when the loaded context already answers them.
+5. **Approach selection (conditional)** -- per [Exploring approaches](#exploring-approaches): present 2-3 alternatives only on heavyweight scope or when more than one genuinely viable approach exists. Otherwise state the chosen approach in one line and proceed.
+6. **Present design + impact (always)** -- in sections scaled to complexity. Each section covered below. The **impact section** is required and MUST include code/DB/BL before-vs-after plus coverage thinking.
 7. **Write design doc** -- save to `docs/pandahrms/designs/YYYY-MM-DD-<topic>-design.md`. Do NOT commit -- leave uncommitted for the user to review.
 8. **Hand off** -- announce that design is complete and return control to atlas. Do NOT invoke any downstream skill in the same turn. End the turn after the handoff message.
 
@@ -100,40 +103,42 @@ Create a task for each item and complete them in order.
 
 ```dot
 digraph design {
-    "Phase 1: Gather context" [shape=box, style=filled, fillcolor=lightblue];
-    "Phase 2: Forced repeat-back clarify\n(skipped on lightweight scope)" [shape=box, style=filled, fillcolor=lightyellow];
+    "Gather context (always)" [shape=box, style=filled, fillcolor=lightblue];
+    "Repeat-back clarify\n(conditional: heavyweight / ambiguity)" [shape=box, style=filled, fillcolor=lightyellow];
     "Scope check" [shape=diamond];
     "Decompose into sub-projects" [shape=box];
-    "Phase 3: Clarifying questions\n(one at a time)" [shape=box];
-    "Phase 3: Propose 2-3 approaches" [shape=box];
-    "Phase 4: Present design sections\n(incl. Impact: code/DB/BL before-vs-after)" [shape=box];
+    "Clarifying questions\n(only those that change the design)" [shape=box];
+    "Approach selection\n(conditional: 2-3 alts on heavyweight / real fork)" [shape=box];
+    "Present design sections\n(incl. Impact: code/DB/BL before-vs-after)" [shape=box];
     "User approves design?" [shape=diamond];
     "Write design doc (uncommitted)" [shape=box];
     "Hand off" [shape=doublecircle];
 
-    "Phase 1: Gather context" -> "Phase 2: Forced repeat-back clarify\n(skipped on lightweight scope)";
-    "Phase 2: Forced repeat-back clarify\n(skipped on lightweight scope)" -> "Scope check";
+    "Gather context (always)" -> "Repeat-back clarify\n(conditional: heavyweight / ambiguity)";
+    "Repeat-back clarify\n(conditional: heavyweight / ambiguity)" -> "Scope check";
     "Scope check" -> "Decompose into sub-projects" [label="multi-subsystem"];
-    "Decompose into sub-projects" -> "Phase 3: Clarifying questions\n(one at a time)" [label="first sub-project"];
-    "Scope check" -> "Phase 3: Clarifying questions\n(one at a time)" [label="single-scope"];
-    "Phase 3: Clarifying questions\n(one at a time)" -> "Phase 3: Propose 2-3 approaches";
-    "Phase 3: Propose 2-3 approaches" -> "Phase 4: Present design sections\n(incl. Impact: code/DB/BL before-vs-after)";
-    "Phase 4: Present design sections\n(incl. Impact: code/DB/BL before-vs-after)" -> "User approves design?";
-    "User approves design?" -> "Phase 4: Present design sections\n(incl. Impact: code/DB/BL before-vs-after)" [label="no, revise"];
+    "Decompose into sub-projects" -> "Clarifying questions\n(only those that change the design)" [label="first sub-project"];
+    "Scope check" -> "Clarifying questions\n(only those that change the design)" [label="single-scope"];
+    "Clarifying questions\n(only those that change the design)" -> "Approach selection\n(conditional: 2-3 alts on heavyweight / real fork)";
+    "Approach selection\n(conditional: 2-3 alts on heavyweight / real fork)" -> "Present design sections\n(incl. Impact: code/DB/BL before-vs-after)";
+    "Present design sections\n(incl. Impact: code/DB/BL before-vs-after)" -> "User approves design?";
+    "User approves design?" -> "Present design sections\n(incl. Impact: code/DB/BL before-vs-after)" [label="no, revise"];
     "User approves design?" -> "Write design doc (uncommitted)" [label="yes"];
     "Write design doc (uncommitted)" -> "Hand off";
 }
 ```
 
-## Forced Repeat-Back Clarify
+## Repeat-Back Clarify
 
-After Phase 1 (gather) completes, before any other refinement question, repeat the user's intent back in B2 English and confirm.
+Conditional. After Phase 1 (gather) completes, repeat the user's intent back in B2 English and confirm -- but only when the run actually needs it.
 
 ### When to run
 
-- **Always** run when no Scope Profile is yet set in conversation context (atlas classifies Scope Profile AFTER Step 1 approval, so this is the normal first-invocation state).
-- **Always** run when `Scope Profile: standard` or `Scope Profile: heavyweight` is set.
-- **Skip** when `Scope Profile: lightweight` is set. Announce: `"Skipping forced repeat-back -- lightweight scope, original intent is clear."`
+Run ONLY when ONE of:
+- `Scope Profile: heavyweight` is set, OR
+- The gather phase revealed that the loaded context materially diverges from the pre-flight intent (the area, scope, or behavior on disk does not match what the prompt implied) -- genuine ambiguity that a confirm would resolve.
+
+Otherwise **skip** and announce: `"Skipping repeat-back -- intent is clear from the loaded context."` This covers the normal first-invocation state (no profile yet) and `lightweight` / `standard` scope.
 
 On re-entry from atlas Step 9 (follow-up loop), Scope Profile is already locked in conversation context; honor it.
 
@@ -145,12 +150,8 @@ On re-entry from atlas Step 9 (follow-up loop), Scope Profile is already locked 
    - `"Yes -- proceed"`
    - `"No, I will clarify more"`
 
-4. **On `"Yes -- proceed"`** -- proceed to Phase 3 (clarifying questions).
+4. **On `"Yes -- proceed"`** -- proceed to clarifying questions.
 5. **On `"No, I will clarify more"`** -- wait for the user's clarification. Fold it into the intent and re-state once more, then ask the same question. Do not loop more than 3 times -- on the 3rd loop, switch to one-question-at-a-time clarification mode and let the user steer. If the clarification implies a different feature area (not just a refinement), re-run Phase 1 gather before the next re-state.
-
-### Why it exists
-
-The forced repeat-back catches divergence between the optimise-prompt pre-flight (which only saw the raw prompt) and the now-loaded context (which reveals what the area actually looks like). On `standard` or `heavyweight` scope, the cost of one extra prompt is far smaller than discovering 30 minutes into design that the user meant something different.
 
 ## The Process
 
@@ -194,18 +195,22 @@ Within a gate, sections still present in order. The approval question fires once
 
 Revisions still scope to the originating section. If a later gate reveals an earlier-section flaw, return to that section, mark it `Revising`, restate the change, then re-request approval for the current gate (which now includes the revised section).
 
-**Exploring approaches:**
+**Exploring approaches (conditional):**
 
-- Propose 2-3 different approaches with trade-offs.
-- If you have identified 4+ viable approaches, do NOT present them all. Pick the 3 with the widest trade-off spread (e.g. simplest-but-limited / balanced / most-flexible-but-costly) and mention the pruned alternatives in one line so the user can pull one back if they care: `"Also considered: X (similar to A but with Y), Z (variant of B). Skipping unless you'd rather discuss them."`
-- If you have identified exactly 1 approach, do NOT force a second one for the sake of the rule -- announce: `"Only one viable approach surfaced: [name]. Proceeding without alternatives."` and continue. Inventing weak alternatives wastes user time and contaminates the trade-off discussion.
-- Present options conversationally with your recommendation and reasoning.
-- Lead with your recommended option and explain why.
+Present 2-3 alternatives ONLY when ONE of:
+- `Scope Profile: heavyweight` is set, OR
+- More than one genuinely viable approach exists with material trade-offs (a real fork where the choice changes architecture, data model, or cost).
+
+Otherwise state the chosen approach in one line and proceed: `"Approach: [name] -- [one-line why]. Proceeding."` Do not invent alternatives to satisfy a rule.
+
+When presenting alternatives (the conditional case):
+- Propose 2-3 with trade-offs; lead with your recommendation and reasoning.
+- If you have identified 4+ viable approaches, do NOT present them all. Pick the 3 with the widest trade-off spread (e.g. simplest-but-limited / balanced / most-flexible-but-costly) and mention the pruned alternatives in one line: `"Also considered: X (similar to A but with Y), Z (variant of B). Skipping unless you'd rather discuss them."`
 - If the user rejects all proposed approaches, ask one clarifying question about the constraint that ruled them out, then propose 2-3 new approaches incorporating that constraint. Repeat at most twice. After the third rejection, stop and ask the user to describe the desired approach in their own words.
 
 **Presenting the design:**
 
-- Begin design presentation only after: (a) Phase 1 (gather) is complete, (b) Phase 2 (forced repeat-back, when applicable) is confirmed, (c) scope check is complete, (d) clarifying questions have answered every Unknown listed during the question round, (e) the chosen approach from the 2-3 proposals is selected by the user. If any of those are still open, ask the next blocking question instead.
+- Begin design presentation only after: (a) gather is complete, (b) repeat-back is confirmed when its when-to-run rule fired (skipped otherwise), (c) scope check is complete, (d) clarifying questions that change the design are answered, (e) the approach is chosen -- selected by the user when alternatives were presented, or stated inline when the conditional brainstorm did not fire. If any blocking item is still open, ask the next blocking question instead.
 - Each section: 2-6 sentences by default. Expand to a maximum of 300 words ONLY if the section contains: more than one architectural component, a non-obvious trade-off, OR an externally-visible API contract. State which of those triggered the expansion in one line.
 - After each approval gate (gate boundaries depend on Scope Profile -- see **Section approval gates** above in Question Pacing), ask inline in plain text with a single question listing these three options for the user to type back: <tier-specific Approve label>, 'Revise -- I will tell you what to change', 'Stop -- rethink approach'. Treat anything other than the first option as not-approved and act accordingly.
 - Present sections in this exact order: (1) Spec impact, (2) Test impact, (3) Architecture, (4) Components, (5) Data flow, (6) Error handling, (7) Testing approach, (8) **Impact section** (code/DB/BL before-vs-after + coverage). Skip a section only when it does not apply, and state the skip reason in one line. Do NOT reorder.
@@ -312,11 +317,11 @@ After self-review, hand off per Phase 8 of the [Checklist](#checklist) using thi
 
 ## Key Principles
 
-- **Four phases in order** -- gather -> forced repeat-back (when applicable) -> brainstorm -> impact section. Each phase has its own approval gate where applicable.
+- **Two always, two conditional** -- gather and impact section always run; repeat-back clarify and brainstorm run only on heavyweight scope or genuine ambiguity. Each phase that runs has its own approval gate where applicable.
 - **One question per AskUserQuestion call** -- batch 2-4 only when questions are causally independent and multiple-choice (see [Question Pacing](#question-pacing)).
 - **Multiple choice required** -- open-ended only when no exhaustive 2-5 option set exists.
 - **YAGNI ruthlessly** -- remove unnecessary features from all designs.
-- **Explore alternatives** -- always propose 2-3 approaches before settling.
+- **Explore alternatives when it matters** -- propose 2-3 approaches only on heavyweight scope or a real fork; otherwise state the chosen approach inline and proceed.
 - **Incremental validation** -- present design in sections, then call AskUserQuestion at every approval gate per Scope Profile (lightweight: 1 end-of-design gate; standard: 3 grouped gates; heavyweight: 8 per-section gates).
 - **Approval requires a structured selection** -- approval requires the user to type back one of the tier-specific Approve options exactly (`"Approve this design"` / `"Approve this direction"` / `"Approve this detail"` / `"Approve this impact"` / `"Approve this section"`). Free-text replies like "ok", "sure", "go on", "next" do NOT count as approval. If the user replies that way, restate the approval question inline.
 - **Impact section is mandatory** -- the design must show code/DB/BL before-vs-after plus coverage thinking. This is what spec-writing uses to draft scenarios downstream.
@@ -327,13 +332,13 @@ After self-review, hand off per Phase 8 of the [Checklist](#checklist) using thi
 | Thought | Reality |
 |---------|---------|
 | "I'll skip Phase 1 (gather) since the user already described the change" | Required. Phase 1 (gather) is a HARD-GATE. Designs without that grounding miss compatibility issues with existing specs/tests/code. |
-| "Phase 2 (forced repeat-back) feels redundant when the prompt is clear" | Default behavior is to ALWAYS run it on `standard` and `heavyweight` scope. Only `Scope Profile: lightweight` skips it. The cost of one extra prompt is far smaller than discovering wrong intent 30 minutes into design. |
+| "I'll run repeat-back to be safe even on a clear standard-scope task" | No. Repeat-back runs ONLY on `heavyweight` scope or when gather revealed real divergence from the prompt. On clear lightweight/standard intent, skip it with the canonical announcement and proceed. |
 | "I'll batch a 5+ question survey to be efficient" | Cap at 2-4 batched questions, and only when they're causally independent and have clear multiple-choice options. 5+ means the design isn't refined enough yet -- ask the most-blocking question first and let the answer narrow the rest. |
 | "These two questions feel related, but I'll batch them anyway to save a round-trip" | If the second question's framing depends on the first's answer, ask sequentially. Batching dependent questions produces shallow or contradictory answers. |
 | "pandahrms-spec is on main but the project is on a feature branch -- close enough" | No. Align the spec repo to the project's branch BEFORE reading specs. Reading from the wrong branch hides in-flight spec edits and produces designs that contradict them. See [Spec Branch Alignment](#spec-branch-alignment). |
 | "It's a bug fix, no need to discuss tests upfront" | Bug fixes especially need a failing test that would have caught the bug. The design proposes that test before the fix. |
 | "I'll auto-commit the design doc when I save it" | Never. The design doc stays uncommitted for user review. |
-| "I'll propose one approach since it's obviously right -- skip the 2-3 rule" | Default is 2-3 approaches with trade-offs. If exactly one viable approach truly surfaces, announce `"Only one viable approach surfaced: [name]. Proceeding without alternatives."` and continue. But do NOT shortcut here just because one feels "obvious" -- the obvious option is often wrong on rereading. |
+| "I'll present 2-3 approaches on this lightweight task to be thorough" | No. Alternatives are conditional: present them only on `heavyweight` scope or a real fork (where the choice changes architecture, data model, or cost). Otherwise state the chosen approach in one line and proceed. Inventing alternatives wastes user time. |
 | "I'll jump to implementation since the user described what they want" | HARD-GATE. No implementation action until a design is presented and approved. |
 | "I'll re-ask the user to review the saved spec" | No. Atlas Step 5 (Spec <-> Code audit) handles post-execute validation. Don't add a redundant gate here. |
 | "I'll skip the impact section -- the architecture section already covers it" | No. The impact section captures before/after for code/DB/BL and lists coverage scenarios. Architecture describes structure; impact describes change. Both are required. |

@@ -444,11 +444,12 @@ Split features by **functional concerns/bounded contexts**, not by CRUD operatio
    - `Scenario` column is the title text after the keyword, verbatim. Do not paraphrase.
    - Numbering restarts at 1 per file.
    - End with a one-line totals footer: `**Totals:** <N> files, <M> scenarios (<per-file counts>).`
-2. Highlight any assumptions made or gaps in understanding.
-3. Wait for explicit approval from user before advancing.
-4. If user requests changes, return to Step 4 and apply ONLY requested changes -- do not rewrite unaffected scenarios, do not add new scenarios that were not requested, do not refactor unrelated specs. Re-present (including the refreshed scenario index table) and wait for approval again. Loop this revise-and-re-present cycle until user explicitly approves.
-5. Do NOT commit, write to disk in spec repository, or proceed to Step 6 without explicit approval.
-6. **Only after approval:** proceed to Step 6 (commit). Step 5 ends at approval; "implementation planning/coding" is handled by downstream skills, not this one.
+2. **Design coverage cross-check (when a design doc exists).** Before presenting, read the design doc at `<project>/docs/pandahrms/designs/*-design.md` and confirm every requirement and every implied scenario in its impact / coverage-thinking section maps to at least one written scenario. List any design requirement with no matching scenario as a gap and close it in Step 4 before presenting. Skip this sub-step only when no design doc exists (verbal/informal request). This is the inline coverage check; a separate `pandahrms:spec-review` pass is optional and reserved for heavyweight scope or explicit request.
+3. Highlight any assumptions made or gaps in understanding.
+4. Wait for explicit approval from user before advancing.
+5. If user requests changes, return to Step 4 and apply ONLY requested changes -- do not rewrite unaffected scenarios, do not add new scenarios that were not requested, do not refactor unrelated specs. Re-present (including the refreshed scenario index table) and wait for approval again. Loop this revise-and-re-present cycle until user explicitly approves.
+6. Do NOT commit, write to disk in spec repository, or proceed to Step 6 without explicit approval.
+7. **Only after approval:** proceed to Step 6 (commit). Step 5 ends at approval; "implementation planning/coding" is handled by downstream skills, not this one.
 
 **Step 6: Commit**
 

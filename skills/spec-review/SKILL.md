@@ -1,13 +1,13 @@
 ---
 name: spec-review
-description: Use after spec-writing to cross-check the design doc against feature spec files - ensures specs fully cover all requirements from the design and nothing is missed or misaligned
+description: Optional deep cross-check of the design doc against feature spec files - ensures specs fully cover all requirements from the design and nothing is missed or misaligned. spec-writing now runs an inline design-coverage cross-check at its Step 5, so this standalone pass is reserved for heavyweight scope or explicit request, not a required chain step after every spec-writing run.
 ---
 
 # Spec Review
 
 ## Overview
 
-Cross-checks approved design doc against written Gherkin spec files for full alignment. Every requirement, behavior, rule, and edge case in design must have spec coverage; no spec may introduce behavior not in design.
+Cross-checks approved design doc against written Gherkin spec files for full alignment. Every requirement, behavior, rule, and edge case in design must have spec coverage; no spec may introduce behavior not in design. Optional deep pass -- spec-writing Step 5 already runs an inline design-coverage cross-check. Use this skill for heavyweight scope or when the user explicitly asks for a second, independent coverage audit.
 
 **Announce at start:** "I'm using the spec-review skill to cross-check the design doc against the feature specs."
 
@@ -17,7 +17,7 @@ Read-only with respect to design docs and `.feature` files. Do not edit, create,
 
 Required:
 
-1. **A design document** at `<project>/docs/plans/*-design.md`.
+1. **A design document** at `<project>/docs/pandahrms/designs/*-design.md`.
 2. **Written spec files** in `pandahrms-spec/specs/<module>/<feature>/`.
 
 If design doc is missing at expected path, do not proceed. Use AskUserQuestion to request absolute path to design doc. Resume Step 1 with provided path. If user declines, exit with message: "Spec review cannot run without a design document. Skill exited." and proceed to Skill Exit.
@@ -32,10 +32,10 @@ Step 1 is sequential. Do not parallelize the two sub-steps; sub-step 2 depends o
 
 #### 1a. Resolve the design doc
 
-- List all `*-design.md` files in `<project>/docs/plans/`.
+- List all `*-design.md` files in `<project>/docs/pandahrms/designs/`.
 - If exactly one exists, use it.
 - If multiple exist, list every candidate by full path inline in chat and ask the user inline in plain text which file to use. Do not pick automatically based on mtime, file name keywords, or git status.
-- Do not search outside `<project>/docs/plans/`.
+- Do not search outside `<project>/docs/pandahrms/designs/`.
 - Read chosen design doc and capture its declared module and feature path (e.g. `specs/auth/onboarding-mobile`). If path is not stated in doc, ask the user inline in plain text so they can type the path.
 
 #### 1b. Resolve the spec directory (runs only after 1a completes)
