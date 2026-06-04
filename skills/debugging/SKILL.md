@@ -240,7 +240,7 @@ Surface to the user with concrete observations:
 - Pattern across failures (e.g. "every fix exposes shared state in `FooService`")
 - Your read on whether this is a refactor candidate or a deeper architecture rethink
 
-If the user agrees a refactor is warranted, hand off to `atlas-pipeline-orchestrator` for design-refinement, not back into another fix attempt. This skill doesn't design refactors.
+If the user agrees a refactor is warranted, hand off to `atlas-pipeline-orchestrator` to redesign, not back into another fix attempt. This skill doesn't design refactors.
 
 ## Hand-off
 

@@ -7,12 +7,10 @@ Pandahrms-specific skills plugin for Claude Code.
 | Skill | Slash Command | Description |
 |-------|---------------|-------------|
 | **atlas-pipeline-orchestrator** | `/pandahrms:atlas-pipeline-orchestrator` | Thin runner: fast lane + main flow (understand -> spec -> decompose -> per-card execute + review -> PR) |
-| **design-refinement** | `/pandahrms:design-refinement` | Sectioned design refinement with mandatory test+spec context loading |
 | **card-decompose** | `/pandahrms:card-decompose` | Cut an understood change into independently-shippable vertical-slice cards (path + sensitivity tags) |
 | **card-execute** | `/pandahrms:card-execute` | Native TDD execution of one card; SOLID/DDD inlined; gates + markers; commit-after-review |
 | **card-pr** | `/pandahrms:card-pr` | Per-card PR step: raise PR?, ask how to branch, commit via hermes-commit, open the PR (cross-repo = 2 linked PRs) |
-| **spec-writing** | `/pandahrms:spec-writing` | Write/update Gherkin specs before implementing any change (hard gate) |
-| **spec-review** | `/pandahrms:spec-review` | Cross-check design docs against Gherkin specs for coverage gaps |
+| **spec-writing** | `/pandahrms:spec-writing` | Conditional Gherkin spec step: check/update specs when behavior changes; user-agreement gate; inline design-coverage cross-check |
 | **athena-code-review** | `/pandahrms:athena-code-review` | Review git changes against code standards, fix issues, run /simplify (no commits) |
 | **aegis-security-review** | `/pandahrms:aegis-security-review` | Security review (OWASP Top 10 + Pandahrms tenant/audit/PII checks); optionally invoked from athena-code-review |
 | **hermes-commit** | `/pandahrms:hermes-commit` | Verify code is reviewed and clean, plan and execute atomic commits |

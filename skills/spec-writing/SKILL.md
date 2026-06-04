@@ -1,13 +1,13 @@
 ---
 name: spec-writing
-description: Use when starting any work in a Pandahrms project - writing or updating Gherkin specs is a required first step before implementation for all changes including features, bug fixes, and refactors
+description: The conditional spec step of the Pandahrms main flow. Use when a change affects business behavior (feature, bug fix, refactor) to check the project's Gherkin specs and create or update them in pandahrms-spec, then present them and get the user's agreement before decomposing. UI-only changes with no behavior impact skip it.
 ---
 
 # Spec Writing
 
 ## Overview
 
-Specs come first. Before implementing any change in any Pandahrms project -- feature, bug fix, or refactor -- Gherkin specs must be written or updated in `pandahrms-spec`. Hard gate: no implementation begins until specs are in place.
+The conditional spec step. When a change affects business behavior, check the project's Gherkin specs and create or update them in `pandahrms-spec`, then present them to the user and get agreement before decomposing. A UI-only change with no behavior impact skips this step. Design discussion is authoritative -- if it diverges from the spec, update the spec here.
 
 **Announce at start with exactly one of these strings:**
 - "I'm using the spec-writing skill to write specs before implementation." -- use when no relevant specs exist for the affected feature area.
@@ -444,7 +444,7 @@ Split features by **functional concerns/bounded contexts**, not by CRUD operatio
    - `Scenario` column is the title text after the keyword, verbatim. Do not paraphrase.
    - Numbering restarts at 1 per file.
    - End with a one-line totals footer: `**Totals:** <N> files, <M> scenarios (<per-file counts>).`
-2. **Design coverage cross-check (when a design doc exists).** Before presenting, read the design doc at `<project>/docs/pandahrms/designs/*-design.md` and confirm every requirement and every implied scenario in its impact / coverage-thinking section maps to at least one written scenario. List any design requirement with no matching scenario as a gap and close it in Step 4 before presenting. Skip this sub-step only when no design doc exists (verbal/informal request). This is the inline coverage check; a separate `pandahrms:spec-review` pass is optional and reserved for heavyweight scope or explicit request.
+2. **Design coverage cross-check (when a design doc exists).** Before presenting, read the design doc at `<project>/docs/pandahrms/designs/*-design.md` and confirm every requirement and every implied scenario in its impact / coverage-thinking section maps to at least one written scenario. List any design requirement with no matching scenario as a gap and close it in Step 4 before presenting. Skip this sub-step only when no design doc exists (verbal/informal request). This is the coverage check for the spec.
 3. Highlight any assumptions made or gaps in understanding.
 4. Wait for explicit approval from user before advancing.
 5. If user requests changes, return to Step 4 and apply ONLY requested changes -- do not rewrite unaffected scenarios, do not add new scenarios that were not requested, do not refactor unrelated specs. Re-present (including the refreshed scenario index table) and wait for approval again. Loop this revise-and-re-present cycle until user explicitly approves.

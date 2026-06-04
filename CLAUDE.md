@@ -15,13 +15,11 @@ pandahrms-skills/
 │   │  # Pipeline orchestrator (entry point)
 │   ├── atlas-pipeline-orchestrator/   # Thin runner: fast lane + main flow (understand -> spec -> decompose -> per-card execute + review -> PR)
 │   │  # Pipeline components (used by atlas)
-│   ├── design-refinement/             # Design refinement with mandatory test+spec context loading
 │   ├── card-decompose/                # Cut a change into vertical-slice cards (path + sensitivity tags)
 │   ├── card-execute/                  # Native TDD execution of one card (SOLID/DDD inlined)
 │   ├── card-pr/                       # Per-card PR step: raise PR?, ask-branch, commit (hermes), open PR
 │   │  # Spec + review skills
-│   ├── spec-writing/                  # Gherkin spec writing (hard gate before implementation)
-│   ├── spec-review/                   # Cross-check design docs against Gherkin specs
+│   ├── spec-writing/                  # Conditional Gherkin spec step (check/update; user-agreement gate)
 │   ├── athena-code-review/            # Code review, fix issues, /simplify (no commits)
 │   ├── aegis-security-review/         # Security review (OWASP + Pandahrms-specific), no commits
 │   ├── simplify/                      # 3-agent parallel reuse/quality/efficiency pass on working-tree changes (no commits)
