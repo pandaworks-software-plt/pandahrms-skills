@@ -201,7 +201,7 @@ Fix the root cause, not the symptom.
 
 ### 1. Write a failing test FIRST (TDD)
 
-Non-negotiable. Reference: `~/.claude/rules/TDD.md` and the RED/GREEN markers used in plan-writing/execute-plan.
+Non-negotiable. Write the failing test before any fix, then make it pass -- Red then Green, using the always-on RED/GREEN execution markers.
 
 - Test must fail for the right reason (the bug), not an unrelated reason (missing setup, wrong assertion).
 - Pandahrms backends: `dotnet test --filter "FullyQualifiedName~<TestName>"` against the relevant test project.

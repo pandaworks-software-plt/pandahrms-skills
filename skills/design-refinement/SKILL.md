@@ -352,7 +352,7 @@ This skill MUST NOT produce, write, or stage any of the following:
 - Test files
 - EF migration files
 - Spec / `.feature` files (those belong to spec-writing)
-- Implementation plan files (those belong to plan-writing)
+- Implementation plan files
 - Git commits or stashes
 - Code blocks longer than 20 lines inside the design doc (use prose + interface signatures instead)
 
@@ -366,4 +366,4 @@ This skill MUST NOT produce, write, or stage any of the following:
 - Outside atlas. Direct invocation STOPs with a message redirecting the user to run /atlas-pipeline-orchestrator.
 - Quick fixes that don't need brainstorming (typos, config changes) -- handle directly without atlas at all.
 - Pure spec writing for existing functionality (use `pandahrms:spec-writing` directly).
-- Plan execution (use `pandahrms:execute-plan` directly).
+- Executing a card (use `pandahrms:card-execute` directly).

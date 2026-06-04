@@ -7,7 +7,7 @@ description: Triggers when the user requests a security review of code or workin
 
 ## Overview
 
-Focused security audit of code under review. Scans working tree changes (or specified feature area) for vulnerabilities using OWASP Top 10, Pandahrms-specific threat patterns (tenant isolation, audit trails, PII handling), and `~/.claude/rules/Security.md`. Reports findings by severity and optionally fixes approved issues. Never commits on its own.
+Focused security audit of code under review. Scans working tree changes (or specified feature area) for vulnerabilities using OWASP Top 10 and Pandahrms-specific threat patterns (tenant isolation, audit trails, PII handling). Reports findings by severity and optionally fixes approved issues. Never commits on its own.
 
 ## Hard Prohibitions
 

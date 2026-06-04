@@ -6,10 +6,11 @@ Pandahrms-specific skills plugin for Claude Code.
 
 | Skill | Slash Command | Description |
 |-------|---------------|-------------|
-| **atlas-pipeline-orchestrator** | `/pandahrms:atlas-pipeline-orchestrator` | Unified pipeline: design -> specs -> QA review -> plan -> Plan/Spec cross-review -> execute -> simplify -> test |
+| **atlas-pipeline-orchestrator** | `/pandahrms:atlas-pipeline-orchestrator` | Thin runner: fast lane + main flow (understand -> spec -> decompose -> per-card execute + review -> PR) |
 | **design-refinement** | `/pandahrms:design-refinement` | Sectioned design refinement with mandatory test+spec context loading |
-| **plan-writing** | `/pandahrms:plan-writing` | Turn an approved design into a bite-sized implementation plan |
-| **execute-plan** | `/pandahrms:execute-plan` | Dispatch implementer subagents per plan task; supports codex modes |
+| **card-decompose** | `/pandahrms:card-decompose` | Cut an understood change into independently-shippable vertical-slice cards (path + sensitivity tags) |
+| **card-execute** | `/pandahrms:card-execute` | Native TDD execution of one card; SOLID/DDD inlined; gates + markers; commit-after-review |
+| **card-pr** | `/pandahrms:card-pr` | Per-card PR step: raise PR?, ask how to branch, commit via hermes-commit, open the PR (cross-repo = 2 linked PRs) |
 | **spec-writing** | `/pandahrms:spec-writing` | Write/update Gherkin specs before implementing any change (hard gate) |
 | **spec-review** | `/pandahrms:spec-review` | Cross-check design docs against Gherkin specs for coverage gaps |
 | **athena-code-review** | `/pandahrms:athena-code-review` | Review git changes against code standards, fix issues, run /simplify (no commits) |
@@ -41,22 +42,21 @@ To update the plugin to the latest version:
 
 ## How it fits
 
-`atlas-pipeline-orchestrator` is the single entry point for design-through-execution work in Pandahrms projects:
+`atlas-pipeline-orchestrator` is the single entry point for build work in Pandahrms projects. It is a thin runner: a fast lane for trivial changes, and a main flow that cuts work into vertical-slice cards and ships each as its own small PR.
 
 ```
-Any work request --> pandahrms:atlas-pipeline-orchestrator
-    --> pandahrms:design-refinement (design)
-    --> pandahrms:spec-writing (Gherkin specs - hard gate)
-    --> QA review (conditional)
-    --> pandahrms:plan-writing (implementation plan)
-    --> Plan <-> Spec cross-review
-    --> pandahrms:execute-plan (subagent-driven TDD)
-    --> /simplify
-    --> Playwright e2e (conditional)
-    --> user tests --> pandahrms:hermes-commit
+Trivial change --> fast lane: confirm --> native TDD --> offer a PR --> done
+
+Everything else --> pandahrms:atlas-pipeline-orchestrator (main flow)
+    --> understand (native, no skill)
+    --> pandahrms:spec-writing (check/update; you agree)
+    --> pandahrms:card-decompose (vertical-slice cards; you agree)
+    --> per card: pandahrms:card-execute (native TDD)
+                  --> pandahrms:athena-code-review (+ pandahrms:aegis-security-review when sensitive)
+                  --> pandahrms:card-pr (raise PR?, ask-branch, commit, open PR)
 ```
 
-It ensures `spec-writing` is never skipped after design and that code review, security review (when applicable), simplification, and spec compliance are verified before the user tests.
+The always-on execution rules (TDD markers, gates, sensitivity list, fast-lane threshold) ship via the plugin's SessionStart hook, so they apply in every session with no per-member setup.
 
 Additional standalone skills: `pandahrms:branching`, `pandahrms:bridge-file`, `pandahrms:athena-code-review`, `pandahrms:aegis-security-review`, `pandahrms:hermes-commit`, `pandahrms:ef-migrations`, and `pandahrms:debugging`.
 
