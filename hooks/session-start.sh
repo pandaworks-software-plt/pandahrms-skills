@@ -46,12 +46,21 @@ escape_for_json() {
 skills_escaped=$(escape_for_json "$skills_list")
 warning_escaped=$(escape_for_json "$warning_message")
 
+# Load compact always-on execution rules (single source of truth, ships with plugin)
+rules_block=""
+RULES_FILE="${PLUGIN_ROOT}/hooks/execution-rules.md"
+if [ -f "$RULES_FILE" ]; then
+    rules_content="$(cat "$RULES_FILE")"
+    rules_escaped=$(escape_for_json "$rules_content")
+    rules_block="\\n\\n${rules_escaped}"
+fi
+
 # Output context injection as JSON
 cat <<EOF
 {
   "hookSpecificOutput": {
     "hookEventName": "SessionStart",
-    "additionalContext": "Pandahrms skills available (use Skill tool to invoke):\n${skills_escaped}${warning_escaped}"
+    "additionalContext": "Pandahrms skills available (use Skill tool to invoke):\n${skills_escaped}${warning_escaped}${rules_block}"
   }
 }
 EOF
