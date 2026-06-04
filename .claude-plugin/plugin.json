@@ -1,7 +1,7 @@
 {
   "name": "pandahrms",
-  "description": "Pandahrms-specific skills for Claude Code: atlas-pipeline-orchestrator entry point, card-decompose / card-execute / card-pr native-flow components, spec-writing, spec-review, bridge-file cross-project messaging, EF Core migrations, athena-code-review, aegis-security-review, simplify, commit workflow, and safe branching",
-  "version": "4.0.1",
+  "description": "Pandahrms-specific skills for Claude Code: atlas-pipeline-orchestrator entry point, card-decompose / card-execute / card-pr native-flow components, spec-writing, bridge-file cross-project messaging, EF Core migrations, athena-code-review, aegis-security-review, simplify, commit workflow, and safe branching",
+  "version": "4.0.2",
   "author": { "name": "Pandaworks" },
   "license": "UNLICENSED",
   "keywords": ["pandahrms", "skills", "gherkin", "specs", "setup", "bridge", "security", "aegis", "athena", "atlas"]
