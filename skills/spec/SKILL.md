@@ -1,6 +1,6 @@
 ---
 name: spec
-description: Manually invoked as `/spec` to write or update the L1 behaviour spec in pandahrms-spec from intake output (objective + acceptance criteria + module). The L1 spec is the tech-agnostic product truth (what the feature does, when it's done) in Gherkin -- no UI mechanics, no API/endpoint detail. Conditional on behaviour change: pure UI restyle or refactor with no behaviour change proposes a skip for user confirmation. Writes L1 only (L2 FE/BE executable specs come later during execution). Presents a scenario-index table for user agreement, then asks whether to commit/PR to pandahrms-spec -- never auto-commits. Does NOT auto-trigger -- only on the `/spec` slash command or an explicit "write the spec" / "update the spec" request; talk of a behaviour change or a ready intake output alone is not enough.
+description: Manually invoked as `/spec` to write or update the L1 behaviour spec in the project's L1 spec repo (default sibling pandahrms-spec; falls back to asking the user when the location is not stated) from intake output (objective + acceptance criteria + module). The L1 spec is the tech-agnostic product truth (what the feature does, when it's done) in Gherkin -- no UI mechanics, no API/endpoint detail. Conditional on behaviour change: pure UI restyle or refactor with no behaviour change proposes a skip for user confirmation. Writes L1 only (L2 FE/BE executable specs come later during execution). Presents a scenario-index table for user agreement, then asks whether to commit/PR to pandahrms-spec -- never auto-commits. Does NOT auto-trigger -- only on the `/spec` slash command or an explicit "write the spec" / "update the spec" request; talk of a behaviour change or a ready intake output alone is not enough.
 ---
 
 # /spec -- L1 Behaviour Spec
@@ -17,9 +17,15 @@ Behaviour change = new rule, changed rule, or bug that changes what "correct" me
 
 ## LOCATE
 
-`pandahrms-spec` is a sibling of the working project: `$(dirname $PWD)/pandahrms-spec/`. If missing, STOP and tell user to clone `https://github.com/pandaworks-software-plt/pandahrms-spec.git` into the workspace, then re-run.
+Resolve the L1 spec repo location (call the result `<spec-repo>`) in this order -- first hit wins:
 
-Branch alignment (before reading any `.feature`): compare `git -C <pandahrms-spec> rev-parse --abbrev-ref HEAD` with the working project's `git rev-parse --abbrev-ref HEAD`. On mismatch, AskUserQuestion: checkout matching branch / stay and proceed / abort. Never auto-checkout, auto-fetch, or auto-pull.
+1. **Stated location** -- if the session context or the working project's `CLAUDE.md` names where the L1 spec lives (e.g. a `Spec repo: <path>` line), use that path. Never re-derive it.
+2. **Sibling default** -- else try `$(dirname $PWD)/pandahrms-spec/`. Use it only if that directory exists.
+3. **Ask** -- if neither resolves, AskUserQuestion for the L1 spec repo path. Offer cloning `https://github.com/pandaworks-software-plt/pandahrms-spec.git` as a sibling as one candidate. Do not guess a path.
+
+After the user answers via step 3, append a `Spec repo: <path>` line to the working project's `CLAUDE.md` (under a `## Spec` heading, create it if absent) so later runs skip the ask. The user's answer is the authorization to write -- do not re-confirm.
+
+Branch alignment (before reading any `.feature`): compare `git -C <spec-repo> rev-parse --abbrev-ref HEAD` with the working project's `git rev-parse --abbrev-ref HEAD`. On mismatch, AskUserQuestion: checkout matching branch / stay and proceed / abort. Never auto-checkout, auto-fetch, or auto-pull.
 
 Find `specs/<module>/<feature>/*.feature`. `module` comes from intake -- never hard-code a module list. `<feature>` = kebab-case of the affected feature area (e.g. `adhoc-review`). Full path: `specs/<module>/<feature>/<entity>-<area>.feature`. Check existing FIRST: update the matching `.feature`; create a new file only when none fits.
 
@@ -167,13 +173,13 @@ Highlight assumptions and gaps. Wait for explicit agreement. On change requests,
 
 ## COMMIT? -- ask, never auto
 
-After agreement, write the `.feature` file(s) to `specs/<module>/<feature>/` in the `pandahrms-spec` repo.
+After agreement, write the `.feature` file(s) to `specs/<module>/<feature>/` in `<spec-repo>`.
 
 Then AskUserQuestion: commit/PR the spec, or leave it written and stop?
 - **No** -> leave the `.feature` files written in the working tree, stop. Nothing staged, nothing committed.
-- **Yes** -> in the `pandahrms-spec` repo: stage ONLY the `.feature` files this skill produced (`git -C <pandahrms-spec> add <each .feature path>`) -- never `git add .`/`-A`, never any non-`.feature` path; leave all other working-tree files untouched. Commit them in `pandahrms-spec`. Then optionally open a PR if the user wants one.
+- **Yes** -> in `<spec-repo>`: stage ONLY the `.feature` files this skill produced (`git -C <spec-repo> add <each .feature path>`) -- never `git add .`/`-A`, never any non-`.feature` path; leave all other working-tree files untouched. Commit them in `<spec-repo>`. Then optionally open a PR if the user wants one.
 
-Nothing auto-commits. Never stage or commit outside `pandahrms-spec`.
+Nothing auto-commits. Never stage or commit outside `<spec-repo>`.
 
 Commit-message format when the user opts to commit:
 - new: `feat(<module>): add spec for <feature>`
