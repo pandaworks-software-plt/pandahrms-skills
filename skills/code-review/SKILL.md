@@ -1,18 +1,19 @@
 ---
-name: athena-code-review
-description: Triggers on mentions of code review of working-tree changes -- "review my changes", "check my changes", "review the diff", "review before commit", or "lint check on my changes". If the user is ambiguous between working-tree review and PR review, ask which one they mean. Reads all changed files, reviews against the checklist, fixes issues, and runs /simplify. Does NOT commit directly. Supports `--approve` to auto-pick the "proceed" choice at every AskUserQuestion, and `--skip` to forward to `/hermes-commit --skip` at Phase 7 -- e.g., `/athena-code-review --skip --approve` runs the full pipeline and commits without pausing.
+name: code-review
+description: Triggers on mentions of code review of working-tree changes -- "review my changes", "check my changes", "review the diff", "review before commit", or "lint check on my changes". If the user is ambiguous between working-tree review and PR review, ask which one they mean. Reads all changed files, reviews against the checklist, fixes issues, and runs /simplify. Does NOT commit directly. Supports `--approve` to auto-pick the "proceed" choice at every AskUserQuestion, and `--skip` to forward to `/commit --skip` at Phase 7 -- e.g., `/code-review --skip --approve` runs the full pipeline and commits without pausing.
 ---
 
-# Athena Code Review
+# Code Review
 
 ## Overview
 
-Review all git working tree changes against code quality standards, fix issues, and run /simplify. Changes code but never commits directly. May invoke `/hermes-commit` in Phase 7.
+Review all git working tree changes against code quality standards, fix issues, and run /simplify. Changes code but never commits directly. May invoke `/commit` in Phase 7.
 
 ## Flags
 
 - `--approve` -- auto-pick the "proceed" choice at every AskUserQuestion in this skill. No pauses for confirmation. See per-phase defaults below.
-- `--skip` -- forwarded to `/hermes-commit` at Phase 7. Athena calls `/hermes-commit --skip` so the commit step bypasses its own Phase 1 gate. No effect on athena phases themselves.
+- `--skip` -- forwarded to `/commit` at Phase 7. Code review calls `/commit --skip` so the commit step bypasses its own Phase 1 gate. No effect on code-review phases themselves.
+- `--no-commit` -- review-only mode. Skip Phase 7 entirely (no commit/test question, no `/commit` invocation). Emit the Phase 7 summary and return control to the caller. Use when a caller owns the commit gate itself.
 
 Per-phase `--approve` defaults:
 
@@ -20,9 +21,9 @@ Per-phase `--approve` defaults:
 |-------|--------|--------------------|
 | 0 | Small change: review or commit? | review (full review) |
 | 3 | Apply major fixes? | yes, fix all |
-| 4 | Run /aegis-security-review? | yes |
-| 5 | Create/update specs? | skip (record gap, do not invoke /spec-writing) |
-| 7 | Commit or test first? | commit (invoke /hermes-commit, forwarding `--skip` if passed) |
+| 4 | Run /security-review? | yes |
+| 5 | Create/update specs? | skip (record gap, do not invoke /spec) |
+| 7 | Commit or test first? | commit (invoke /commit, forwarding `--skip` if passed) |
 
 When `--approve` is set, announce the auto-pick on one line at each phase (e.g., `--approve: running full review`) before proceeding. Do NOT call AskUserQuestion for any prompt covered by the table above.
 
@@ -33,7 +34,7 @@ digraph code_review {
     "Assess change size" [shape=doublecircle];
     "Small change?" [shape=diamond];
     "Ask: review or commit?" [shape=diamond];
-    "Run /hermes-commit directly" [shape=box, style=filled, fillcolor=lightgreen];
+    "Run /commit directly" [shape=box, style=filled, fillcolor=lightgreen];
     "Gather changes" [shape=box];
     "git diff and git status" [shape=plaintext];
     "Any changes?" [shape=diamond];
@@ -51,23 +52,23 @@ digraph code_review {
     "User approves fixes?" [shape=diamond];
     "Apply major fixes" [shape=box];
     "Security-sensitive changes?" [shape=diamond, style=filled, fillcolor=lightpink];
-    "Run /aegis-security-review" [shape=box, style=filled, fillcolor=lightpink];
+    "Run /security-review" [shape=box, style=filled, fillcolor=lightpink];
     "UI-only changes?" [shape=diamond, style=filled, fillcolor=lightblue];
     "Check spec discrepancy" [shape=box, style=filled, fillcolor=lightblue];
     "Spec covers changes?" [shape=diamond, style=filled, fillcolor=lightblue];
     "Ask: create/update spec?" [shape=diamond, style=filled, fillcolor=lightblue];
-    "Run /spec-writing" [shape=box, style=filled, fillcolor=lightblue];
+    "Run /spec" [shape=box, style=filled, fillcolor=lightblue];
     "Run /simplify" [shape=box, style=filled, fillcolor=lightyellow];
     "Show simplify changes" [shape=box];
     "Review summary" [shape=box];
-    "Ask: /hermes-commit or test first?" [shape=diamond, style=filled, fillcolor=lightgreen];
-    "Run /hermes-commit" [shape=box, style=filled, fillcolor=lightgreen];
+    "Ask: /commit or test first?" [shape=diamond, style=filled, fillcolor=lightgreen];
+    "Run /commit" [shape=box, style=filled, fillcolor=lightgreen];
     "Done - user will test" [shape=doublecircle];
 
     "Assess change size" -> "Small change?";
     "Small change?" -> "Ask: review or commit?" [label="yes"];
     "Small change?" -> "Gather changes" [label="no, full review"];
-    "Ask: review or commit?" -> "Run /hermes-commit directly" [label="commit"];
+    "Ask: review or commit?" -> "Run /commit directly" [label="commit"];
     "Ask: review or commit?" -> "Gather changes" [label="review"];
     "Gather changes" -> "git diff and git status";
     "git diff and git status" -> "Any changes?";
@@ -90,22 +91,22 @@ digraph code_review {
     "User approves fixes?" -> "Apply major fixes" [label="yes"];
     "User approves fixes?" -> "Security-sensitive changes?" [label="skip"];
     "Apply major fixes" -> "Security-sensitive changes?";
-    "Security-sensitive changes?" -> "Run /aegis-security-review" [label="yes"];
+    "Security-sensitive changes?" -> "Run /security-review" [label="yes"];
     "Security-sensitive changes?" -> "UI-only changes?" [label="no"];
-    "Run /aegis-security-review" -> "UI-only changes?";
+    "Run /security-review" -> "UI-only changes?";
     "UI-only changes?" -> "Run /simplify" [label="yes, skip spec check"];
     "UI-only changes?" -> "Check spec discrepancy" [label="no"];
     "Check spec discrepancy" -> "Spec covers changes?";
     "Spec covers changes?" -> "Run /simplify" [label="yes"];
     "Spec covers changes?" -> "Ask: create/update spec?" [label="no or missing"];
-    "Ask: create/update spec?" -> "Run /spec-writing" [label="yes"];
+    "Ask: create/update spec?" -> "Run /spec" [label="yes"];
     "Ask: create/update spec?" -> "Run /simplify" [label="skip"];
-    "Run /spec-writing" -> "Run /simplify";
+    "Run /spec" -> "Run /simplify";
     "Run /simplify" -> "Show simplify changes";
     "Show simplify changes" -> "Review summary";
-    "Review summary" -> "Ask: /hermes-commit or test first?";
-    "Ask: /hermes-commit or test first?" -> "Run /hermes-commit" [label="commit"];
-    "Ask: /hermes-commit or test first?" -> "Done - user will test" [label="test first"];
+    "Review summary" -> "Ask: /commit or test first?";
+    "Ask: /commit or test first?" -> "Run /commit" [label="commit"];
+    "Ask: /commit or test first?" -> "Done - user will test" [label="test first"];
 }
 ```
 
@@ -115,12 +116,14 @@ Run `git diff` and `git diff --cached` to assess change size.
 
 **Small change definition (literal):** diff has **<= 20 changed lines total across <= 2 files**, AND no `.cs` / `.ts` / `.tsx` / `.py` files contain new functions, classes, or exported symbols. If both conditions hold, change is small. Otherwise not small. Do not classify by file type alone.
 
-**If small**: use `AskUserQuestion` to ask:
+**If `--no-commit` set:** skip this whole triage question and proceed directly to Phase 1 (full review). Never offer the commit shortcut -- the caller owns the commit gate.
+
+**If small** (and not `--no-commit`): use `AskUserQuestion` to ask:
 
 > "Small change detected. Would you like to run a full code review, or commit directly?"
 
 - **review** -> proceed to Phase 1
-- **commit** -> invoke `/hermes-commit` and end flow
+- **commit** -> invoke `/commit` and end flow
 - If answer off-list, re-ask once with same options. If second response still off-list, stop skill, summarize state in one line, let user direct next steps.
 
 If `--approve` set, skip the question, announce `--approve: running full review` and proceed to Phase 1.
@@ -175,7 +178,7 @@ Failure handling:
 - **Build runs and emits compile/type errors:** treat each error as a **must-fix** Phase 2 finding. Compile errors are not stylistic -- they will break the next deploy. Include them alongside lint findings in Phase 2 review output.
 - **Build runs clean:** record `Build: clean` in Phase 7 summary, proceed.
 
-Never skip build silently when one was matched but failed. Build runs once per review pass -- do NOT re-run after applying fixes; the user re-runs athena if they want a re-verify.
+Never skip build silently when one was matched but failed. Build runs once per review pass -- do NOT re-run after applying fixes; the user re-runs /code-review if they want a re-verify.
 
 ### Second Opinion: Dispatch Codex Reviewer (if installed)
 
@@ -341,9 +344,9 @@ If user's answer does not match offered options, re-ask same question once. If s
 
 If `--approve` set, skip the question, announce `--approve: applying all major fixes` and apply every major finding (still bound by scope-of-edits rule).
 
-**Phase 4: Security Review (/aegis-security-review)**
+**Phase 4: Security Review (/security-review)**
 
-Phase 2 catches obvious security issues. Aegis Security Review is the deeper pass: OWASP Top 10, tenant isolation, PII handling, audit-trail completeness, and dependency scanning.
+Phase 2 catches obvious security issues. The security review is the deeper pass: OWASP Top 10, tenant isolation, PII handling, audit-trail completeness, and dependency scanning.
 
 ### Skip Conditions
 
@@ -373,28 +376,28 @@ From diff already gathered in Phase 1, check for any of:
 
 If none apply, apply skip condition above. Otherwise continue.
 
-**Step 2: Invoke /aegis-security-review**
+**Step 2: Invoke /security-review**
 
 Use `AskUserQuestion` to confirm:
 
-> "Changes include security-sensitive surface ([summary of what was detected]). Run /aegis-security-review for a deeper OWASP + Pandahrms security audit?"
+> "Changes include security-sensitive surface ([summary of what was detected]). Run /security-review for a deeper OWASP + Pandahrms security audit?"
 
 Options:
-- **Run /aegis-security-review** -> invoke `aegis-security-review` skill against working tree. Aegis Security Review reports findings, optionally applies approved fixes, returns control here.
+- **Run /security-review** -> invoke `security-review --no-commit` against working tree (always pass `--no-commit` so the sub-review never owns the commit; control returns here). The security review reports findings, optionally applies approved fixes, returns control here.
 - **Skip** -> note skip in review summary and proceed to Phase 5.
 - If answer off-list, re-ask once. If still off-list, stop skill.
 
-If `--approve` set, skip the question, announce `--approve: running /aegis-security-review` and invoke the skill.
+If `--approve` set, skip the question, announce `--approve: running /security-review` and invoke `security-review --no-commit`.
 
-When aegis-security-review returns, treat any approved fixes as already applied (aegis-security-review does not commit). Do not re-ask about committing -- control returns here, not to aegis-security-review's own commit prompt. If aegis-security-review exits with an error or times out, see "Sub-Skill Failure Handling" below.
+When security-review returns, treat any approved fixes as already applied (security-review does not commit). Do not re-ask about committing -- control returns here. If security-review exits with an error or times out, see "Sub-Skill Failure Handling" below.
 
 **Step 3: Record Outcome**
 
-Capture aegis-security-review outcome for Phase 7 summary:
+Capture security-review outcome for Phase 7 summary:
 - **Skipped** -- no security surface, or user declined
-- **Clean** -- aegis-security-review ran, zero findings
-- **Fixes applied** -- aegis-security-review ran, N findings, M fixed
-- **Findings acknowledged** -- aegis-security-review ran, findings reported, user chose not to fix
+- **Clean** -- security-review ran, zero findings
+- **Fixes applied** -- security-review ran, N findings, M fixed
+- **Findings acknowledged** -- security-review ran, findings reported, user chose not to fix
 
 Then proceed to Phase 5.
 
@@ -448,15 +451,15 @@ If **outdated or missing specs**, report discrepancies clearly:
 
 Then ask inline in plain text:
 
-> "Specs are out of sync with your changes. Would you like to create/update specs now? (This will invoke /spec-writing)"
+> "Specs are out of sync with your changes. Would you like to create/update specs now? (This will invoke /spec)"
 
-- **yes** -> invoke `/spec-writing` skill, then continue to Phase 6
+- **yes** -> invoke `/spec` skill, then continue to Phase 6
 - **skip** -> record gap in Phase 7 summary and move to Phase 6
 - If answer off-list, re-ask once. If still off-list, stop skill.
 
-If `--approve` set, skip the question, announce `--approve: skipping spec update, recording gap` and proceed to Phase 6. Do NOT invoke `/spec-writing` under `--approve`.
+If `--approve` set, skip the question, announce `--approve: skipping spec update, recording gap` and proceed to Phase 6. Do NOT invoke `/spec` under `--approve`.
 
-**Never write `.feature` files yourself in this skill.** Only path to spec creation/update is invoking `/spec-writing`. If user declines, do NOT draft spec content as a courtesy. If `/spec-writing` exits with an error, see "Sub-Skill Failure Handling" below.
+**Never write `.feature` files yourself in this skill.** Only path to spec creation/update is invoking `/spec`. If user declines, do NOT draft spec content as a courtesy. If `/spec` exits with an error, see "Sub-Skill Failure Handling" below.
 
 **Phase 6: Simplify**
 
@@ -485,21 +488,23 @@ Summarize all changes made during review:
 - Spec discrepancy status (in sync, updated, or skipped)
 - /simplify changes
 
+**If `--no-commit` set:** emit the summary above and STOP. Do NOT ask the commit/test question, do NOT invoke `/commit`. Return control to the caller (the caller owns the commit gate).
+
 Then use `AskUserQuestion` to ask:
 
-> "Code review complete. Would you like to proceed to /hermes-commit, or test first?"
+> "Code review complete. Would you like to proceed to /commit, or test first?"
 
-- **commit** -> invoke `/hermes-commit` skill. When `/hermes-commit` returns control, **athena-code-review skill is complete**. Do not produce further output, do not re-summarize, do not offer next steps.
-- **test** -> end flow with: "Sounds good. Run /hermes-commit when you're ready."
+- **commit** -> invoke `/commit` skill. When `/commit` returns control, **code-review skill is complete**. Do not produce further output, do not re-summarize, do not offer next steps.
+- **test** -> end flow with: "Sounds good. Run /commit when you're ready."
 - If answer off-list, re-ask once. If still off-list, stop skill.
 
-If `--approve` set, skip the question, announce `--approve: invoking /hermes-commit` and invoke the commit skill. Forward `--skip` if the athena invocation included it: call `/hermes-commit --skip` when both flags were passed, `/hermes-commit` otherwise. When `/hermes-commit` returns, athena ends -- same termination rule as the **commit** branch above.
+If `--approve` set, skip the question, announce `--approve: invoking /commit` and invoke the commit skill. Forward `--skip` if the code-review invocation included it: call `/commit --skip` when both flags were passed, `/commit` otherwise. When `/commit` returns, code-review ends -- same termination rule as the **commit** branch above.
 
 ## Red Flags - STOP
 
-- Running `/spec-writing` without asking user first - always use AskUserQuestion
-- Running `/aegis-security-review` without asking user first - always use AskUserQuestion in Phase 4
-- Committing without asking user first - always ask commit vs test in Phase 7
+- Running `/spec` without asking user first - always use AskUserQuestion
+- Running `/security-review` without asking user first - always use AskUserQuestion in Phase 4
+- Committing without asking user first - always ask commit vs test in Phase 7 (unless `--approve` is set, which auto-picks commit; or `--no-commit`, which skips the commit step entirely)
 - Auto-skipping review because "changes are small" without asking user - Phase 0 ALWAYS asks via AskUserQuestion when small; never auto-skip
 - Reviewing only diff, not full file - always read full files
 - Running spec check on UI-only changes - skip Phase 5 for styling/layout/theming work (per precise UI-only definition in Phase 4)
@@ -507,12 +512,12 @@ If `--approve` set, skip the question, announce `--approve: invoking /hermes-com
 - Waiting for Codex before starting Claude's own checklist - dispatch Codex in same tool-call batch as first Phase 2 read, so both reviews run in parallel
 - Blocking review when Codex fails or times out - note failure and proceed with Claude-only findings
 - Announcing "Codex not installed" when it isn't - silent skip only
-- Running tests, migrations, dev servers, or any side-effecting commands during this skill - only commands this skill runs are `git status`, `git diff`, `git diff --cached`, file reads, matched linter scoped to changed files, a single workspace build / type-check pass (Phase 1 "Run Build / Type-check"), and sub-skill invocations defined in phases (`/simplify`, `/aegis-security-review`, `/spec-writing`, `/hermes-commit`). Anything else requires explicit user instruction mid-flow.
+- Running tests, migrations, dev servers, or any side-effecting commands during this skill - only commands this skill runs are `git status`, `git diff`, `git diff --cached`, file reads, matched linter scoped to changed files, a single workspace build / type-check pass (Phase 1 "Run Build / Type-check"), and sub-skill invocations defined in phases (`/simplify`, `/security-review`, `/spec`, `/commit`). Anything else requires explicit user instruction mid-flow.
 - Dispatching multiple Codex agents (per file, per category, per phase) - exactly ONE Codex agent for entire diff
 - Editing files outside `git status` changed set when applying fixes - only touch changed files plus single file needed to wire up a finding (e.g., DI registration)
-- Writing `.feature` files yourself in Phase 5 - only path to spec creation/update is `/spec-writing`
+- Writing `.feature` files yourself in Phase 5 - only path to spec creation/update is `/spec`
 - Splitting / refactoring a god class during this skill - flag as Major finding only; splitting requires a separate plan
-- Continuing after `/hermes-commit` returns - skill ends
+- Continuing after `/commit` returns - skill ends
 - Producing commit messages, PR descriptions, changelogs, migration plans, test scaffolds, new docs, design docs, memory entries, or branch/PR creation - see "Out of Scope" below
 
 ## Common Mistakes
@@ -521,32 +526,32 @@ If `--approve` set, skip the question, announce `--approve: invoking /hermes-com
 |---------|-----|
 | Reviewing only diff, not full file | Always read full file for context |
 | Fixing issues without telling user | Always summarize what was auto-fixed |
-| Committing without asking | Always ask user: /hermes-commit or test first? |
+| Committing without asking | Always ask user: /commit or test first? (unless `--approve` / `--no-commit`) |
 | Blocking review when spec repo is missing | Report it and move on -- do not block review |
 | Running spec check on UI-only changes | Skip Phase 5 for precise UI-only definition in Phase 4 |
-| Running /aegis-security-review on UI-only or docs-only changes | Skip Phase 4 when no security-relevant surface exists |
-| Invoking /aegis-security-review without user confirmation | Always ask in Phase 4 before invoking |
+| Running /security-review on UI-only or docs-only changes | Skip Phase 4 when no security-relevant surface exists |
+| Invoking /security-review without user confirmation | Always ask in Phase 4 before invoking |
 | Running Claude's checklist first then Codex | Dispatch in parallel -- same tool-call batch as first Phase 2 read |
 | Announcing "Codex not installed" | Silent skip -- no user-facing message when absent |
 | Treating Codex output as authoritative | Advisory only -- dedupe, merge attribution, use higher severity when classifications differ |
 | Editing AND asking in same turn | After AskUserQuestion in Phase 3, STOP. No Edit calls until user approves. |
 | "Tidying up" files opened only for context | Only touch files in `git status` plus DI-registration wiring file |
-| Drafting `.feature` content as a courtesy | Spec writes go through `/spec-writing` only; never inline |
+| Drafting `.feature` content as a courtesy | Spec writes go through `/spec` only; never inline |
 | Running tests / migrations to "verify" | Out of scope. The Phase 1 build / type-check pass is the only side-effecting verification allowed; everything else is read-only. |
 
 ## Out of Scope
 
-Athena Code Review does NOT produce any of the following. If any would be useful, mention it as a one-line suggestion in Phase 7 summary and let user decide whether to invoke a separate skill:
+Code Review does NOT produce any of the following. If any would be useful, mention it as a one-line suggestion in Phase 7 summary and let user decide whether to invoke a separate skill:
 
 - Commit messages, PR descriptions, changelogs
 - Migration plans, test scaffolds, new documentation files
 - Design docs, memory entries
 - Branch creation, PR creation, push operations
-- Builds, test runs, dev-server starts, database migrations, deployment artifacts
+- Build artifacts and deployment builds beyond the single Phase 1 build / type-check pass, test runs, dev-server starts, database migrations
 
 ## Sub-Skill Failure Handling
 
-Applies whenever athena-code-review invokes `/simplify`, `/aegis-security-review`, `/spec-writing`, or `/hermes-commit`:
+Applies whenever code-review invokes `/simplify`, `/security-review`, `/spec`, or `/commit`:
 
 - If sub-skill exits with an error or times out, record failure as `<skill>: failed - <reason>` in Phase 7 summary and continue to next phase. Do NOT retry sub-skill in this run.
-- If sub-skill returns control with its own pending question, treat that question as belonging to sub-skill -- surface it verbatim to user, then resume athena-code-review once user answered through sub-skill.
+- If sub-skill returns control with its own pending question, treat that question as belonging to sub-skill -- surface it verbatim to user, then resume code-review once user answered through sub-skill.

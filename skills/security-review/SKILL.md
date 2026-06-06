@@ -1,9 +1,9 @@
 ---
-name: aegis-security-review
-description: Triggers when the user requests a security review of code or working-tree changes -- phrasings such as "/aegis-security-review", "run aegis", "do a security review", "audit this for vulnerabilities", "OWASP pass on this branch", "check this PR for security issues", "auth audit", "authz audit", "pen test this". Audits auth, authz, input validation, injection, secrets, PII exposure, audit trails, and tenant isolation in working tree changes or a specified feature area. Reports findings and fixes approved issues. Does NOT commit, stage, or push.
+name: security-review
+description: Triggers when the user requests a security review of code or working-tree changes -- phrasings such as "/security-review", "run security review", "do a security review", "audit this for vulnerabilities", "OWASP pass on this branch", "check this PR for security issues", "auth audit", "authz audit", "pen test this". Audits auth, authz, input validation, injection, secrets, PII exposure, audit trails, and tenant isolation in working tree changes or a specified feature area. Reports findings and fixes approved issues. Does NOT commit, stage, or push.
 ---
 
-# Aegis Security Review
+# Security Review
 
 ## Overview
 
@@ -41,8 +41,8 @@ Run `git diff` and grep for tokens above before declaring change out of scope.
 Phases run **strictly sequentially** Phase 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8. Do not begin a phase until previous emitted required output. No parallel subagents; all work in main thread.
 
 ```dot
-digraph aegis {
-    "User triggers /aegis-security-review" [shape=doublecircle];
+digraph security_review {
+    "User triggers /security-review" [shape=doublecircle];
     "Scope provided?" [shape=diamond];
     "Use working tree diff" [shape=box];
     "Use specified scope" [shape=box];
@@ -63,11 +63,11 @@ digraph aegis {
     "Ask: fix now?" [shape=diamond];
     "Apply approved fixes" [shape=box];
     "Re-verify fixes" [shape=box];
-    "Ask: /hermes-commit or test first?" [shape=diamond, style=filled, fillcolor=lightgreen];
-    "Run /hermes-commit" [shape=box, style=filled, fillcolor=lightgreen];
+    "Ask: /commit or test first?" [shape=diamond, style=filled, fillcolor=lightgreen];
+    "Run /commit" [shape=box, style=filled, fillcolor=lightgreen];
     "Done - user will test" [shape=doublecircle];
 
-    "User triggers /aegis-security-review" -> "Scope provided?";
+    "User triggers /security-review" -> "Scope provided?";
     "Scope provided?" -> "Use specified scope" [label="yes"];
     "Scope provided?" -> "Use working tree diff" [label="no"];
     "Use working tree diff" -> "Detect project type";
@@ -86,13 +86,13 @@ digraph aegis {
     "Categorize by severity" -> "Report findings to user";
     "Report findings to user" -> "Critical/High present?";
     "Critical/High present?" -> "Ask: fix now?" [label="yes"];
-    "Critical/High present?" -> "Ask: /hermes-commit or test first?" [label="no, low/info only"];
+    "Critical/High present?" -> "Ask: /commit or test first?" [label="no, low/info only"];
     "Ask: fix now?" -> "Apply approved fixes" [label="fix"];
-    "Ask: fix now?" -> "Ask: /hermes-commit or test first?" [label="skip"];
+    "Ask: fix now?" -> "Ask: /commit or test first?" [label="skip"];
     "Apply approved fixes" -> "Re-verify fixes";
-    "Re-verify fixes" -> "Ask: /hermes-commit or test first?";
-    "Ask: /hermes-commit or test first?" -> "Run /hermes-commit" [label="commit"];
-    "Ask: /hermes-commit or test first?" -> "Done - user will test" [label="test first"];
+    "Re-verify fixes" -> "Ask: /commit or test first?";
+    "Ask: /commit or test first?" -> "Run /commit" [label="commit"];
+    "Ask: /commit or test first?" -> "Done - user will test" [label="test first"];
 }
 ```
 
@@ -100,7 +100,7 @@ digraph aegis {
 
 ### 0.1 Resolve scope to concrete file list
 
-- If user supplied literal path or glob (e.g. `/aegis-security-review src/auth`, `aegis on Pandahrms.Performance.Api/Controllers/LoginController.cs`), use exactly that path set.
+- If user supplied literal path or glob (e.g. `/security-review src/auth`, `/security-review on Pandahrms.Performance.Api/Controllers/LoginController.cs`), use exactly that path set.
 - If user supplied natural-language scope (e.g. "the new login endpoint", "the export feature"), resolve to concrete file list using `git status`, `grep`, `find`. When more than 5 files match, or zero match, list the matched files inline in chat and ask the user inline in plain text to confirm before proceeding.
 - If no scope supplied, default to git working tree captured by:
   - `git status` (untracked and modified files)
@@ -108,7 +108,7 @@ digraph aegis {
 
 ### 0.2 Empty working tree halt
 
-If no scope supplied AND `git status` shows clean tree (no staged, unstaged, or untracked changes), halt immediately with single line: "No changes to audit. Pass an explicit scope (e.g. `/aegis-security-review src/auth`) to audit specific files." Do not audit entire repository as fallback.
+If no scope supplied AND `git status` shows clean tree (no staged, unstaged, or untracked changes), halt immediately with single line: "No changes to audit. Pass an explicit scope (e.g. `/security-review src/auth`) to audit specific files." Do not audit entire repository as fallback.
 
 ### 0.3 Read every in-scope file end-to-end
 
@@ -300,7 +300,7 @@ Group findings into four buckets:
 Phase 6 report is single message containing, in this exact order:
 
 1. Any `## CRITICAL: POSSIBLE SECRET LEAKED` blocks emitted by Phase 5 (zero or more, at very top).
-2. `## Aegis Report -- <scope summary>`
+2. `## Security Report -- <scope summary>`
 3. `### Counts` -- table with one row per severity (Critical, High, Medium, Low, Info) and integer count for each.
 4. `### Phase 2: Trust Boundaries` -- Trust Boundary Map produced in Phase 2.
 5. `### Findings` -- one block per finding using **exactly** this four-bullet template:
@@ -331,7 +331,7 @@ Every `Where:` reference must come from file actually opened by Read tool in thi
 
 If Critical or High findings exist, ask inline in plain text:
 
-> "Aegis Security Review found [N Critical / M High] issues. Fix them now, or report and let you handle them?"
+> "The security review found [N Critical / M High] issues. Fix them now, or report and let you handle them?"
 
 Options the user can type back:
 - **Fix now** -- apply remediations for approved findings.
@@ -368,14 +368,16 @@ Summarize:
 - What was fixed (if any)
 - Residual risk the user is accepting (if any)
 
+**If `--no-commit` set (review-only mode):** emit the summary above and STOP. Do NOT ask the commit/test question, do NOT invoke `/commit`. Return control to the caller (the caller owns the commit gate). Used when a caller such as `/code-review` or `/execute` invokes this skill for findings only.
+
 Then use `AskUserQuestion` to ask:
 
-> "Security review complete. Would you like to proceed to /hermes-commit, or test first?"
+> "Security review complete. Would you like to proceed to /commit, or test first?"
 
-- **Commit** -- invoke `pandahrms:hermes-commit` via Skill tool, then end aegis-security-review turn immediately upon dispatch. Do not produce additional output, findings, or commentary after dispatch.
-- **Test first** -- emit exactly the single line "Sounds good. Run /hermes-commit when you're ready." and end turn. Do not add further text.
+- **Commit** -- invoke `pandahrms:commit` via Skill tool, then end security-review turn immediately upon dispatch. Do not produce additional output, findings, or commentary after dispatch.
+- **Test first** -- emit exactly the single line "Sounds good. Run /commit when you're ready." and end turn. Do not add further text.
 
-After Phase 8 ends, aegis-security-review is complete. Do not continue executing aegis-security-review behavior (no further audits, follow-up advice, or additional checks) in same turn.
+After Phase 8 ends, security-review is complete. Do not continue executing security-review behavior (no further audits, follow-up advice, or additional checks) in same turn.
 
 ## Red Flags - STOP
 
@@ -384,7 +386,7 @@ After Phase 8 ends, aegis-security-review is complete. Do not continue executing
 - Skipping tenant-isolation checks on any DB query in tenant-scoped project
 - Declaring hardcoded credential "probably fine" - always flag as Critical until disproven
 - Using narrow diff view to judge security question - always read full file to see surrounding guards
-- Running `/hermes-commit` automatically after fixes - always ask commit vs test first
+- Running `/commit` automatically after fixes - always ask commit vs test first
 - Treating missing audit trail as Low - it is High severity in Pandahrms
 
 ## Common Mistakes

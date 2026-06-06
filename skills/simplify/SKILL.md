@@ -175,7 +175,7 @@ End. Return control to caller or to user. No follow-up offers.
 - No new files. Single-helper extractions land inside an existing file in the changed set.
 - No public API surface changes during this skill (route paths, DTO field names, exported symbols, DB schema). Findings that need any of those are `behavior-changing` and route through Phase 5.
 - One AskUserQuestion at a time in Phase 5. No batching across files unless the question references the same file.
-- No `/hermes-commit`, no `atlas-pipeline-orchestrator`, no `/athena-code-review` invocations from inside this skill.
+- No `/commit`, no `/code-review` invocations from inside this skill.
 
 ## Out of Scope
 

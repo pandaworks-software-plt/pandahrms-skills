@@ -22,7 +22,7 @@ Real logic is never exempt: a mapping/DTO/config carrying real behavior (e.g. a 
 - Do NOT reclassify a gate at runtime -- no Auto to Manual "to be safe", no Manual to Auto "looks safe".
 - **BE to deploy to regen to FE order**: finish BE, deploy BE locally so swagger is live, regen FE types, then FE work. Never hand-edit generated types to start FE early.
 
-## Sensitivity list (sensitive-card tagging + aegis gating)
+## Sensitivity list (sensitive-card tagging + security-review gating)
 A change is sensitive when it touches any of:
 - authentication / authorization / session
 - multi-tenant data boundary -- tenant_id filters, row-level security, cross-tenant checks
@@ -31,7 +31,7 @@ A change is sensitive when it touches any of:
 - PII handling / audit logging / data retention
 - anything a design doc flagged as risky
 
-Tag such cards sensitive; run aegis-security-review on them.
+Tag such cards sensitive; run /security-review on them.
 
 ## Spec vs code conflict
 If a spec and the code or plan disagree, STOP and report the conflict. Never silently reconcile or pick one side.
