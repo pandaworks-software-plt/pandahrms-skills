@@ -19,11 +19,11 @@ Behaviour change = new rule, changed rule, or bug that changes what "correct" me
 
 Resolve the L1 spec repo location (call the result `<spec-repo>`) in this order -- first hit wins:
 
-1. **Stated location** -- if the session context or the working project's `CLAUDE.md` names where the L1 spec lives (e.g. a `Spec repo: <path>` line), use that path. Never re-derive it.
+1. **Stated location** -- if the session context or the user's global `~/.claude/CLAUDE.md` names where the L1 spec lives (e.g. a `Spec repo: <path>` line under a `## Spec` heading), use that path. Never re-derive it.
 2. **Sibling default** -- else try `$(dirname $PWD)/pandahrms-spec/`. Use it only if that directory exists.
 3. **Ask** -- if neither resolves, AskUserQuestion for the L1 spec repo path. Offer cloning `https://github.com/pandaworks-software-plt/pandahrms-spec.git` as a sibling as one candidate. Do not guess a path.
 
-After the user answers via step 3, append a `Spec repo: <path>` line to the working project's `CLAUDE.md` (under a `## Spec` heading, create it if absent) so later runs skip the ask. The user's answer is the authorization to write -- do not re-confirm.
+After the user answers via step 3, append a `Spec repo: <path>` line to the user's global `~/.claude/CLAUDE.md` (under a `## Spec` heading, create the file and the heading if absent) so later runs in every project skip the ask. The user's answer is the authorization to write -- do not re-confirm. Never write this line to a project `CLAUDE.md`.
 
 Branch alignment (before reading any `.feature`): compare `git -C <spec-repo> rev-parse --abbrev-ref HEAD` with the working project's `git rev-parse --abbrev-ref HEAD`. On mismatch, AskUserQuestion: checkout matching branch / stay and proceed / abort. Never auto-checkout, auto-fetch, or auto-pull.
 
