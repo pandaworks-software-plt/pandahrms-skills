@@ -12,6 +12,7 @@ The plugin is a set of manual, standalone skills. There is no orchestrator -- yo
 |-------|---------------|-------------|
 | **discover** | `/pandahrms:discover` | Free-form intake door: a new feature / enhancement / bug -> objective + acceptance criteria |
 | **discover-ticket** | `/pandahrms:discover-ticket` | Ticket intake door (workspace-prod MCP) -> same output contract as `/discover` |
+| **discover-project** | `/pandahrms:discover-project` | Project-queue door (workspace-prod MCP) -> numbered table of a project's pending dev tickets; user picks -> `/discover-ticket` |
 | **spec** | `/pandahrms:spec` | Write/update the L1 behaviour Gherkin spec in pandahrms-spec; conditional on behaviour change; user-agreement gate |
 | **slice** | `/pandahrms:slice` | Cut agreed work into vertical-slice cards; each card holds its L2 spec files + an ordered work sequence |
 | **execute** | `/pandahrms:execute` | Run one card: guided run with stop-gates, spec-first TDD, inline review/deploy/regen; `/execute card-NN` or bare `/execute` for the next card |
@@ -61,7 +62,7 @@ To update the plugin to the latest version:
 Each skill is manual and standalone -- you run each step. There is no orchestrator: each skill ends by suggesting the next one (`## Next step`), so the flow self-guides while you stay in control of every hop. A typical piece of work flows like this:
 
 ```
-/discover  (or /discover-ticket)     intake -> objective + acceptance criteria
+/discover  (or /discover-ticket; /discover-project to pick from a project's pending queue)   intake -> objective + acceptance criteria
    -> /spec        L1 behaviour Gherkin spec (central pandahrms-spec)
    -> /slice       vertical-slice cards (each holds its L2 spec files + an ordered sequence)
    -> /execute     per card: guided run with stop-gates + spec-first TDD

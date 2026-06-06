@@ -17,6 +17,7 @@ pandahrms-skills/
 │   │  # Flow skills (manual, standalone; run in order, no orchestrator)
 │   ├── discover/                      # Free-form intake door: a new feature / enhancement / bug -> objective + acceptance criteria
 │   ├── discover-ticket/               # Ticket intake door (workspace-prod MCP) -> same output contract as /discover
+│   ├── discover-project/              # Project-queue door (workspace-prod MCP) -> numbered table of pending dev tickets, user picks -> /discover-ticket
 │   ├── spec/                          # Write/update the L1 behaviour Gherkin spec in pandahrms-spec (conditional on behaviour change)
 │   ├── slice/                         # Cut agreed work into vertical-slice cards (each holds its L2 spec files + an ordered work sequence)
 │   ├── execute/                       # Run one card: guided run with stop-gates, spec-first TDD, inline review/deploy/regen
