@@ -102,7 +102,7 @@ The card carries its ordered sequence as a checklist.
 - Append dated Progress entries, mirroring the docspace card convention (Goal/Scope/Acceptance/TDD/Progress).
 - A card is DONE when every checklist step is ticked THROUGH the `/commit` step (the PR may be raised now or deferred to `/pr`).
 - `/execute` OWNS the card move. The moment the card is done, move it `<work-folder>/active/` → `<work-folder>/done/` and APPEND a `## Closed: <date>` block at the END of the card file (append, never prepend). `/close` does NOT move cards.
-- When that move leaves `<work-folder>/active/` empty (the last card is done), `/status` auto-fires.
+- When that move leaves `<work-folder>/active/` empty (the last card is done), INVOKE `/status` as a leaf action to present the completion conclusion.
 
 ## Handoff
 
@@ -129,4 +129,4 @@ Never silently absorb a problem or a mid-run user correction. Surface it; record
 
 ## Next step
 
-End by telling the user their next skill: if active cards remain, run `/execute` for the next card; when the last card finishes, `/status` runs automatically.
+End by telling the user their next skill: if active cards remain, run `/execute` for the next card; when the last card finishes, `/execute` invokes `/status` itself to present the conclusion.

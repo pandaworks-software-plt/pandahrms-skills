@@ -1,7 +1,7 @@
 {
   "name": "pandahrms",
   "description": "Pandahrms skills for Claude Code: a manual, standalone work flow -- /discover and /discover-ticket intake, /spec (layered Gherkin behaviour spec), /slice (vertical-slice cards), /execute (guided card run with TDD and stop-gates), /status, /close, /pr -- plus quality skills (code-review, security-review, simplify, commit), safe branching, EF Core migrations, handoff-compact, and the optimise-prompt pre-flight repeat-back",
-  "version": "4.1.0",
+  "version": "4.1.1",
   "author": { "name": "Pandaworks" },
   "license": "UNLICENSED",
   "keywords": ["pandahrms", "skills", "gherkin", "specs", "discover", "spec", "slice", "execute", "review", "security", "commit", "branching"]

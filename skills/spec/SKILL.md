@@ -1,6 +1,6 @@
 ---
 name: spec
-description: Manually invoked as `/spec` to write or update the L1 behaviour spec in pandahrms-spec from intake output (objective + acceptance criteria + module). The L1 spec is the tech-agnostic product truth (what the feature does, when it's done) in Gherkin -- no UI mechanics, no API/endpoint detail. Conditional on behaviour change: pure UI restyle or refactor with no behaviour change proposes a skip for user confirmation. Writes L1 only (L2 FE/BE executable specs come later during execution). Presents a scenario-index table for user agreement, then asks whether to commit/PR to pandahrms-spec -- never auto-commits.
+description: Manually invoked as `/spec` to write or update the L1 behaviour spec in pandahrms-spec from intake output (objective + acceptance criteria + module). The L1 spec is the tech-agnostic product truth (what the feature does, when it's done) in Gherkin -- no UI mechanics, no API/endpoint detail. Conditional on behaviour change: pure UI restyle or refactor with no behaviour change proposes a skip for user confirmation. Writes L1 only (L2 FE/BE executable specs come later during execution). Presents a scenario-index table for user agreement, then asks whether to commit/PR to pandahrms-spec -- never auto-commits. Does NOT auto-trigger -- only on the `/spec` slash command or an explicit "write the spec" / "update the spec" request; talk of a behaviour change or a ready intake output alone is not enough.
 ---
 
 # /spec -- L1 Behaviour Spec

@@ -1,6 +1,6 @@
 ---
 name: slice
-description: Manually invoked as `/slice` (or by an explicit "slice this" / "cut this into cards" mention) to cut agreed work into independently-shippable vertical-slice cards. One capability per slice (CRUD -> 4 slices), Collapse Rule for trivial ones. Each card carries the L1 scenarios it covers, its L2 spec file(s) (BE Reqnroll .feature + FE cucumber-vite .feature -- decided here, written later in /execute, one per layer the slice touches), an ordered work-sequence CHECKLIST templated by layer-span AND architecture, a sensitivity tag (auth/tenant/PII), and acceptance. Gates on user agreement before any execution. Cross-repo slice raises 2 linked PRs.
+description: Manually invoked as `/slice` (or by an explicit "slice this" / "cut this into cards" mention) to cut agreed work into independently-shippable vertical-slice cards. One capability per slice (CRUD -> 4 slices), Collapse Rule for trivial ones. Each card carries the L1 scenarios it covers, its L2 spec file(s) (BE Reqnroll .feature + FE cucumber-vite .feature -- decided here, written later in /execute, one per layer the slice touches), an ordered work-sequence CHECKLIST templated by layer-span AND architecture, a sensitivity tag (auth/tenant/PII), and acceptance. Gates on user agreement before any execution. Cross-repo slice raises 2 linked PRs. Does NOT auto-trigger -- only on the `/slice` slash command or an explicit slice/decompose/"cut into cards" request; an agreed spec alone is not enough.
 ---
 
 # Pandahrms Slice
