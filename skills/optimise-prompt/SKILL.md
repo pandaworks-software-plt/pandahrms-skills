@@ -1,19 +1,20 @@
 ---
 name: optimise-prompt
-description: ALWAYS run this as the very first step of every user-facing turn -- BEFORE any other tool call. Acts as a repeat-back step so the user can confirm Claude read their message correctly. Rephrases the user's request in clear B2-Level English and emits the restatement as a visible chat message. When intent is unambiguous (CLEAR), prints a one-line restatement and proceeds in the same turn without pausing -- the user interrupts if Claude misread. When the request is ambiguous, contradictory, or missing critical info, calls AskUserQuestion with candidate intents and waits for the user to pick. Triggers on read-only questions, diagnostic questions, working-tree actions (write/edit/refactor/fix/add/remove/rename/drop/run/build/commit/migrate/deploy), one-line tweaks, single-file edits, single-className removals, config touches, and short follow-up directives. Mechanical skips only: short acks that carry no new verb or object (e.g. "yes", "ok", "got it", "sounds good", "go ahead", "continue", "stop", "skip", "cancel", "nevermind"), direct replies to an in-flight AskUserQuestion, recursive self-calls when the skill is already running, any message whose first non-whitespace character is "/" (slash-command skill trigger -- the slash command itself is the explicit intent), and any message whose first non-whitespace character is "!" or "$" (explicit bypass prefix -- the user has opted out of the repeat-back step for this turn). Also triggers on direct user invocation -- "rephrase this", "what do you think I'm asking", "clarify my prompt". Returns a single normalized intent statement that the caller uses as the canonical request from that point forward.
+description: ALWAYS run this as the very first step of every user-facing turn -- BEFORE any other tool call. Acts as a repeat-back step so the user can confirm Claude read their message correctly. Rephrases the user's request in clear B1-Level English (technical terms kept) and emits the restatement as a visible chat message. When intent is unambiguous (CLEAR), prints a one-line restatement and proceeds in the same turn without pausing -- the user interrupts if Claude misread. When the request is ambiguous, contradictory, or missing critical info, calls AskUserQuestion with candidate intents and waits for the user to pick. Triggers on read-only questions, diagnostic questions, working-tree actions (write/edit/refactor/fix/add/remove/rename/drop/run/build/commit/migrate/deploy), one-line tweaks, single-file edits, single-className removals, config touches, and short follow-up directives. Mechanical skips only: short acks that carry no new verb or object (e.g. "yes", "ok", "got it", "sounds good", "go ahead", "continue", "stop", "skip", "cancel", "nevermind"), direct replies to an in-flight AskUserQuestion, recursive self-calls when the skill is already running, any message whose first non-whitespace character is "/" (slash-command skill trigger -- the slash command itself is the explicit intent), and any message whose first non-whitespace character is "!" or "$" (explicit bypass prefix -- the user has opted out of the repeat-back step for this turn). Also triggers on direct user invocation -- "rephrase this", "what do you think I'm asking", "clarify my prompt". Returns a single normalized intent statement that the caller uses as the canonical request from that point forward.
 ---
 
 # Optimise Prompt
 
-Rephrase user's request in B2-Level English. Always emit a visible restatement. Pause only on AMBIGUOUS or UNDER-SPECIFIED.
+Rephrase user's request in B1-Level English (keep technical terms). Always emit a visible restatement. Pause only on AMBIGUOUS or UNDER-SPECIFIED.
 
-## B2-English Rules
+## B1-English Rules
 
-- Everyday vocabulary -- `use` not `utilise`, `start` not `commence`, `next` not `subsequent`.
-- One idea per sentence.
+- Simple, common words -- `use` not `utilise`, `start` not `commence`, `next` not `subsequent`, `help` not `assist`, `show` not `demonstrate`.
+- Short sentences. One idea per sentence.
 - No idioms, sarcasm, double negatives, culture-specific references.
-- Keep technical terms (`migration`, `endpoint`, `DTO`, `token`, `tenant`).
+- Keep technical terms (`migration`, `endpoint`, `DTO`, `token`, `tenant`). Do NOT simplify or replace these -- they are the developer's vocabulary.
 - Spell out abbreviations on first use unless user introduced them (`FE` -> `frontend (FE)`).
+- Explain any non-basic word in a few simple words, UNLESS it is a technical term.
 - Active voice.
 
 ### Scope
@@ -81,7 +82,7 @@ Apply checks in order. First match wins.
 | Raw input | Verdict | Reason |
 |-----------|---------|--------|
 | `fix the failing UserServiceTests.GetUser_ReturnsActiveOnly test` | CLEAR | Verb + object + qualifier, declarative. |
-| `/hermes-commit` | CLEAR | Self-contained slash command. |
+| `/commit` | CLEAR | Self-contained slash command. |
 | `auth thing?` | AMBIGUOUS | Trailing `?`, single noun. |
 | `recruitment` | AMBIGUOUS | Single noun, no verb. |
 | `maybe we should clean up the migration code` | AMBIGUOUS | Hedged + `clean` has two meanings. |
@@ -92,7 +93,7 @@ Apply checks in order. First match wins.
 
 ### Phase 3a: CLEAR path (non-blocking)
 
-Print one B2-English chat message as a visible assistant message (not a thinking block, not a tool argument):
+Print one B1-English chat message as a visible assistant message (not a thinking block, not a tool argument):
 
 ```
 You want to <verb> <object> [<qualifier>].
@@ -102,7 +103,7 @@ Return control to the caller in the same turn. No confirm prompt, no pause. Call
 
 Rephrase rules for the restatement line:
 
-- B2 vocabulary.
+- B1 vocabulary (simple words; keep technical terms).
 - Verb and object explicit so the user spots a misread in one glance.
 - Include every qualifier from raw input (file, branch, scope, target DB).
 - One line. Two ideas: pick primary verb+object; secondary scope goes in the qualifier slot.
@@ -115,13 +116,13 @@ Examples:
 
 ### Phase 3b: AMBIGUOUS / UNDER-SPECIFIED path (blocking)
 
-Call AskUserQuestion once. The `question` text IS the restatement -- rephrase the raw input in B2 English so the user sees Claude read the message and is asking because a detail is missing.
+Call AskUserQuestion once. The `question` text IS the restatement -- rephrase the raw input in B1 English so the user sees Claude read the message and is asking because a detail is missing.
 
 Shape:
 
-- **question**: rephrased candidate intent in B2 English, ending in `?`. Echo verb, object, named qualifiers before posing the choice.
+- **question**: rephrased candidate intent in B1 English, ending in `?`. Echo verb, object, named qualifiers before posing the choice.
 - **header**: max 12 chars (e.g. `Confirm intent`).
-- **options**: 2-4 distinct candidate intents (AMBIGUOUS) or missing-field choices (UNDER-SPECIFIED). Labels in B2 English.
+- **options**: 2-4 distinct candidate intents (AMBIGUOUS) or missing-field choices (UNDER-SPECIFIED). Labels in B1 English.
 - **multiSelect**: false.
 
 AMBIGUOUS example:
@@ -147,7 +148,7 @@ options:
 
 ### Phase 4: Lock confirmed intent
 
-After option pick (AMBIGUOUS / UNDER-SPECIFIED) or restatement print (CLEAR), store intent as one B2-English sentence. Parent skill treats this as the canonical request.
+After option pick (AMBIGUOUS / UNDER-SPECIFIED) or restatement print (CLEAR), store intent as one B1-English sentence. Parent skill treats this as the canonical request.
 
 If user picks `Other` with free text, run Phase 2 once on that text. If still ambiguous after one round, stop and say: `I am still not sure what you want. Please write the request again in a different way.`
 
