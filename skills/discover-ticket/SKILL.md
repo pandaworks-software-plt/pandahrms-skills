@@ -124,3 +124,7 @@ Print the written path and a one-line summary. End. Return control to caller or 
 - Gherkin / spec conversion.
 - Editing the ticket on the workspace.
 - Card decomposition, implementation, branching, commits, PRs.
+
+## Next step
+
+End by telling the user their next skill: if the change affects business behaviour, run `/spec`; if it is UI-only with no behaviour change, skip to `/slice`.

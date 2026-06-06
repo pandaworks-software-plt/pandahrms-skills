@@ -37,3 +37,7 @@ Ticket-driven work: include the ticket number and ticket URL. Read them from the
 ## 5. Cross-repo work (BE + FE)
 
 Work spanning two repos raises 2 PRs, one per repo. Run `/commit` (clean-check + atomic commits) in EACH repo. Open the first PR, then the second in its repo. Edit each PR body to cross-link the other's URL, so each PR names its counterpart.
+
+## Next step
+
+End by telling the user the flow is complete -- the work is committed and the PR(s) are open.

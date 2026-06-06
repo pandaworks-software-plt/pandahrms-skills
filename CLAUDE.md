@@ -55,6 +55,7 @@ pandahrms-skills/
   - **WHY prose** -- rationale, justification, or reasoning for a rule. Body holds rules and instructions only; rationale belongs in commit messages, design docs, or chat replies
   - **Upstream-flow prose** -- descriptions of which skill, step, or pipeline node invokes this one ("called by atlas Step 5", "triggered after spec-writing"). The invoker owns that knowledge; the invoked skill stays self-contained
   - **Negative-trigger prose** -- "does NOT trigger on X", "skip when Y", or any mention of skills/contexts the current skill should ignore. Silence is the rule; only state what the skill does. (This applies to the body only -- the frontmatter `description` field still needs precise trigger language for the harness)
+- **Allowed exception -- the `## Next step` line.** A flow skill MAY end with a single `## Next step` section that suggests the next skill to the user (e.g. "run `/spec` next"). This is the one permitted downstream-flow line: it is a user-facing recommendation, not a runner and not an instruction the model auto-executes. The dev still invokes the next skill by hand, and that skill re-reads the durable `_overview.md` / cards -- no state passes by prose. Keep it to one short section; do not let it grow into orchestration logic.
 
 ## SKILL.md Prose Compression Rules
 

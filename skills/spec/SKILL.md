@@ -183,3 +183,7 @@ Commit-message format when the user opts to commit:
 ## RECORD
 
 Record the written L1 `.feature` path(s) back into the per-work `_overview.md` (the file at `work_folder` from INPUT) so later steps can find the parent spec.
+
+## Next step
+
+End by telling the user to run `/slice` to cut the work into vertical-slice cards.

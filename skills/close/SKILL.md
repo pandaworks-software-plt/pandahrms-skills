@@ -47,3 +47,7 @@ Read the per-work `_overview.md` intake. Detect ticket work by the presence of a
 - No PR creation, no push, no `/commit`.
 - Ticket update runs only for ticket-sourced work.
 - Always write the log and mark the work closed once Phase 1 passes, for ticket and free-form work alike.
+
+## Next step
+
+End by telling the user: to raise a PR for the work, run `/pr` (optional).

@@ -49,3 +49,7 @@ A where-are-we report only. The user comments in chat. A requested change routes
 - Read-only. No file edits, no `git` of any kind, no ticket update, no docspace writes.
 - No card moves (`active`->`done`), no close, no PR.
 - A user comment requesting a change routes to `/slice` (new card); updating the existing L1 spec for it goes through `/spec`. This skill does not act on the change itself.
+
+## Next step
+
+End by telling the user their next skill: when every card is done, run `/close` to finish the work; if cards remain, run `/execute` for the next card.

@@ -126,3 +126,7 @@ Never silently absorb a problem or a mid-run user correction. Surface it; record
 | "I'll hand-edit the generated types to start FE early" | Deploy BE, regen from live swagger, then FE work. |
 | "The review skill will commit after its pass" | Review skills are review + fixes only. `/execute` owns the single commit gate and runs `/commit`. |
 | "`/close` will move the finished card" | `/execute` owns the card move + `## Closed:` append. `/close` does not move cards. |
+
+## Next step
+
+End by telling the user their next skill: if active cards remain, run `/execute` for the next card; when the last card finishes, `/status` runs automatically.

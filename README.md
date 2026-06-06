@@ -58,7 +58,7 @@ To update the plugin to the latest version:
 
 ## How it fits
 
-Each skill is manual and standalone -- you run each step. A typical piece of work flows like this:
+Each skill is manual and standalone -- you run each step. There is no orchestrator: each skill ends by suggesting the next one (`## Next step`), so the flow self-guides while you stay in control of every hop. A typical piece of work flows like this:
 
 ```
 /discover  (or /discover-ticket)     intake -> objective + acceptance criteria

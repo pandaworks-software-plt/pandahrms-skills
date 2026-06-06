@@ -163,3 +163,7 @@ After drafting the card set, show the user the ordered list -- each line: order,
 - Do not begin execution until the user agrees to the set. The gate is blocking.
 - BE + FE slice raises two linked PRs, one per repo. Flag it on the card.
 - Draft cards in chat, get agreement, then write files. Don't write rejected proposals to the store.
+
+## Next step
+
+End by telling the user to run `/execute` to build the first card (or `/execute card-01`).

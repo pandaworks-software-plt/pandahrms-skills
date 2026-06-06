@@ -126,3 +126,7 @@ Create the work folder plus its `active/` and `done/` subfolders. Write `_overvi
 - Decomposing the work into cards or PRs.
 - Branch creation, commits, pushes, PRs.
 - Ticket-shaped intake (a sibling door handles a ticket reference).
+
+## Next step
+
+End by telling the user their next skill: if the change affects business behaviour, run `/spec`; if it is UI-only with no behaviour change, skip to `/slice`.
