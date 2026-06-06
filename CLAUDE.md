@@ -6,31 +6,32 @@ This is the **pandahrms-skills** repository -- a Claude Code plugin containing P
 
 ## Structure
 
+The plugin is a set of manual, standalone skills. There is no orchestrator -- the user runs each step. Typical order: `/discover` (or `/discover-ticket`) -> `/spec` -> `/slice` -> `/execute` (per card) -> `/status` -> `/close` -> `/pr`.
+
 ```
 pandahrms-skills/
 ├── .claude-plugin/plugin.json   # Plugin metadata and version
 ├── skills/                      # Claude Code skills (SKILL.md files)
 │   │  # Pre-flight (runs first on every user turn -- repeat-back / intent lock)
-│   ├── optimise-prompt/               # Rephrase user request in B2-English on every turn so the user can confirm Claude read it right. Pipeline-node skills skip it.
-│   │  # Pipeline orchestrator (entry point)
-│   ├── atlas-pipeline-orchestrator/   # Thin runner: fast lane + main flow (understand -> spec -> decompose -> per-card execute + review -> PR)
-│   │  # Pipeline components (used by atlas)
-│   ├── card-decompose/                # Cut a change into vertical-slice cards (path + sensitivity tags)
-│   ├── card-execute/                  # Native TDD execution of one card (SOLID/DDD inlined)
-│   ├── card-pr/                       # Per-card PR step: raise PR?, ask-branch, commit (hermes), open PR
-│   │  # Spec + review skills
-│   ├── spec-writing/                  # Conditional Gherkin spec step (check/update; user-agreement gate)
-│   ├── athena-code-review/            # Code review, fix issues, /simplify (no commits)
-│   ├── aegis-security-review/         # Security review (OWASP + Pandahrms-specific), no commits
+│   ├── optimise-prompt/               # Rephrase user request in B1-English (keep technical terms) each turn so the user can confirm Claude read it right
+│   │  # Flow skills (manual, standalone; run in order, no orchestrator)
+│   ├── discover/                      # Free-form intake door: a new feature / enhancement / bug -> objective + acceptance criteria
+│   ├── discover-ticket/               # Ticket intake door (workspace-prod MCP) -> same output contract as /discover
+│   ├── spec/                          # Write/update the L1 behaviour Gherkin spec in pandahrms-spec (conditional on behaviour change)
+│   ├── slice/                         # Cut agreed work into vertical-slice cards (each holds its L2 spec files + an ordered work sequence)
+│   ├── execute/                       # Run one card: guided run with stop-gates, spec-first TDD, inline review/deploy/regen
+│   ├── status/                        # Read-only summary: auto-fires when /execute finishes the last card, also a manual status report
+│   ├── close/                         # Mutating close: re-check, update ticket status, write log, tidy cards
+│   ├── pr/                            # Optional final PR: runs /commit first, then raises the PR (ticket ref in body)
+│   │  # Quality skills (leaf actions inside /execute; also standalone)
+│   ├── code-review/                   # Code review, fix issues, /simplify (no commits)
+│   ├── security-review/               # Security review (OWASP + Pandahrms-specific), no commits
 │   ├── simplify/                      # 3-agent parallel reuse/quality/efficiency pass on working-tree changes (no commits)
-│   ├── hermes-commit/                 # Verify clean, plan and execute atomic commits
-│   │  # Standalone skills
+│   ├── commit/                        # Verify clean, plan and execute atomic commits
+│   │  # Standalone utilities
 │   ├── branching/                     # Safe branch creation with upstream protection
-│   ├── bridge-file/                   # Communication between FE/BE Claude sessions
 │   ├── ef-migrations/                 # Entity Framework Core migrations
-│   ├── debugging/                     # 4-phase root-cause-first debugging for bugs/test failures
-│   ├── retrospective/                 # Manual /pandahrms:retrospective on a completed atlas plan file -> markdown retro
-│   └── tool-harness-bootstrap/        # Manual /pandahrms:tool-harness-bootstrap -- studies project, recommends + installs mechanical-check tools (Reqnroll, Semgrep, gitleaks, ESLint rules, PreToolUse hooks); per-project, per-tool approval
+│   └── handoff-compact/               # Write a session handoff doc, then compact
 ├── hooks/                       # Claude Code hooks (session-start, etc.)
 └── docs/                        # Plans and documentation
 ```
