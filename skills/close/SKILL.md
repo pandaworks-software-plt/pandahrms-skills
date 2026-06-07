@@ -1,6 +1,6 @@
 ---
 name: close
-description: Manually invoked as `/close` to close a finished piece of Pandahrms work after every card is executed. Verifies every card is already in the per-work `done/` folder and STOPS if any card remains in `active/`; for ticket-driven work updates the ticket status to a done state via the workspace-prod MCP tools; writes the docspace dev-diary log and updates progress; marks the work closed in the per-work `_overview`. Mutating -- it changes ticket state and writes the log. Does NOT move cards. Does NOT raise PRs (that is `/pr`). Does NOT auto-trigger -- only on the slash command or an explicit "close this work" mention.
+description: Manually invoked as `/close` to close a finished piece of Pandahrms work after every card is executed. Verifies every card is already in the per-work `done/` folder and STOPS if any card remains in `active/`; for ticket-driven work updates the ticket to a done state via the workspace-prod MCP tools -- status + solution, dev status, Developer Resolution (`resolutionNotes`), a customer-facing resolved comment, and an internal dev-note; writes the docspace dev-diary log and updates progress; marks the work closed in the per-work `_overview`. Mutating -- it changes ticket state and writes the log. Does NOT move cards. Does NOT raise PRs (that is `/pr`). Does NOT auto-trigger -- only on the slash command or an explicit "close this work" mention.
 ---
 
 # Close
@@ -28,24 +28,30 @@ Read `work_folder` from the per-work `_overview.md` frontmatter -- single source
 
 ## Phase 2: TICKET (ticket work only)
 
-Read the per-work `_overview.md` intake. Detect ticket work by the presence of a `Source`/ticket field.
+Read the per-work `_overview.md` intake. Detect ticket work by the presence of a `Source`/ticket field. No ticket field -> skip this phase. Use the ticket ref from the `_overview` for every call below.
 
-- Ticket field present -> update the ticket status to a done state via the workspace-prod MCP tools (`update_ticket_status`, and `update_ticket_dev_status` where the work carried a dev status). Use the ticket ref from the `_overview`.
-- No ticket field -> skip this phase.
+Ticket field present -> run all of the following via the workspace-prod MCP tools:
+
+1. **Status** -> `update_ticket_status` to a done state. Set its `solution` field: a plain-business-language summary of what the customer now gets. CUSTOMER-FACING -- no code, file paths, PR/branch refs, or internal IDs.
+2. **Dev status** -> `update_ticket_dev_status` where the work carried a dev status.
+3. **Developer Resolution** -> `update_ticket` with `resolutionNotes`: the engineering resolution -- root cause, code changes, files/areas touched, tests, follow-ups. Internal; full technical detail allowed.
+4. **Customer comment** -> `add_ticket_comment` with `commentType="comment"`: short plain-language note that the work is resolved. CUSTOMER-FACING -- no engineering detail.
+5. **Dev-note** -> `add_ticket_comment` with `commentType="dev-note"`: short internal note -- cards covered, branch/PR refs. Route the full resolution to `resolutionNotes` above, not here.
 
 ## Phase 3: LOG + CLOSE
 
 - Write the docspace dev-diary log entry for the work (date, what was built, cards covered).
 - Update the project progress.
 - Mark the work closed in the per-work `_overview` (once).
-- Print a one-line summary: cards verified done, ticket updated (yes/no), log written.
+- Print a one-line summary: cards verified done, ticket updated (status + solution + Developer Resolution + comment + dev-note, or n/a), log written.
 
 ## Hard Rules
 
 - Phase 1 is a hard gate. Never mutate anything when a card is still in `active/`.
 - `/close` does NOT move cards and does NOT stamp `## Closed:` on cards -- it only verifies they are already in `done/`.
 - No PR creation, no push, no `/commit`.
-- Ticket update runs only for ticket-sourced work.
+- Ticket updates (status, solution, dev status, Developer Resolution, comment, dev-note) run only for ticket-sourced work.
+- Customer-facing fields (`solution`, the `comment`) stay in plain business language -- never code, file paths, PR/branch refs, or internal IDs. Engineering detail goes only to `resolutionNotes` and the `dev-note`.
 - Always write the log and mark the work closed once Phase 1 passes, for ticket and free-form work alike.
 
 ## Next step
