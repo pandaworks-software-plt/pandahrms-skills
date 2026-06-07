@@ -25,14 +25,18 @@ pandahrms-skills/
 │   ├── close/                         # Mutating close: re-check, update ticket status, write log, tidy cards
 │   ├── pr/                            # Optional final PR: runs /commit first, then raises the PR (ticket ref in body)
 │   │  # Quality skills (leaf actions inside /execute; also standalone)
-│   ├── code-review/                   # Code review, fix issues, /simplify (no commits)
+│   ├── lint-gate/                     # Diff-scoped deterministic guard runner: linter + Tool Gate scans + analyzer/dup + L1->L2 traceability (no LLM judgment)
+│   ├── verify/                        # Project-scoped runner: full build + full test + coverage; the single source /commit + /execute invoke
+│   ├── code-review/                   # Diff-scoped LLM-judgment only (consumes a /lint-gate result), fix issues, /simplify (no commits)
 │   ├── security-review/               # Security review (OWASP + Pandahrms-specific), no commits
 │   ├── simplify/                      # 3-agent parallel reuse/quality/efficiency pass on working-tree changes (no commits)
-│   ├── commit/                        # Verify clean, plan and execute atomic commits
+│   ├── card-commit/                   # Card-scope commit: commits one card's files, trusts the card's pre-complete /verify
+│   ├── commit/                        # Branch-scope commit gate: invokes /verify, plan and execute atomic commits
 │   │  # Standalone utilities
 │   ├── branching/                     # Safe branch creation with upstream protection
 │   ├── ef-migrations/                 # Entity Framework Core migrations
-│   └── handoff-compact/               # Write a session handoff doc, then compact
+│   ├── handoff-compact/               # Write a session handoff doc, then compact
+│   └── tool-doctor/                   # External, once-per-project setup: audit machine + project for the guard tools, offer install/config (per-item confirm)
 ├── hooks/                       # Claude Code hooks (session-start, etc.)
 └── docs/                        # Plans and documentation
 ```

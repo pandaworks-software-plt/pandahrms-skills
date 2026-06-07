@@ -23,18 +23,35 @@ MUST NOT at any phase:
 - Cite CVE numbers from training-data memory. CVE knowledge comes only from package-manager audit output captured during Phase 3 (A06).
 - Dispatch parallel subagents. All work in main thread.
 
-## Skip Conditions
+## Entry Criteria
 
-Skip ONLY when **every** condition holds. If any fails, run in full.
+Run the full multi-phase pass when the change touches ANY security surface. Surface presence is the only gate; file category (test, refactor, docs) never grants an exemption — a test file with a hardcoded credential, or a refactor that adds a dependency, still runs in full.
 
-- Diff contains no `dangerouslySetInnerHTML`, no `@Html.Raw`, no template/raw-HTML interpolation.
-- Diff contains no `localStorage`, `sessionStorage`, or cookie writes.
-- Diff contains no auth-route, middleware, filter, policy, or `[Authorize]` changes.
-- Diff contains no new API call, new fetch, new HTTP client usage, or new server-action declarations.
-- Diff contains no env-var reads (`process.env.*`, `IConfiguration[...]`, `appsettings.*`).
-- Diff is documentation-only (`*.md`, `*.mdx`, `*.txt`), spec-only (`*.feature`), or tooling-only (lint config, formatter config) not shipped to production.
+### Build the change set first
 
-Run `git diff` and grep for tokens above before declaring change out of scope.
+Security surface lives across all three views; `git diff` alone omits untracked files. Capture every changed line before checking surface:
+
+- `git diff` — unstaged changes.
+- `git diff --cached` — staged changes.
+- Untracked files — list via `git status` (or `git ls-files --others --exclude-standard`), then Read each.
+
+### Run when ANY surface is present
+
+Run the full pass when the combined change set contains any of:
+
+- **Auth / authz** — auth-route, middleware, filter, policy, or `[Authorize]` change.
+- **Endpoints / HTTP clients / server actions** — new API call, fetch, HTTP client usage, or server-action declaration.
+- **Data writes** — DB write, EF `SaveChanges`, migration, or persistence change.
+- **PII** — fields such as salary, bank info, NRIC/SSN, password, token, or email handling.
+- **Secrets / env** — secret or credential literal; env-var read (`process.env.*`, `IConfiguration[...]`, `appsettings.*`); committed `.env`/`.pem`/`.pfx`/`.key`/`.p12`/`credentials.json`.
+- **Dependencies** — added/changed package in `*.csproj`, `package.json`, or any lockfile.
+- **Tenant operations** — query or write involving `TenantId`/`OrganisationId`, or a global query filter change.
+- **Injection / XSS sinks** — `dangerouslySetInnerHTML`, `@Html.Raw`, raw-HTML/template interpolation, `FromSqlRaw`/`ExecuteSqlRaw`, command/shell exec.
+- **Client storage** — `localStorage`, `sessionStorage`, or cookie write.
+
+### Self-skip only when ALL surfaces are absent
+
+A change self-skips only when the combined change set (unstaged + staged + untracked) contains NONE of the surfaces above. When all surfaces are absent, emit the standard explicit skip notice (one line stating the change set has zero security surface) instead of the full pass.
 
 ## Workflow
 

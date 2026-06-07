@@ -1,24 +1,23 @@
 ---
 name: commit
-description: Triggers when the user explicitly requests a git commit of the current working tree -- phrases like "commit my changes", "git commit", "ready to commit", "/commit", or "make atomic commits". Pure commit step: verifies a clean working tree (0 test failures, 0 lint errors, 0 format errors, 0 build errors -- even pre-existing or unrelated to the current session) by auto-fixing mechanical issues and stopping on the rest, then plans and executes atomic commits. Supports `/commit --skip` to bypass the Phase 1 gate (format, lint, tests, build) and go straight to commit planning.
+description: Triggers when the user explicitly requests a git commit of the whole branch's working-tree changes -- phrases like "commit my changes", "git commit", "ready to commit", "/commit", or "make atomic commits". Branch-scope commit step: a clean-tree gate over the whole branch that auto-fixes format + lint inline, then invokes `/verify` (the project-scoped build + test runner) and requires `VERIFY RESULT: PASS` before planning and executing atomic commits across the branch. The gate applies even to pre-existing or unrelated failures. Supports `/commit --skip` to bypass the entire Phase 1 gate (format, lint, and the `/verify` build + test run).
 ---
 
 # Commit
 
 ## Overview
 
-Pure commit step. Verify the working tree is clean, then plan and execute atomic commits.
+Branch-scope commit step. Verify the whole branch's working tree is clean, then plan and execute atomic commits across the branch.
 
 **Phase 1 is a HARD GATE.** Before any commit, the working tree must have:
 
-- 0 test failures
-- 0 lint errors
 - 0 format errors
-- 0 build errors (JS/TS only; .NET's build is implicit in `dotnet test`)
+- 0 lint errors
+- `VERIFY RESULT: PASS` from `/verify` (build + test)
 
-This applies **even when the failures are pre-existing or unrelated to the current session's changes**. The only escape hatches are the explicit `/commit --skip` flag (see Skip Mode) and the "Tool missing" branch. Never bypass the gate any other way.
+This applies **even when the failures are pre-existing or unrelated to the current session's changes**. The only escape hatches are the explicit `/commit --skip` flag (see Skip Mode) and the "Tool missing" branch in Phase 1A/1B. Never bypass the gate any other way.
 
-The skill auto-fixes mechanical violations by invoking formatter and linter in write mode (`dotnet format`, `biome check --write`, `eslint --fix`, etc.); those fixes get pulled into the commit plan in Phase 3. For non-mechanical failures (failing tests, lint diagnostics that cannot be auto-fixed), the skill STOPS and tells the user what to fix -- it does not make judgment-call code edits itself.
+Phase 1A/1B auto-fix mechanical format/lint violations by invoking formatter and linter in write mode (`dotnet format`, `biome check --write`, `eslint --fix`, etc.); those fixes get pulled into the commit plan in Phase 3. Format and lint run BEFORE `/verify` so `/verify` sees the post-fix tree. For non-mechanical failures (a `/verify` FAIL, lint diagnostics that cannot be auto-fixed), the skill STOPS and tells the user what to fix -- it does not make judgment-call code edits itself.
 
 ## Skip Mode
 
@@ -28,8 +27,8 @@ Detection: enter skip mode when the user's invocation message contains the liter
 
 In skip mode:
 
-- Skip Phase 1A (format auto-fix), 1B (lint auto-fix), 1C (test suite), 1D (build/type-check). No formatter, linter, test runner, or build is invoked.
-- Before Phase 2, emit verbatim: `Skip mode: Phase 1 gate bypassed. Format, lint, tests, and build will NOT run. Proceeding directly to commit planning.`
+- Skip Phase 1A (format auto-fix), 1B (lint auto-fix), and the Phase 1C `/verify` invocation. No formatter, linter, or `/verify` build + test run.
+- Before Phase 2, emit verbatim: `Skip mode: Phase 1 gate bypassed. Format, lint, and /verify (build + tests) will NOT run. Proceeding directly to commit planning.`
 - All other phases run unchanged. Every Red Flag still applies -- no `git add -A`, no committing secrets, no `--amend`, no `--no-verify`, no destructive git commands.
 
 ## Workflow
@@ -40,8 +39,7 @@ digraph commit {
     "Skip mode?" [shape=diamond];
     "Auto-fix format" [shape=box];
     "Auto-fix lint" [shape=box];
-    "Run tests" [shape=box];
-    "Run build" [shape=box];
+    "Invoke /verify" [shape=box];
     "All gates pass?" [shape=diamond];
     "Stop and report" [shape=octagon, style=filled, fillcolor=orange];
     "Gather changes" [shape=box];
@@ -55,11 +53,10 @@ digraph commit {
     "Skip mode?" -> "Auto-fix format" [label="no"];
     "Skip mode?" -> "Gather changes" [label="yes -- --skip flag"];
     "Auto-fix format" -> "Auto-fix lint";
-    "Auto-fix lint" -> "Run tests";
-    "Run tests" -> "Run build";
-    "Run build" -> "All gates pass?";
+    "Auto-fix lint" -> "Invoke /verify";
+    "Invoke /verify" -> "All gates pass?";
     "All gates pass?" -> "Stop and report" [label="no -- tell user to fix"];
-    "All gates pass?" -> "Gather changes" [label="yes"];
+    "All gates pass?" -> "Gather changes" [label="yes -- VERIFY RESULT: PASS"];
     "Gather changes" -> "Plan atomic commits";
     "Plan atomic commits" -> "Present commit plan";
     "Present commit plan" -> "User approves?";
@@ -75,29 +72,31 @@ Phases execute strictly in order: Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 -> Ph
 
 If `--skip` is set per the Skip Mode section, skip Phase 1 entirely and start at Phase 2.
 
-Within Phase 1, sub-steps run strictly in this order: Phase 1A (format auto-fix) -> Phase 1B (lint auto-fix) -> Phase 1C (test suite) -> Phase 1D (build / type-check). Tests run after format/lint so they execute on final post-fix code state. Build runs last because it is the most expensive sub-step and because earlier failures (format, lint, test) are cheaper signal that should surface first.
+Within Phase 1, sub-steps run strictly in this order: Phase 1A (format auto-fix) -> Phase 1B (lint auto-fix) -> Phase 1C (`/verify` build + test). Format and lint run first so `/verify` executes against the final post-fix tree.
 
 Within Phase 2, the four `git` commands listed run in parallel; that is the only parallelism allowed in this workflow.
 
-**Phase 1: Hard Gate (Format + Lint + Tests)**
+**Phase 1: Hard Gate (Format + Lint + /verify)**
 
-This phase is a **HARD GATE** unless `--skip` is set. The skill cannot proceed past Phase 1 unless all four checks (format, lint, tests, build) report 0 errors and 0 failures. The gate applies **even when failures are pre-existing or unrelated to the current session's changes** -- if the working tree is broken, the commit does not happen until the working tree is fixed.
+This phase is a **HARD GATE** unless `--skip` is set. The skill cannot proceed past Phase 1 unless format reports 0 errors, lint reports 0 errors, and `/verify` returns `VERIFY RESULT: PASS`. The gate applies **even when failures are pre-existing or unrelated to the current session's changes** -- if the working tree is broken, the commit does not happen until the working tree is fixed.
 
 Two documented escape hatches exist:
 
 1. `--skip` flag -- bypasses the entire phase. See Skip Mode section.
-2. "Tool missing" branch in Failure Handling -- bypasses a single sub-step when a required tool is not installed.
+2. "Tool missing" branch in Failure Handling -- bypasses a single format/lint sub-step when a required tool is not installed.
 
 No other bypass is allowed.
 
 ### Detection
 
-Detect ALL project types present in the workspace (not just the changed-files set -- the gate covers the whole working tree):
+Detect ALL project types present in the workspace for the format/lint sub-steps (not just the changed-files set -- the gate covers the whole working tree):
 
-- `.csproj` / `.sln` anywhere in the workspace -> run .NET checks.
-- `package.json` anywhere in the workspace -> run JS/TS checks.
+- `.csproj` / `.sln` anywhere in the workspace -> run .NET format/lint.
+- `package.json` anywhere in the workspace -> run JS/TS format/lint.
 - Mixed repos: run BOTH for every sub-step. Aggregate results. STOP if any sub-step fails.
-- If neither matches, emit verbatim: `No format/lint/test/build configuration recognized for this repo; proceeding to Phase 2 without verification.` Then continue to Phase 2. Do not invent or guess at commands.
+- If neither matches, emit verbatim: `No format/lint configuration recognized for this repo; proceeding to the /verify sub-step.` Then continue to Phase 1C. Do not invent or guess at commands.
+
+`/verify` owns build/test detection -- Phase 1C invokes it; this skill does not detect or run build/test commands itself.
 
 **Phase 1A: Format Auto-Fix**
 
@@ -135,47 +134,31 @@ If the verify pass shows remaining errors (i.e. errors the linter could not auto
 
 `Lint errors remain after auto-fix. These are real code issues that need targeted edits. For each violation above: fix the offending code, or add a one-line "// reason" suppression when the rule does not apply here. Re-run /commit when verify passes.`
 
-**Phase 1C: Test Suite**
+**Phase 1C: /verify (Build + Test)**
 
-Run the full test suite for every detected project type. Tests run **after** format/lint auto-fix so they execute on final post-fix code state.
+Invoke `/verify` (no args) over the whole branch's working tree. `/verify` runs the full whole-graph build / type-check + full test suite + changed-file coverage gate and emits one structured result. Run it AFTER Phase 1A/1B so it sees the post-fix tree.
 
-- **.NET**: `dotnet test` on the solution.
-- **JS/TS**:
-  1. `package.json` has a `test` script -> `pnpm test`.
-  2. Otherwise detect framework directly: `vitest`, `jest` -> run appropriate command (`pnpm vitest run`, `pnpm jest`). Playwright in this codebase refers to Playwright MCP browser tools, not a CLI test runner, so do NOT invoke `pnpm playwright test` here.
-  3. No tests detected -> skip this sub-step (do not block the gate when no tests exist).
-- **Mixed**: run both. Aggregate results.
+Read the returned result block:
 
-The gate is **0 failures and 0 errors**. Skipped/pending tests are allowed; failed and errored tests are not.
+```
+VERIFY RESULT: <PASS|FAIL>
+- build: ...
+- tests: ...
+- coverage: ...
+```
 
-If any test fails, STOP and emit a concise summary of failing test names followed by:
+- `VERIFY RESULT: PASS` -> the build/test gate is met. Continue to Phase 2.
+- `VERIFY RESULT: FAIL` -> STOP. Emit the `/verify` result block and its captured error output / failing test names verbatim, followed by:
 
-`Tests failing. For each failure above: read the test, read the code it covers, decide regression vs environment flake (network, timing, fixture state). Fix the underlying cause -- never edit the test to silence the failure. Re-run /commit when the suite passes.`
+`/verify failed (build or test). Read each failure above, decide regression vs environment flake, and fix the underlying cause -- never edit a test to silence a failure or patch a type to match broken usage. Re-run /commit when /verify returns PASS.`
 
-**Phase 1D: Build / Type-check**
-
-Run a full build to catch type-contract drift that earlier sub-steps miss. Two structural reasons this sub-step is needed:
-
-1. JS/TS test runners (vitest, jest) transform only the files reachable from the test graph. Type errors in unrelated source files slip past Phase 1C.
-2. `tsc --noEmit` against a workspace consumer resolves shared-package types via `package.json#exports.types`, which usually points at compiled `dist/*.d.ts`. So `tsc --noEmit` cannot detect drift between a shared package's source and its built artifact -- it reads whatever the last build left in `dist/`. A full build rebuilds the dependency `dist/` outputs first, then compiles consumers against the fresh artifact. This is the only reliable way to catch this drift before deploy.
-
-Detection precedence (JS/TS only; .NET's `dotnet test` in Phase 1C already implies a successful build, so no separate step is needed there):
-
-1. Root `package.json` has a `build` script -> run that (`pnpm build`, `yarn build`, or `npm run build` based on the lockfile). Preferred -- recursive workspace builds rebuild shared `dist/` outputs in dependency order, which is what catches the drift described above.
-2. Root `package.json` has a `type-check` script but no `build` script -> run that (`pnpm type-check` etc.). Weaker than option 1 because `tsc --noEmit` may still consult stale `dist/*.d.ts`; flag this in the output so the user knows the gate is partial.
-3. Neither script exists -> skip this sub-step. Do not invent commands.
-
-The gate is **0 build errors**. Warnings (e.g. "chunk size exceeds limit", deprecated-API notices) do not block the gate.
-
-If the build fails, STOP and emit error output verbatim followed by:
-
-`Build/type-check failed. These are real type or compile errors that need targeted edits. For each error above: read the offending file, read the type or contract it depends on, and fix the source -- do not patch the type to match the broken usage unless that is genuinely the intended change. Re-run /commit when the build passes. Do not bypass with --skip unless you understand the contract you are breaking.`
+The coverage line is advisory -- a non-empty uncovered list does NOT block the gate. Surface it to the user but proceed when the overall result is `PASS`.
 
 ### Failure Handling
 
-- **Tool missing** (command not found, exit code 127): emit `[tool name] is not installed. Install it or skip this sub-step?` and ask the user via `AskUserQuestion` with options "Install and re-run" (STOP, await fix) or "Skip this sub-step" (continue past this single sub-step only -- the rest of the gate still applies). Do not auto-skip.
+- **Tool missing in Phase 1A/1B** (command not found, exit code 127): emit `[tool name] is not installed. Install it or skip this sub-step?` and ask the user via `AskUserQuestion` with options "Install and re-run" (STOP, await fix) or "Skip this sub-step" (continue past this single format/lint sub-step only -- the rest of the gate still applies). Do not auto-skip. Tool-missing inside `/verify` is `/verify`'s own concern -- it records the stage `not-configured` and the result still drives the gate.
 - **Auto-fix made changes**: expected. Note in the Phase 3 commit plan that pre-existing format/lint fixes are included.
-- **Verify-pass errors after auto-fix**: STOP per sub-step instructions above. Do not retry, do not attempt manual edits, do not bypass.
+- **Verify-pass errors after format/lint auto-fix**: STOP per sub-step instructions above. Do not retry, do not attempt manual edits, do not bypass.
 
 **Phase 2: Gather Changes**
 
@@ -283,13 +266,13 @@ Then STOP. Do not push, do not offer to push, do not propose follow-up work, do 
 Each item below is a HARD rule. Hitting any of them means STOP in the current response.
 
 - About to make a logic / judgment-call code edit during commit -> STOP. Mechanical auto-fix via formatter or linter (`dotnet format`, `biome check --write`, `eslint --fix`) is allowed and expected; hand-editing source to silence a lint diagnostic or pass a test is NOT.
-- About to bypass the Phase 1 gate (skip tests, skip lint, skip format, skip build, "just this once") -> STOP, unless the user explicitly invoked `/commit --skip` or the Tool-missing branch applies. Those two branches are the only documented escape hatches; no other bypass is allowed.
+- About to bypass the Phase 1 gate (skip format, skip lint, skip `/verify`, "just this once") -> STOP, unless the user explicitly invoked `/commit --skip` (whole gate) or the Tool-missing branch applies to a format/lint sub-step. Those two branches are the only documented escape hatches; no other bypass is allowed.
 - About to `git add -A` or `git add .` -> stage specific files only.
 - Committing `.env`, credentials, or secrets -> warn the user and STOP.
 - Committing `settings.json`, `appsettings.*.json`, `config.json`, `application.yml`, `.npmrc`, or similar config files -> scan file content for API keys, tokens, passwords, connection strings, OAuth client secrets, or other sensitive values BEFORE staging. If any are found, STOP and surface the exact line(s) to the user to redact (move to env var, secret manager, or local-only file ignored by git). Do not commit "I'll redact it later" placeholders.
 - Commit message describes "what" instead of "why" (e.g. `add if statement` instead of `support widget filtering`) -> rewrite it. The message must explain purpose, not mechanics.
 - Commit message doesn't match the actual changes -> rewrite it.
-- Test failures, format errors, or lint errors remain after Phase 1 auto-fix passes -> STOP. Tell the user to fix and re-invoke `/commit`.
+- Format or lint errors remain after Phase 1A/1B auto-fix, or `/verify` returns `VERIFY RESULT: FAIL` -> STOP. Tell the user to fix and re-invoke `/commit`.
 - NEVER push, force-push, tag, create branches, or open PRs. This skill commits only. Stop after Phase 5's `git status` verification.
 - NEVER use `--amend`, `--no-verify`, `--no-gpg-sign`, or any flag that bypasses hooks/signing. If a hook fails, STOP and report the failure to the user; do not retry with bypass flags.
 - NEVER run `git reset --hard`, `git checkout --`, `git restore`, `git clean`, or any destructive command. The only `git reset` permitted is the no-flag form in Phase 2 to auto-unstage pre-existing staged changes (file edits preserved).
