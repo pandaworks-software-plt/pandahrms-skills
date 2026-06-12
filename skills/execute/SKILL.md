@@ -1,6 +1,6 @@
 ---
 name: execute
-description: Manually invoked as `/execute card-NN` to run that specific card's ordered sequence, or bare `/execute` to run the next available card (lowest-order active card not done). A guided run with stop-gates -- mechanical work auto-runs between gates; stops after each layer's code review, before deploy, and before commit/PR. Detects project architecture to include or skip the deploy + FE-regen bridge. Spec-first TDD with RED/GREEN/VERIFICATION markers, inlined SOLID + DDD. Orchestrates single-responsibility skills: per layer it runs scoped feature tests then invokes `/lint-gate` (deterministic guards) and `/code-review` (LLM judgment, fed the lint-gate result); at card pre-complete it invokes `/verify` ONCE on the final tree (full build + full test + coverage) and requires `VERIFY RESULT: PASS`; it commits the card with `/card-commit` (card scope, trusts the pre-complete /verify). The umbrella/branch commit is /commit or /pr. Moves the finished card to done and appends a Closed block. Does NOT auto-trigger -- only on the slash command or an explicit "execute card" mention.
+description: Manually invoked as `/execute card-NN` to run that specific card's ordered sequence, or bare `/execute` to run the next available card (lowest-order active card not done). A guided run with stop-gates -- mechanical work auto-runs between gates; stops after each layer's code review, before deploy, and before commit/PR. Detects project architecture to include or skip the deploy + FE-regen bridge. Spec-first TDD with RED/GREEN/VERIFICATION markers, inlined SOLID + DDD. Orchestrates single-responsibility skills: per layer it runs scoped feature tests then invokes `/lint-gate` (deterministic guards) and `/code-review` (LLM judgment, fed the lint-gate result); at card pre-complete it invokes `/verify` ONCE on the final tree (full build + full test + coverage) and requires `VERIFY RESULT: PASS`; it commits the card with `/card-commit` (card scope, trusts the pre-complete /verify). The umbrella/branch commit is /commit or /pr. Moves the finished card to done and appends a Closed block. Append `--blast-mode` to run every available card back to back with no stop-gates: the agent resolves each decision point on its own and records it as a `DECISION` line, commit and PR are prohibited (no `/card-commit`, `/commit`, or `/pr`; deploy + FE regen still run), a card that cannot pass is marked BLOCKED and the run continues unless the block also blocks the remaining cards, and the run ends with a wrap-up of cards done, cards blocked, and every autonomous decision saved to the work `_overview.md` and printed to chat. Does NOT auto-trigger -- only on the slash command or an explicit "execute card" mention.
 ---
 
 # Pandahrms Execute
@@ -14,6 +14,7 @@ Run ONE vertical-slice card by following its ordered sequence. Native, current c
 - `/execute card-NN` -- run that card.
 - `/execute` (bare) -- run the next available card = lowest-order active card not yet done.
 - Append `--approve` to either form (`/execute card-NN --approve`) for low-touch mode -- see Low-touch mode.
+- `/execute --blast-mode` -- blast mode: run every available card back to back with no stop-gates; commit + PR prohibited. See Blast mode.
 
 Read `work_folder` from the intake `_overview.md`. The card store is `<work-folder>/active/` and `<work-folder>/done/`. Pick by `order`.
 
@@ -58,6 +59,33 @@ Flag forwarding: pass `--approve` narrowly to the leaf review (`/code-review --n
 
 Announce the auto-pick on one line at each auto-proceeded gate (e.g. `--approve: proceeding past code review`). Under `--approve`, default the per-card PR to DEFER to `/pr` unless the user said otherwise.
 
+## Blast mode (`--blast-mode`)
+
+`/execute --blast-mode` runs EVERY available card in `<work-folder>/active/` back to back -- lowest-order not-done card first, then the next, until none remain. No human pause at any gate. Implies `--approve`'s auto-proceed and extends it across all cards.
+
+**Commit + PR prohibited.** Never run `/card-commit`, `/commit`, or `/pr` in this mode. Deploy BE to local Docker and FE regen still run (they are not commit/PR). All cards' changes pile up uncommitted in the working tree for the user to review and commit later.
+
+**Decision points instead of stop-gates.** The normal hard stops -- scoped/full test failure, `/verify` FAIL, card/spec conflict, `/security-review` finding, major `/code-review` finding -- do NOT pause the run. At each:
+
+- Resolve it autonomously when safe (apply the fix, take the spec-backed reading). Announce one line `DECISION -- <point>: <choice> (<reason>)` and append the same to the card's Progress.
+- When it cannot be safely resolved (a card that will not reach `/verify` PASS after fix attempts, an irreconcilable card/spec conflict), mark the card BLOCKED: leave it in `active/`, append a `BLOCKED -- <reason>` Progress entry, move to the next available card.
+
+Never fake a pass, never commit broken code, never silently absorb a block. Every `DECISION` and every `BLOCKED` is recorded and surfaced in the wrap-up.
+
+**End condition.** Stop when `active/` holds no runnable card (all done or blocked). If a blocker also blocks the remaining cards (they depend on the blocked card), END the run immediately and go to the wrap-up -- do not attempt the dependent cards.
+
+**Card done in blast mode** = all work + `/verify` PASS, WITHOUT the commit step. Move the done card `active/` -> `done/` and append a `## Closed: <date>` block noting `commit skipped (blast mode)`.
+
+**Diff scope.** With no commits between cards the working-tree diff accumulates. Scope each card's `/lint-gate` and `/code-review` to the files THAT card touched, not the whole accumulated diff. `/verify` stays project-scoped.
+
+**Wrap-up (always, at the end).** Append a dated `## Blast run <date>` section to the work `_overview.md` AND print it to chat. Include:
+
+- Cards done, each with its `## Closed` note.
+- Cards blocked, each with its `BLOCKED -- <reason>`.
+- Every `DECISION` the agent made during the run.
+- A line stating nothing was committed: all changes sit uncommitted in the working tree.
+- Next step: the user reviews the working tree, then runs `/commit` or `/pr` to ship.
+
 ## Boundary steps (inline leaf actions)
 
 Run these inline as leaf actions, NOT a skill chain. `/execute` drives the whole slice and composes the leaf skills.
@@ -90,6 +118,8 @@ Invoke `/verify` ONCE per card, placed LAST -- after every layer's `/code-review
 - Cross-repo card: at card completion, run `/card-commit` once in EACH touched repo (BE repo + FE repo), after that repo's `/verify` PASS. The earlier DEPLOY BE step runs from the working tree (local Docker) -- it needs no commit.
 
 A PR is optional at this point: ask the user to raise the per-card PR now or defer it to the final `/pr`. Commit is required for the card to count as done; the PR may be deferred.
+
+Under `--blast-mode` this whole section is skipped: no `/card-commit`, no PR. A card counts as done on `/verify` PASS without a commit. See Blast mode.
 
 ## Check scope
 
@@ -171,7 +201,12 @@ Never silently absorb a problem or a mid-run user correction. Surface it; record
 | "I'll hand-edit the generated types to start FE early" | Deploy BE, regen from live swagger, then FE work. |
 | "The review skill will commit after its pass" | Review skills are review + fixes only. `/execute` owns the single commit gate and runs `/card-commit`. |
 | "`/close` will move the finished card" | `/execute` owns the card move + `## Closed:` append. `/close` does not move cards. |
+| "Blast mode -- I'll commit each card as I go" | Commit + PR are prohibited in blast mode. No `/card-commit`, `/commit`, or `/pr`. Changes stay uncommitted. |
+| "A card won't pass -- I'll stop the whole blast run" | Mark it BLOCKED, continue the next card. End the run only when the blocker also blocks the remaining cards. |
+| "Card/spec conflict in blast mode -- I'll quietly pick a side" | Record every autonomous call as `DECISION --`; BLOCK on an irreconcilable conflict. Nothing silent. |
 
 ## Next step
 
 End by telling the user their next skill: if active cards remain, run `/execute` for the next card; when the last card finishes, `/execute` invokes `/status` itself to present the conclusion.
+
+Under `--blast-mode` the run ends with the Blast mode wrap-up (saved to `_overview.md` + chat); next step is the user reviews the uncommitted working tree, then runs `/commit` or `/pr`.
