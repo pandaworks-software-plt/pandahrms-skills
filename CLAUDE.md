@@ -22,7 +22,8 @@ pandahrms-skills/
 │   ├── slice/                         # Cut agreed work into vertical-slice cards (each holds its L2 spec files + an ordered work sequence)
 │   ├── execute/                       # Run one card: guided run with stop-gates, spec-first TDD, inline review/deploy/regen
 │   ├── status/                        # Read-only summary: auto-fires when /execute finishes the last card, also a manual status report
-│   ├── close/                         # Mutating close: re-check, update ticket status, write log, tidy cards
+│   ├── close/                         # Mutating close: re-check, invoke /resolve-ticket for ticket work, write log, tidy cards
+│   ├── resolve-ticket/                # Card-less ticket resolution: one ticket ref -> dev status ready-for-release + status resolved + solution/resolutionNotes/comment/dev-note (confirm before mutate)
 │   ├── pr/                            # Optional final PR: runs /commit first, then raises the PR (ticket ref in body)
 │   │  # Quality skills (leaf actions inside /execute; also standalone)
 │   ├── lint-gate/                     # Diff-scoped deterministic guard runner: linter + Tool Gate scans + analyzer/dup + L1->L2 traceability (no LLM judgment)

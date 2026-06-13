@@ -1,6 +1,6 @@
 ---
 name: close
-description: Manually invoked as `/close` to close a finished piece of Pandahrms work after every card is executed. Verifies every card is already in the per-work `done/` folder and STOPS if any card remains in `active/`; for ticket-driven work updates the ticket to a done state via the workspace-prod MCP tools -- status + solution, dev status, Developer Resolution (`resolutionNotes`), a customer-facing resolved comment, and an internal dev-note; writes the docspace dev-diary log and updates progress; marks the work closed in the per-work `_overview`. Mutating -- it changes ticket state and writes the log. Does NOT move cards. Does NOT raise PRs (that is `/pr`). Does NOT auto-trigger -- only on the slash command or an explicit "close this work" mention.
+description: Manually invoked as `/close` to close a finished piece of Pandahrms work after every card is executed. Verifies every card is already in the per-work `done/` folder and STOPS if any card remains in `active/`; for ticket-driven work invokes `/resolve-ticket` to move the ticket to a resolved, ready-for-release state (status + solution, dev status, Developer Resolution, customer comment, dev-note); writes the docspace dev-diary log and updates progress; marks the work closed in the per-work `_overview`. Mutating -- it changes ticket state and writes the log. Does NOT move cards. Does NOT raise PRs (that is `/pr`). Does NOT auto-trigger -- only on the slash command or an explicit "close this work" mention.
 ---
 
 # Close
@@ -28,27 +28,11 @@ Read `work_folder` from the per-work `_overview.md` frontmatter -- single source
 
 ## Phase 2: TICKET (ticket work only)
 
-Read the per-work `_overview.md` intake. Detect ticket work by the presence of a `Source`/ticket field. No ticket field -> skip this phase. Use the ticket ref from the `_overview` for every call below.
+Read the per-work `_overview.md` intake. Detect ticket work by the presence of a `Source`/ticket field. No ticket field -> skip this phase.
 
-Ticket field present -> run all of the following via the workspace-prod MCP tools:
+Ticket field present -> invoke `/resolve-ticket <ticket-ref>` via the Skill tool, passing the ticket ref from the `_overview`. Draft the field content from the `_overview` intake + the session's card work, then hand it to `/resolve-ticket`. That skill owns the full ticket update: dev status -> `ready-for-release`, status -> `resolved` with a plain customer-facing `solution`, `resolutionNotes` (Developer Resolution), a customer-facing resolved comment, and an internal dev-note -- with the relevance gate, plain-text rule, customer-facing tone rule, and the confirm-before-mutate gate. Wait for it to return before Phase 3.
 
-1. **Status** -> `update_ticket_status` to a done state. Set its `solution` field: a plain-business-language summary of what the customer now gets. CUSTOMER-FACING -- no code, file paths, PR/branch refs, or internal IDs. PLAIN TEXT only -- no HTML or markup (`<p>`, `<h1>`, `<br>`, `<ul>`, etc.); use line breaks for separation.
-2. **Dev status** -> `update_ticket_dev_status` where the work carried a dev status.
-3. **Developer Resolution** -> `update_ticket` with `resolutionNotes`: the engineering resolution -- root cause, code changes, files/areas touched, tests. Internal; full technical detail allowed. Scope to THIS ticket only (see Relevance gate below). PLAIN TEXT only -- no HTML or markup (`<p>`, `<h1>`, `<br>`, `<ul>`, etc.); use line breaks for separation.
-4. **Customer comment** -> `add_ticket_comment` with `commentType="comment"`: short plain-language note that the work is resolved. CUSTOMER-FACING -- no engineering detail.
-5. **Dev-note** -> `add_ticket_comment` with `commentType="dev-note"`: short internal note -- cards covered, branch/PR refs. Route the full resolution to `resolutionNotes` above, not here.
-
-### Relevance gate (all four ticket fields)
-
-Every ticket field -- `solution`, `resolutionNotes`, customer comment, dev-note -- carries only information about THIS ticket's problem and fix. Before writing each field, drop any content that is not about this ticket.
-
-EXCLUDE (these are session noise, never written to the ticket):
-- Pre-existing or unrelated test failures (e.g. "23 pre-existing unit failures on development", date-sensitive test flakiness).
-- Follow-up tasks, ideas, or side-work surfaced during the session that are not part of this ticket's fix.
-- Environment, tooling, or local-setup issues hit while working.
-- Side observations about other modules, tickets, or tech debt.
-
-A genuine follow-up that belongs to THIS ticket's fix (a known limitation of the delivered change) may stay in `resolutionNotes`. Anything else goes to `docspace/agent-zone` or a new card, not the ticket.
+`/resolve-ticket` STOPS on a rejected required transition -> if it stops, do not run Phase 3; report and let the user resolve the ticket state first.
 
 ## Phase 3: LOG + CLOSE
 
@@ -62,10 +46,7 @@ A genuine follow-up that belongs to THIS ticket's fix (a known limitation of the
 - Phase 1 is a hard gate. Never mutate anything when a card is still in `active/`.
 - `/close` does NOT move cards and does NOT stamp `## Closed:` on cards -- it only verifies they are already in `done/`.
 - No PR creation, no push, no `/commit`.
-- Ticket updates (status, solution, dev status, Developer Resolution, comment, dev-note) run only for ticket-sourced work.
-- Customer-facing fields (`solution`, the `comment`) stay in plain business language -- never code, file paths, PR/branch refs, or internal IDs. Engineering detail goes only to `resolutionNotes` and the `dev-note`.
-- Relevance gate is mandatory: no ticket field carries session noise (pre-existing/unrelated test failures, session follow-up tasks, environment issues, side observations). Every field is scoped to THIS ticket only.
-- `solution` and `resolutionNotes` are PLAIN TEXT -- no HTML or markup (`<p>`, `<h1>`, `<br>`, `<ul>`, etc.). Use line breaks for separation.
+- Ticket updates run only for ticket-sourced work, and only through `/resolve-ticket` -- `/close` does not call the workspace-prod ticket tools directly. The field rules (relevance gate, plain text, customer-facing tone, confirm-before-mutate) are owned by `/resolve-ticket`.
 - Always write the log and mark the work closed once Phase 1 passes, for ticket and free-form work alike.
 
 ## Next step
