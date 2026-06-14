@@ -75,6 +75,7 @@ All three fields obey these rules. Apply before writing.
 
 - **Plain text only.** No HTML and no Markdown formatting -- no `<p>`/`<h1>`/`<br>`/`<ul>` tags, no `#` headings, no `**bold**`, no `-`/`*` bullet markup. Use line breaks for separation.
 - **Customer-facing fields** (`solution`, the customer comment) stay in plain business language. Never code, file paths, function names, stack traces, internal IDs, or branch/PR refs.
+- **No release-timing boilerplate.** Drop closing lines about when the fix ships -- e.g. "This fix is ready and will take effect once your system is updated to the next release." No next-release / "after update" / "in the next version" phrasing in any field.
 - **Internal field** (`resolutionNotes`) carries the engineering detail. Branch/PR refs and files touched go here, not in the customer-facing fields.
 - **Engineering substance, not local-dev noise.** Every field carries durable substance: root cause, the fix, files/endpoints/areas touched, commit/PR refs. Drop local-dev or session progress noise -- "deployed to local Docker", "not yet committed / PR pending", test pass counts ("122 tests pass"), "validated via Playwright / validated locally".
 
@@ -96,6 +97,7 @@ A genuine limitation of the delivered change (a known follow-up that belongs to 
 - Dev status before main status, always. Ensure `developer` + `needsDev=true`, set dev status -> `ready-for-release`, then move status -> `resolved`.
 - A rejected required transition STOPS the run with a report. Never silently skip a step.
 - Customer-facing fields (`solution`, the customer comment) stay plain business language -- never code, file paths, branch/PR refs, or internal IDs. Engineering detail goes only to `resolutionNotes`.
+- No release-timing boilerplate in any field -- no "next release" / "after update" / "in the next version" closing line.
 - All fields are PLAIN TEXT -- no HTML, no Markdown formatting. Use line breaks for separation.
 - Relevance gate is mandatory: no field carries session noise (pre-existing/unrelated test failures, session follow-up tasks, environment issues, side observations).
 - One ticket per run. No card moves, no docspace log, no git, no PR.
