@@ -34,6 +34,7 @@ pandahrms-skills/
 │   ├── card-commit/                   # Card-scope commit: commits one card's files, trusts the card's pre-complete /verify
 │   ├── commit/                        # Branch-scope commit gate: invokes /verify, plan and execute atomic commits
 │   │  # Standalone utilities
+│   ├── pr-approver-review/            # Senior-approver review of an already-opened GitHub PR by number: own findings + gate first, then cross-check claude[bot]
 │   ├── branching/                     # Safe branch creation with upstream protection
 │   ├── ef-migrations/                 # Entity Framework Core migrations
 │   ├── handoff-compact/               # Write a session handoff doc, then compact
