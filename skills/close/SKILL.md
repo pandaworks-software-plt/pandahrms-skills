@@ -1,6 +1,6 @@
 ---
 name: close
-description: Manually invoked as `/close` to close a finished piece of Pandahrms work after every card is executed. Verifies every card is already in the per-work `done/` folder and STOPS if any card remains in `active/`; for ticket-driven work invokes `/resolve-ticket` to move the ticket to a resolved, ready-for-release state (status + solution, dev status, Developer Resolution, customer comment, dev-note); writes the docspace dev-diary log and updates progress; marks the work closed in the per-work `_overview`. Mutating -- it changes ticket state and writes the log. Does NOT move cards. Does NOT raise PRs (that is `/pr`). Does NOT auto-trigger -- only on the slash command or an explicit "close this work" mention.
+description: Manually invoked as `/close` to close a finished piece of Pandahrms work after every card is executed. Verifies every card is already in the per-work `done/` folder and STOPS if any card remains in `active/`; for ticket-driven work invokes `/resolve-ticket` to move the ticket to a resolved, ready-for-release state (status + solution, dev status, Developer Resolution, customer comment); writes the docspace dev-diary log and updates progress; marks the work closed in the per-work `_overview`. Mutating -- it changes ticket state and writes the log. Does NOT move cards. Does NOT raise PRs (that is `/pr`). Does NOT auto-trigger -- only on the slash command or an explicit "close this work" mention.
 ---
 
 # Close
@@ -30,7 +30,7 @@ Read `work_folder` from the per-work `_overview.md` frontmatter -- single source
 
 Read the per-work `_overview.md` intake. Detect ticket work by the presence of a `Source`/ticket field. No ticket field -> skip this phase.
 
-Ticket field present -> invoke `/resolve-ticket <ticket-ref>` via the Skill tool, passing the ticket ref from the `_overview`. Draft the field content from the `_overview` intake + the session's card work, then hand it to `/resolve-ticket`. That skill owns the full ticket update: dev status -> `ready-for-release`, status -> `resolved` with a plain customer-facing `solution`, `resolutionNotes` (Developer Resolution), a customer-facing resolved comment, and an internal dev-note -- with the relevance gate, plain-text rule, customer-facing tone rule, and the confirm-before-mutate gate. Wait for it to return before Phase 3.
+Ticket field present -> invoke `/resolve-ticket <ticket-ref>` via the Skill tool, passing the ticket ref from the `_overview`. Draft the field content from the `_overview` intake + the session's card work, then hand it to `/resolve-ticket`. That skill owns the full ticket update: dev status -> `ready-for-release`, status -> `resolved` with a plain customer-facing `solution`, `resolutionNotes` (Developer Resolution), and a customer-facing resolved comment -- with the relevance gate, plain-text rule, customer-facing tone rule, and the confirm-before-mutate gate. Wait for it to return before Phase 3.
 
 `/resolve-ticket` STOPS on a rejected required transition -> if it stops, do not run Phase 3; report and let the user resolve the ticket state first.
 
@@ -39,7 +39,7 @@ Ticket field present -> invoke `/resolve-ticket <ticket-ref>` via the Skill tool
 - Write the docspace dev-diary log entry for the work (date, what was built, cards covered).
 - Update the project progress.
 - Mark the work closed in the per-work `_overview` (once).
-- Print a one-line summary: cards verified done, ticket updated (status + solution + Developer Resolution + comment + dev-note, or n/a), log written.
+- Print a one-line summary: cards verified done, ticket updated (status + solution + Developer Resolution + comment, or n/a), log written.
 
 ## Hard Rules
 
