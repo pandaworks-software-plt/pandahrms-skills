@@ -1,5 +1,7 @@
 # pandahrms-skills
 
+**Version:** 4.7.0
+
 Pandahrms-specific skills plugin for Claude Code.
 
 The plugin is a set of manual, standalone skills. There is no orchestrator -- you run each step yourself.
