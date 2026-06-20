@@ -14,7 +14,7 @@ The plugin is a set of manual, standalone skills. There is no orchestrator -- yo
 | **discover-ticket** | `/pandahrms:discover-ticket` | Ticket intake door (workspace-prod MCP) -> same output contract as `/discover` |
 | **discover-project** | `/pandahrms:discover-project` | Project-queue door (workspace-prod MCP) -> numbered table of a project's pending dev tickets; user picks -> `/discover-ticket` |
 | **spec** | `/pandahrms:spec` | Write/update the L1 behaviour Gherkin spec in pandahrms-spec; conditional on behaviour change; user-agreement gate |
-| **slice** | `/pandahrms:slice` | Cut agreed work into vertical-slice cards; each card holds its L2 spec files + an ordered work sequence |
+| **slice** | `/pandahrms:slice` | Cut agreed work into independently-completable cards; each card holds its L2 spec files + an ordered work sequence |
 | **execute** | `/pandahrms:execute` | Run one card: guided run with stop-gates, spec-first TDD, inline review/deploy/regen; `/execute card-NN` or bare `/execute` for the next card |
 | **status** | `/pandahrms:status` | Read-only summary: auto-fires when `/execute` finishes the last card, also a manual status report |
 | **close** | `/pandahrms:close` | Mutating close: re-check all cards done, update ticket status, write the log, tidy cards |
@@ -64,13 +64,13 @@ Each skill is manual and standalone -- you run each step. There is no orchestrat
 ```
 /discover  (or /discover-ticket; /discover-project to pick from a project's pending queue)   intake -> objective + acceptance criteria
    -> /spec        L1 behaviour Gherkin spec (central pandahrms-spec)
-   -> /slice       vertical-slice cards (each holds its L2 spec files + an ordered sequence)
+   -> /slice       work cards (each holds its L2 spec files + an ordered sequence)
    -> /execute     per card: guided run with stop-gates + spec-first TDD
                    inline leaf actions: /code-review (+ /security-review when sensitive),
-                   deploy BE, regen FE types, per-card commit/PR
+                   deploy BE, regen FE types. No per-card commit or PR -- changes accumulate
    -> /status      auto when the last card is done (conclusion) + manual status anytime
    -> /close       update ticket status, write the log, tidy cards
-   -> /pr          optional final PR (runs /commit first)
+   -> /pr          final PR for the whole work, once every card is done (runs /commit first)
 ```
 
 The always-on execution rules (TDD markers, gates, sensitivity list) ship via the plugin's SessionStart hook, so they apply in every session with no per-member setup.

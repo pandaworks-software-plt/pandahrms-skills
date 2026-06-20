@@ -1,26 +1,22 @@
 ---
 name: slice
-description: Manually invoked as `/slice` (or by an explicit "slice this" / "cut this into cards" mention) to cut agreed work into independently-shippable vertical-slice cards. One capability per slice (CRUD -> 4 slices), Collapse Rule for trivial ones. Each card carries the L1 scenarios it covers, its L2 spec file(s) (BE Reqnroll .feature + FE cucumber-vite .feature -- decided here, written later in /execute, one per layer the slice touches), an ordered work-sequence CHECKLIST templated by layer-span AND architecture, a sensitivity tag (auth/tenant/PII), and acceptance. Gates on user agreement before any execution. Cross-repo slice raises 2 linked PRs. Does NOT auto-trigger -- only on the `/slice` slash command or an explicit slice/decompose/"cut into cards" request; an agreed spec alone is not enough.
+description: Manually invoked as `/slice` (or by an explicit "slice this" / "cut this into cards" mention) to cut agreed work into independently-completable cards. Group by capability where it helps (e.g. CRUD -> 4 cards), Collapse Rule for trivial ones; strict vertical slicing is not required. Each card carries the L1 scenarios it covers, its L2 spec file(s) (BE Reqnroll .feature + FE cucumber-vite .feature -- decided here, written later in /execute, one per layer the card touches), an ordered work-sequence CHECKLIST templated by layer-span AND architecture, a sensitivity tag (auth/tenant/PII), and acceptance. Cards do NOT commit or raise a PR each -- the whole branch is committed and ONE PR raised at the end via /commit or /pr once every card is done (cross-repo work raises 2 linked PRs then). Gates on user agreement before any execution. Does NOT auto-trigger -- only on the `/slice` slash command or an explicit slice/decompose/"cut into cards" request; an agreed spec alone is not enough.
 ---
 
 # Pandahrms Slice
 
-Cut agreed work into independently-shippable vertical-slice cards. Each card = one capability through every layer it touches, carrying its own L2 spec file(s) and an ordered work-sequence checklist. Gate on user agreement before execution.
+Cut agreed work into independently-completable cards. Group by capability where it helps; strict vertical slicing is not required. Each card carries its own L2 spec file(s) and an ordered work-sequence checklist. Gate on user agreement before execution.
 
-**Announce at start:** "I'm using Pandahrms slice to cut this into vertical-slice cards."
+**Announce at start:** "I'm using Pandahrms slice to cut this into work cards."
 
 ## Input
 
 - Agreed L1 behaviour spec (the `.feature` scenarios).
 - Intake output: objective, acceptance criteria, module.
 
-## Vertical-slice heuristic
+## Slicing heuristic
 
-One capability per vertical slice. CRUD -> 4 slices (create, read, update, delete). A slice cuts through every layer it touches (e.g. DB column + API endpoint + FE form), NOT a horizontal layer ("all DB" then "all API"). Each slice:
-- delivers working, testable behaviour on its own
-- ships as one small PR, reviewable alone
-
-Don't bundle unrelated capabilities into one card. Don't split what ships together (Collapse Rule).
+Cut into independently-completable cards. Group by capability where it helps -- e.g. CRUD -> 4 cards (create, read, update, delete). A vertical cut through every layer a capability touches (DB column + API endpoint + FE form) is preferred where natural, but not required; a card may span fewer layers. Each card delivers working, testable behaviour on its own. Don't bundle unrelated capabilities into one card. Don't split what belongs together (Collapse Rule).
 
 ## Collapse Rule
 
@@ -39,7 +35,7 @@ Determine the project shape before templating sequences:
 
 ## Each card
 
-One vertical slice = one capability cut through all layers it touches. Each card holds:
+Each card is one independently-completable unit of work. Each card holds:
 
 - **Title** -- the capability (e.g. "Create appraisal").
 - **Order** -- slice number.
@@ -69,9 +65,8 @@ Render the card's Sequence as a markdown checklist (`- [ ]`), templated by layer
 - [ ] FE work
 - [ ] FE test
 - [ ] FE code review
-- [ ] commit (BE repo + FE repo) + PR (ask user)
 ```
-(Commit ONLY when the card is complete -- never mid-card. Cross-repo = one commit per repo, both at the end. Deploy uses the working tree, no commit.)
+(No per-card commit or PR. The card ends on `/verify` PASS; its changes stay in the working tree. The whole branch is committed and ONE PR raised at the end via `/commit` or `/pr`. Deploy uses the working tree, no commit.)
 
 **monolith / MVC5 / monorepo, cross-layer slice (NO deploy, NO regen):**
 ```
@@ -83,12 +78,12 @@ Render the card's Sequence as a markdown checklist (`- [ ]`), templated by layer
 - [ ] FE work
 - [ ] FE test
 - [ ] FE code review
-- [ ] commit / PR (ask user)
 ```
+(No per-card commit or PR. Cards end on `/verify` PASS; the whole branch is committed and ONE PR raised at the end via `/commit` or `/pr`.)
 
-**BE-only slice:** the BE half only (BE spec -> BE work -> BE test -> BE code review -> commit/PR ask).
+**BE-only card:** the BE half only (BE spec -> BE work -> BE test -> BE code review).
 
-**FE-only slice:** the FE half only (FE spec -> FE work -> FE test -> FE code review -> commit/PR ask).
+**FE-only card:** the FE half only (FE spec -> FE work -> FE test -> FE code review).
 
 Security review enters the sequence (after code review of the touched layer) when the card's sensitivity tag is set.
 
@@ -145,9 +140,9 @@ sensitivity: sensitive | standard
 - <adjacent capability deferred to another card>
 ```
 
-## Cross-repo slice
+## Cross-repo card
 
-A slice spanning BE + FE is one logical unit but raises 2 linked PRs (one per repo) at PR time. Each PR description cross-links the other. Flag it on the card.
+A card spanning BE + FE is one logical unit. No commit or PR per card; the 2 linked PRs (one per repo) are raised at the END for the whole work via `/pr`, each cross-linking the other. Flag the cross-repo span on the card.
 
 ## User-agreement gate
 
@@ -155,13 +150,13 @@ After drafting the card set, show the user the ordered list -- each line: order,
 
 ## Rules
 
-- Cut vertically -- one capability through all the layers it needs. Never a horizontal "database" then "API" then "UI" card set.
+- Prefer capability-grouped cards; a vertical cut through the layers a capability needs is preferred but not mandatory. Avoid a pure horizontal "all database" then "all API" then "all UI" card set when a capability cut fits.
 - Collapse steps into one card when they are same concern + causally chained + can't parallelise.
 - Always check the sensitivity list. Auth, tenant boundary, billing, schema, PII force `sensitive` + /security-review in the sequence.
 - Cross-repo slice deploys BE then regenerates FE API types before FE work. Only monolith/MVC5/monorepo skips that bridge.
 - Slice DECIDES the L2 spec paths; the writing happens later.
 - Do not begin execution until the user agrees to the set. The gate is blocking.
-- BE + FE slice raises two linked PRs, one per repo. Flag it on the card.
+- Cross-repo card: the two linked PRs (one per repo) are raised at the end via `/pr`, not per card. Flag the cross-repo span on the card.
 - Draft cards in chat, get agreement, then write files. Don't write rejected proposals to the store.
 
 ## Next step

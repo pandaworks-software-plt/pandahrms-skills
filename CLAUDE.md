@@ -19,7 +19,7 @@ pandahrms-skills/
 │   ├── discover-ticket/               # Ticket intake door (workspace-prod MCP) -> same output contract as /discover
 │   ├── discover-project/              # Project-queue door (workspace-prod MCP) -> numbered table of pending dev tickets, user picks -> /discover-ticket
 │   ├── spec/                          # Write/update the L1 behaviour Gherkin spec in pandahrms-spec (conditional on behaviour change)
-│   ├── slice/                         # Cut agreed work into vertical-slice cards (each holds its L2 spec files + an ordered work sequence)
+│   ├── slice/                         # Cut agreed work into independently-completable cards (each holds its L2 spec files + an ordered work sequence)
 │   ├── execute/                       # Run one card: guided run with stop-gates, spec-first TDD, inline review/deploy/regen
 │   ├── status/                        # Read-only summary: auto-fires when /execute finishes the last card, also a manual status report
 │   ├── close/                         # Mutating close: re-check, invoke /resolve-ticket for ticket work, write log, tidy cards
@@ -31,8 +31,7 @@ pandahrms-skills/
 │   ├── code-review/                   # Diff-scoped LLM-judgment only (consumes a /lint-gate result), fix issues, /simplify (no commits)
 │   ├── security-review/               # Security review (OWASP + Pandahrms-specific), no commits
 │   ├── simplify/                      # 3-agent parallel reuse/quality/efficiency pass on working-tree changes (no commits)
-│   ├── card-commit/                   # Card-scope commit: commits one card's files, trusts the card's pre-complete /verify
-│   ├── commit/                        # Branch-scope commit gate: invokes /verify, plan and execute atomic commits
+│   ├── commit/                        # Branch-scope commit gate: invokes /verify, plan and execute atomic commits (one commit pass at end of work)
 │   │  # Standalone utilities
 │   ├── pr-approver-review/            # Senior-approver review of an already-opened GitHub PR by number: own findings + gate first, then cross-check claude[bot]
 │   ├── branching/                     # Safe branch creation with upstream protection

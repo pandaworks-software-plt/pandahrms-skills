@@ -191,4 +191,4 @@ Record the written L1 `.feature` path(s) back into the per-work `_overview.md` (
 
 ## Next step
 
-End by telling the user to run `/slice` to cut the work into vertical-slice cards.
+End by telling the user to run `/slice` to cut the work into cards.
