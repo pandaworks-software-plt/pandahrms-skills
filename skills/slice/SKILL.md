@@ -1,6 +1,6 @@
 ---
 name: slice
-description: Manually invoked as `/slice` (or by an explicit "slice this" / "cut this into cards" mention) to cut agreed work into independently-completable cards. Group by capability where it helps (e.g. CRUD -> 4 cards), Collapse Rule for trivial ones; strict vertical slicing is not required. Each card carries the L1 scenarios it covers, its L2 spec file(s) (BE Reqnroll .feature + FE cucumber-vite .feature -- decided here, written later in /execute, one per layer the card touches), an ordered work-sequence CHECKLIST templated by layer-span AND architecture, a sensitivity tag (auth/tenant/PII), and acceptance. Cards do NOT commit or raise a PR each -- the whole branch is committed and ONE PR raised at the end via /commit or /pr once every card is done (cross-repo work raises 2 linked PRs then). Gates on user agreement before any execution. Does NOT auto-trigger -- only on the `/slice` slash command or an explicit slice/decompose/"cut into cards" request; an agreed spec alone is not enough.
+description: Manually invoked as `/slice` (or by an explicit "slice this" / "cut this into cards" mention) to cut agreed work into independently-completable cards. Group by capability where it helps (e.g. CRUD -> 4 cards), Collapse Rule for trivial ones; strict vertical slicing is not required. Each card carries the L1 scenarios it covers, its L2 spec file(s) (BE Reqnroll .feature + FE cucumber-vite .feature -- decided here, written later in /execute, one per layer the card touches), an ordered work-sequence CHECKLIST templated by layer-span AND architecture, a category tag (implementation/data-migration/deployment/testing/refactor/config), a sensitivity tag (auth/tenant/PII), and acceptance. Cards do NOT commit or raise a PR each -- the whole branch is committed and ONE PR raised at the end via /commit or /pr once every card is done (cross-repo work raises 2 linked PRs then). Gates on user agreement before any execution. Does NOT auto-trigger -- only on the `/slice` slash command or an explicit slice/decompose/"cut into cards" request; an agreed spec alone is not enough.
 ---
 
 # Pandahrms Slice
@@ -40,6 +40,7 @@ Each card is one independently-completable unit of work. Each card holds:
 - **Title** -- the capability (e.g. "Create appraisal").
 - **Order** -- slice number.
 - **Layers** -- BE / FE / both.
+- **Category** -- the card's primary purpose: implementation / data-migration / deployment / testing / refactor / config (below).
 - **L1 covered** -- the behaviour-spec scenarios this slice satisfies (traceability to L1).
 - **L2 spec file(s)** -- DECIDED here, written later. Before naming any path, INSPECT the real layout: find the BE Reqnroll `.feature` location (the `Features/` folder in the BE test project) and the FE cucumber-vite `.feature` location. Choose paths that match the existing layout. One L2 `.feature` per layer the slice touches:
   - BE -> BE test project `Features/` folder, Reqnroll `.feature`
@@ -87,6 +88,23 @@ Render the card's Sequence as a markdown checklist (`- [ ]`), templated by layer
 
 Security review enters the sequence (after code review of the touched layer) when the card's sensitivity tag is set.
 
+## Card category
+
+Tag every card with one category naming its primary purpose. Pick by what the card mainly delivers (a card may include incidental other-type steps; tag by the dominant one):
+
+| Category | Card's main purpose |
+|----------|---------------------|
+| `implementation` | Adds or changes product behaviour (default; most feature cards). |
+| `data-migration` | Schema change, EF migration, or data backfill / rewrite script. |
+| `deployment` | Release, pipeline, environment, or infra change. |
+| `testing` | Test-only: add or expand coverage, no production code change. |
+| `refactor` | Restructure existing code, no behaviour change. |
+| `config` | Pure configuration change (appsettings, feature flag, settings) with no logic. |
+
+Default to `implementation` when the card builds or changes feature behaviour. Use the others only when that IS the card's whole point.
+
+**Group by category.** Within a capability, keep same-category tasks together in one card -- don't scatter the same kind of work across cards (e.g. all the data-migration steps for one capability go in one card, not spread over three). When a capability needs distinct categories that can each stand alone, split into separate same-category cards ordered by dependency (data-migration before the implementation that reads the new shape; deployment after the implementation it ships). The Collapse Rule still wins: same-concern, causally-chained, non-parallelisable steps stay in one card even when they cross categories (e.g. entity property + EF mapping + migration = one card, tagged by its dominant purpose).
+
 ## Sensitivity tagging
 
 Tag a card `sensitive` when it touches any of:
@@ -117,6 +135,7 @@ created: <YYYY-MM-DD>
 status: active
 project: <slug or "ad-hoc">
 layers: BE | FE | both
+category: implementation | data-migration | deployment | testing | refactor | config
 sensitivity: sensitive | standard
 ---
 
@@ -146,12 +165,14 @@ A card spanning BE + FE is one logical unit. No commit or PR per card; the 2 lin
 
 ## User-agreement gate
 
-After drafting the card set, show the user the ordered list -- each line: order, title, layers, sensitivity, one-line capability. Ask via AskUserQuestion to agree before any execution. On requested changes, revise and re-show. Do NOT write card files, and do NOT begin execution, until the user agrees. After agreement, write the card files to the resolved store.
+After drafting the card set, show the user the ordered list -- each line: order, title, layers, category, sensitivity, one-line capability. Ask via AskUserQuestion to agree before any execution. On requested changes, revise and re-show. Do NOT write card files, and do NOT begin execution, until the user agrees. After agreement, write the card files to the resolved store.
 
 ## Rules
 
 - Prefer capability-grouped cards; a vertical cut through the layers a capability needs is preferred but not mandatory. Avoid a pure horizontal "all database" then "all API" then "all UI" card set when a capability cut fits.
 - Collapse steps into one card when they are same concern + causally chained + can't parallelise.
+- Tag every card with one category (implementation/data-migration/deployment/testing/refactor/config). Default `implementation`; use another only when that is the card's whole point.
+- Group same-category tasks of one capability into one card; don't scatter them. Split a capability into separate same-category cards only when each stands alone, ordered by dependency. Collapse Rule still overrides for same-concern causally-chained steps.
 - Always check the sensitivity list. Auth, tenant boundary, billing, schema, PII force `sensitive` + /security-review in the sequence.
 - Cross-repo slice deploys BE then regenerates FE API types before FE work. Only monolith/MVC5/monorepo skips that bridge.
 - Slice DECIDES the L2 spec paths; the writing happens later.
