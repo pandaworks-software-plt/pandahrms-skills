@@ -103,7 +103,7 @@ Tag every card with one category naming its primary purpose. Pick by what the ca
 
 Default to `implementation` when the card builds or changes feature behaviour. Use the others only when that IS the card's whole point.
 
-**Group by category.** Within a capability, keep same-category tasks together in one card -- don't scatter the same kind of work across cards (e.g. all the data-migration steps for one capability go in one card, not spread over three). When a capability needs distinct categories that can each stand alone, split into separate same-category cards ordered by dependency (data-migration before the implementation that reads the new shape; deployment after the implementation it ships). The Collapse Rule still wins: same-concern, causally-chained, non-parallelisable steps stay in one card even when they cross categories (e.g. entity property + EF mapping + migration = one card, tagged by its dominant purpose).
+**Group by category.** Default to ONE capability card that spans whatever categories the capability needs -- a feature card normally carries its implementation plus its incidental migration / config / test steps. Within that card, keep same-category tasks together; don't scatter the same kind of work across cards. Break a capability into separate same-category cards ONLY when a block of same-category work is BOTH substantial AND independently shippable on its own (a sizeable standalone data migration, a release / deployment task, a test-only coverage expansion) -- never split just because categories differ, and never create a card with no standalone value. When you do split, order by dependency (data-migration before the implementation that reads the new shape; deployment after the implementation it ships). The Collapse Rule still wins: same-concern, causally-chained, non-parallelisable steps stay in one card even when they cross categories (e.g. entity property + EF mapping + migration = one card, tagged by its dominant purpose).
 
 ## Sensitivity tagging
 
@@ -172,7 +172,7 @@ After drafting the card set, show the user the ordered list -- each line: order,
 - Prefer capability-grouped cards; a vertical cut through the layers a capability needs is preferred but not mandatory. Avoid a pure horizontal "all database" then "all API" then "all UI" card set when a capability cut fits.
 - Collapse steps into one card when they are same concern + causally chained + can't parallelise.
 - Tag every card with one category (implementation/data-migration/deployment/testing/refactor/config). Default `implementation`; use another only when that is the card's whole point.
-- Group same-category tasks of one capability into one card; don't scatter them. Split a capability into separate same-category cards only when each stands alone, ordered by dependency. Collapse Rule still overrides for same-concern causally-chained steps.
+- Default to one capability card spanning categories; group same-category tasks together. Break out a same-category card ONLY when that block is BOTH substantial AND independently shippable -- never split on category difference alone, never make a card with no standalone value. Collapse Rule still overrides for same-concern causally-chained steps.
 - Always check the sensitivity list. Auth, tenant boundary, billing, schema, PII force `sensitive` + /security-review in the sequence.
 - Cross-repo slice deploys BE then regenerates FE API types before FE work. Only monolith/MVC5/monorepo skips that bridge.
 - Slice DECIDES the L2 spec paths; the writing happens later.
