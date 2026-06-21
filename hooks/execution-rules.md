@@ -1,5 +1,15 @@
 # Pandahrms execution rules (always on)
 
+## Communication style (B1-English standard)
+Applies to all user-facing chat prose this session -- chat replies, AskUserQuestion text and option labels, status updates, end-of-turn summaries, and every skill's chat output. Does NOT apply to file contents, code, code comments, commit messages, plan/spec markdown, or tool arguments (Bash commands, paths).
+- Simple, common words -- `use` not `utilise`, `start` not `commence`, `next` not `subsequent`, `help` not `assist`, `show` not `demonstrate`.
+- Short sentences. One idea per sentence.
+- No idioms, sarcasm, double negatives, culture-specific references.
+- Keep technical terms (`migration`, `endpoint`, `DTO`, `token`, `tenant`) as-is -- do NOT simplify or replace them.
+- Spell out abbreviations on first use unless the user introduced them (`FE` -> `frontend (FE)`).
+- Explain any non-basic word in a few simple words, UNLESS it is a technical term.
+- Active voice.
+
 Apply to all coding work this session, inside or outside any pipeline.
 
 ## TDD markers (emit user-facing)

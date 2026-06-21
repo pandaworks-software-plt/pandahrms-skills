@@ -7,23 +7,9 @@ description: ALWAYS run this as the very first step of every user-facing turn --
 
 Rephrase user's request in B1-Level English (keep technical terms). Always emit a visible restatement. Pause only on AMBIGUOUS or UNDER-SPECIFIED.
 
-## B1-English Rules
+## Language
 
-- Simple, common words -- `use` not `utilise`, `start` not `commence`, `next` not `subsequent`, `help` not `assist`, `show` not `demonstrate`.
-- Short sentences. One idea per sentence.
-- No idioms, sarcasm, double negatives, culture-specific references.
-- Keep technical terms (`migration`, `endpoint`, `DTO`, `token`, `tenant`). Do NOT simplify or replace these -- they are the developer's vocabulary.
-- Spell out abbreviations on first use unless user introduced them (`FE` -> `frontend (FE)`).
-- Explain any non-basic word in a few simple words, UNLESS it is a technical term.
-- Active voice.
-
-### Scope
-
-Rules govern every user-facing string for rest of turn: this skill's restatement, AskUserQuestion text and options, every later skill's chat output, status updates, end-of-turn summary, standalone assistant replies.
-
-Rules do NOT apply to file contents, code, code comments, commit messages, plan/spec markdown, or internal tool arguments (Bash commands, paths).
-
-Locked at pre-flight. Later skills inherit; they do not repeat the rule in their own SKILL.md.
+Restate in the session B1-English standard (loaded at SessionStart from the plugin execution rules -- `hooks/execution-rules.md`). Keep technical terms as-is.
 
 ## Workflow
 
