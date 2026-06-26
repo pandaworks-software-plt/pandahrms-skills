@@ -1,6 +1,7 @@
 ---
 name: tool-doctor
-description: Manually invoked as `/tool-doctor` (or an explicit "tool-doctor" / "check my tooling" / "set up the guard tools" mention) to audit the work machine AND the current project for the deterministic code-quality guard tools used by the review flow (ripgrep, gitleaks, ast-grep, linters/analyzers, coverage, jscpd). Scans read-only first, prints a readiness table (guard -> tool -> machine status -> project status -> built-in fallback -> recommendation), then OFFERS, with per-item confirmation, to install missing machine tools and add missing project config. Never installs or edits anything without explicit confirmation; never runs `sudo` silently; never auto-edits the repo. External, once-per-project setup -- the dev runs it by hand to set up tools; it is NOT part of the card flow and no other skill invokes it. Does NOT auto-trigger -- only on the slash command or an explicit "tool-doctor" mention.
+description: '`/tool-doctor` -- audit the work machine AND the current project for the deterministic code-quality guard tools used by the review flow (ripgrep, gitleaks, ast-grep, linters/analyzers, coverage, jscpd). Scans read-only first, prints a readiness table (guard -> tool -> machine status -> project status -> built-in fallback -> recommendation), then OFFERS, with per-item confirmation, to install missing machine tools and add missing project config. Never installs or edits anything without explicit confirmation; never runs `sudo` silently; never auto-edits the repo. External, once-per-project setup -- the dev runs it by hand to set up tools; it is NOT part of the card flow and no other skill invokes it.'
+disable-model-invocation: true
 ---
 
 # Tool Doctor

@@ -1,6 +1,7 @@
 ---
 name: discover
-description: The free-form intake door for a new feature, enhancement, or bug in Pandahrms. Manually invoked as `/discover <free-form intent>` (or by an explicit mention of "discover" / "use discover on this"). Turns a raw, unstructured intent into a converged objective plus plain-statement acceptance criteria. Branches internally by intent type -- new-feature and enhancement run a brainstorm mode; a bug runs an understand-scope-then-root-cause investigate mode. Ends by writing one output contract (intent, type, objective, context, root cause for bugs, acceptance criteria, module, open questions) to a per-work location. Does NOT auto-trigger -- pasting a feature idea or a bug report alone is not enough; the user must invoke `/discover` or name the skill. Does NOT write code, run git, or commit.
+description: The free-form intake door for a new feature, enhancement, or bug in Pandahrms. `/discover <free-form intent>`. Turns a raw, unstructured intent into a converged objective plus plain-statement acceptance criteria. Branches internally by intent type -- new-feature and enhancement run a brainstorm mode; a bug runs an understand-scope-then-root-cause investigate mode. Ends by writing one output contract (intent, type, objective, context, root cause for bugs, acceptance criteria, module, open questions) to a per-work location. Does NOT write code, run git, or commit.
+disable-model-invocation: true
 ---
 
 # Discover
