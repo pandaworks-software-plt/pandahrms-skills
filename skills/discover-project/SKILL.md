@@ -51,6 +51,7 @@ End with a one-line count naming the scope (e.g. `7 pending tickets in project <
 
 - Read-only. No `update_ticket`, no comment, no status change, no proposal post.
 - No git, no commits, no file writes. No `_overview.md`, no card folder.
+- Writes nothing today; should any output ever be added, it MUST live inside the current repo -- never outside the repo root (no home dir, no external/iCloud vault).
 - Fail fast: stop on missing projectNumber, on a disconnected workspace-prod MCP, or on a list_tickets error.
 - One project per run.
 
