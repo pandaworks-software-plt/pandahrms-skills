@@ -1,6 +1,6 @@
 ---
 name: discover-ticket
-description: The ticket intake door of the Pandahrms flow. `/discover-ticket <ticket-ref>`. Takes a single ticket reference -- a UUID or a human ticket number like T26050092. Fetches the ticket via the workspace-prod MCP `get_ticket` tool, reads its description sections and existing `typeSpecificData.acceptanceCriteria`, validates and fills gaps in that acceptance criteria (never generates it from scratch), and emits the same converged output contract as `/discover` (objective/root-cause + plain-statement acceptance criteria + module), with the Source field carrying ticketNumber, customer, and affected sys version. Writes to a per-ticket card folder `<TICKET>-<slug>/_overview.md`.
+description: The ticket intake door of the Pandahrms flow. `/discover-ticket <ticket-ref>`. Takes a single ticket reference -- a UUID or a human ticket number like T26050092. Fetches the ticket via the workspace-prod MCP `get_ticket` tool, reads its description sections and existing `typeSpecificData.acceptanceCriteria`, validates and fills gaps in that acceptance criteria (never generates it from scratch), and emits the same converged output contract as `/discover` (objective/root-cause + plain-statement acceptance criteria + module), with the Source field carrying ticketNumber, customer, and affected sys version. Writes to a per-ticket card folder `<TICKET>-<slug>/_overview.md` inside the current repo (never outside the repo root).
 disable-model-invocation: true
 ---
 
@@ -64,10 +64,12 @@ The work lives in a per-work folder of this shape:
   done/             # finished cards
 ```
 
-Resolve `<work-folder>` by the ladder:
-1. user-configured location (for this user: docspace `agent-zone/projects/<project>/<TICKET>-<slug>/`),
-2. user-preferred location if stated,
-3. in-project default: `docs/pandahrms/work/<TICKET>-<slug>/`.
+Hard boundary: `<work-folder>` MUST resolve inside the current repo (the working git project). Reject any rung that resolves outside the repo root -- skip it and fall to the next. Never write `_overview.md` to an external location (home dir, external/iCloud vault, any path outside the repo).
+
+Resolve `<work-folder>` by the ladder; use the first that resolves inside the repo:
+1. user-configured location, only when inside the repo. Skip if it resolves outside the repo root.
+2. user-preferred location if stated, only when inside the repo. Skip if outside.
+3. in-project default: `docs/pandahrms/work/<TICKET>-<slug>/`. Always inside the repo; the guaranteed fallback.
 
 - `<TICKET>` = the human `ticketNumber`.
 - `<slug>` = short kebab-case slug from the ticket title.
@@ -78,11 +80,11 @@ Create `<work-folder>/`, `<work-folder>/active/`, and `<work-folder>/done/` if m
 
 Fill the shared output contract. Same output contract as `/discover`, PLUS the ticket-only `Source` field (ticketNumber, customer, sys version). `Source` is an intentional additive field for the ticket door, not a mismatch.
 
-Record the resolved `<work-folder>` path as a `work_folder:` frontmatter field at the top of `_overview.md`. This is the single source of truth for the path that later steps read.
+Record the resolved `<work-folder>` path as a `work_folder:` frontmatter field at the top of `_overview.md`. This is the single source of truth for the path that later steps read; always repo-relative since the folder lives inside the repo.
 
 ```
 ---
-work_folder: <abs-or-repo-relative path to <work-folder>>
+work_folder: <repo-relative path to <work-folder>>
 ---
 
 # <Intent / title>
@@ -114,6 +116,7 @@ Print the written path and a one-line summary. End. Return control to caller or 
 
 - Read-only on the ticket. No `update_ticket`, no comment, no status change, no proposal post.
 - No git, no commits, no file edits outside the `<TICKET>-<slug>/_overview.md` write.
+- The output work folder MUST live inside the current repo. Never write `_overview.md` outside the repo root (no home dir, no external/iCloud vault).
 - Acceptance criteria are validated + gap-filled from ticket content, never invented from scratch.
 - Same output contract as `/discover`, plus the ticket-only `Source` field (ticketNumber, customer, sys version).
 - Acceptance criteria stay plain testable statements. No Gherkin at intake.

@@ -1,6 +1,6 @@
 ---
 name: discover
-description: The free-form intake door for a new feature, enhancement, or bug in Pandahrms. `/discover <free-form intent>`. Turns a raw, unstructured intent into a converged objective plus plain-statement acceptance criteria. Branches internally by intent type -- new-feature and enhancement run a brainstorm mode; a bug runs an understand-scope-then-root-cause investigate mode. Ends by writing one output contract (intent, type, objective, context, root cause for bugs, acceptance criteria, module, open questions) to a per-work location. Does NOT write code, run git, or commit.
+description: The free-form intake door for a new feature, enhancement, or bug in Pandahrms. `/discover <free-form intent>`. Turns a raw, unstructured intent into a converged objective plus plain-statement acceptance criteria. Branches internally by intent type -- new-feature and enhancement run a brainstorm mode; a bug runs an understand-scope-then-root-cause investigate mode. Ends by writing one output contract (intent, type, objective, context, root cause for bugs, acceptance criteria, module, open questions) to a per-work location inside the current repo. Does NOT write code, run git, or commit, or write outside the repo.
 disable-model-invocation: true
 ---
 
@@ -96,13 +96,15 @@ Create one per-work folder and write the contract as `_overview.md` inside it. T
   done/             # finished cards
 ```
 
-Resolve `<work-folder>` by walking the ladder top-down; use the first that resolves. `<slug>` = short kebab-case name derived from the title/intent.
+Hard boundary: `<work-folder>` MUST resolve inside the current repo (the working git project). Reject any rung that resolves outside the repo root -- skip it and fall to the next. Never write the contract to an external location (home dir, external/iCloud vault, any path outside the repo).
 
-1. **Configured** -- a user-configured intake location exists: `<configured-root>/projects/<project>/<slug>/`.
-2. **User-preferred** -- the user names or has a standing preferred location. Use it.
-3. **In-project default** -- `docs/pandahrms/work/<slug>/`.
+Resolve `<work-folder>` by walking the ladder top-down; use the first that resolves inside the repo. `<slug>` = short kebab-case name derived from the title/intent.
 
-Create the work folder plus its `active/` and `done/` subfolders. Write `_overview.md` with the resolved path recorded at the top as a frontmatter field `work_folder: <abs-or-repo-relative path>` -- the single source of truth for the path. State the resolved path on one line after writing.
+1. **Configured (in-repo only)** -- a user-configured intake location inside the repo: `<configured-root>/projects/<project>/<slug>/`. Skip if it resolves outside the repo root.
+2. **User-preferred (in-repo only)** -- a standing preferred location the user named, only when inside the repo. Skip if outside.
+3. **In-project default** -- `docs/pandahrms/work/<slug>/`. Always inside the repo; the guaranteed fallback.
+
+Create the work folder plus its `active/` and `done/` subfolders. Write `_overview.md` with the resolved path recorded at the top as a frontmatter field `work_folder: <repo-relative path>` -- the single source of truth for the path, always repo-relative since the folder lives inside the repo. State the resolved path on one line after writing.
 
 ## Step 6: Present and close
 
@@ -117,6 +119,7 @@ Create the work folder plus its `active/` and `done/` subfolders. Write `_overvi
 - No `git add`, `git commit`, `git push`, branch creation, or PR creation.
 - Acceptance criteria stay plain-statement. No Gherkin.
 - The written artifact contains only converged conclusions -- no dead ends, no rejected-option log.
+- The output work folder MUST live inside the current repo. Never write the contract outside the repo root (no home dir, no external/iCloud vault).
 - `Module / affected area` is filled by every run.
 - One AskUserQuestion at a time, only when a fork blocks convergence.
 
