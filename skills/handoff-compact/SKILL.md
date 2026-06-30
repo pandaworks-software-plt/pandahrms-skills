@@ -1,7 +1,6 @@
 ---
 name: handoff-compact
 description: '`/handoff-compact [optional-path]` -- write a handoff document capturing the current session''s state, then trigger context compaction immediately after the file is written. Captures user intent, decisions made, pending follow-ups, file paths touched, test counts, and concrete next-step commands so a future session (or the same one after compact) can resume cleanly. Does NOT commit.'
-disable-model-invocation: true
 ---
 
 # Handoff + Compact

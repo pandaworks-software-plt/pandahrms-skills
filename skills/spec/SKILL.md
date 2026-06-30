@@ -1,7 +1,6 @@
 ---
 name: spec
 description: '`/spec` -- write or update the L1 behaviour spec in the L1 spec repo (location read from the `Spec repo:` line in the user''s global `~/.claude/CLAUDE.md`; asks the user and saves it there when the location is not stated -- no default path) from intake output (objective + acceptance criteria + module). The L1 spec is the tech-agnostic product truth (what the feature does, when it''s done) in Gherkin -- no UI mechanics, no API/endpoint detail. Conditional on behaviour change: pure UI restyle or refactor with no behaviour change proposes a skip for user confirmation. Writes L1 only (L2 FE/BE executable specs come later during execution). Presents a scenario-index table for user agreement, then asks whether to commit/PR to the L1 spec repo -- never auto-commits.'
-disable-model-invocation: true
 ---
 
 # /spec -- L1 Behaviour Spec

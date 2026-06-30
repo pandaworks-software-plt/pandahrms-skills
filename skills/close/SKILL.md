@@ -1,7 +1,6 @@
 ---
 name: close
 description: '`/close` -- close a finished piece of Pandahrms work after every card is executed. Verifies every card is already in the per-work `done/` folder and STOPS if any card remains in `active/`; for ticket-driven work invokes `/resolve-ticket` to move the ticket to a resolved, ready-for-release state (status + solution, dev status, Developer Resolution, customer comment); writes the docspace dev-diary log and updates progress; marks the work closed in the per-work `_overview`. Mutating -- it changes ticket state and writes the log. Does NOT move cards. Does NOT raise PRs (that is `/pr`).'
-disable-model-invocation: true
 ---
 
 # Close
