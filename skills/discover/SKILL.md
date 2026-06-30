@@ -10,16 +10,6 @@ disable-model-invocation: true
 
 Free-form intake. Take a raw intent, explore it, converge to confirmed conclusions, and emit one output contract. Two internal modes by intent type. The artifact is a converged conclusion. No code, no git, no commit.
 
-## Pre-Flight: Optimise the prompt (mandatory before any other step)
-
-If `pandahrms:optimise-prompt` has not already run on the current user message, invoke it via the Skill tool with no arguments. Wait for it to return, then continue using the confirmed intent as the canonical request.
-
-Skip this pre-flight when:
-- Standalone pre-flight already ran on the current user message and locked an intent. Reuse the locked intent.
-- Current message is a direct reply to an AskUserQuestion the assistant just sent.
-- Current message is a one-word ack ("yes", "ok", "no", "go", "continue").
-- optimise-prompt is already running in the current call stack.
-
 ## Step 1: Classify intent type
 
 Read the intent. Set `type`:
