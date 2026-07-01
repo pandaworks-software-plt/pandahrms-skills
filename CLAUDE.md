@@ -21,6 +21,7 @@ pandahrms-skills/
 │   ├── spec/                          # Write/update the L1 behaviour Gherkin spec in pandahrms-spec (conditional on behaviour change)
 │   ├── slice/                         # Cut agreed work into independently-completable cards (each holds its L2 spec files + an ordered work sequence)
 │   ├── execute/                       # Run one card: guided run with stop-gates, spec-first TDD, inline review/deploy/regen
+│   ├── execute-sonnet/                # Same as /execute but pinned to Sonnet (frontmatter model: sonnet); invoked as /pandahrms:execute-sonnet. --blast-mode spawns a dynamic Workflow that queues cards as sequential flow items, each card a Sonnet-pinned subagent
 │   ├── status/                        # Read-only summary: auto-fires when /execute finishes the last card, also a manual status report
 │   ├── close/                         # Mutating close: re-check, invoke /resolve-ticket for ticket work, write log, tidy cards
 │   ├── resolve-ticket/                # Card-less ticket resolution: one ticket ref -> dev status ready-for-release + status resolved + solution/resolutionNotes/comment (confirm before mutate)
