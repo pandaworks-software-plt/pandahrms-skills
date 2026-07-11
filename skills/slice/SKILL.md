@@ -1,11 +1,11 @@
 ---
 name: slice
-description: '`/slice` -- cut agreed work into independently-completable cards. Group by capability where it helps (e.g. CRUD -> 4 cards), Collapse Rule for trivial ones; strict vertical slicing is not required. Each card carries the L1 scenarios it covers, its L2 spec file(s) (BE Reqnroll .feature + FE cucumber-vite .feature -- decided here, written later in /execute, one per layer the card touches), an ordered work-sequence CHECKLIST templated by layer-span AND architecture, a category tag (implementation/data-migration/deployment/testing/refactor/config), a sensitivity tag (auth/tenant/PII), and acceptance. Cards do NOT commit or raise a PR each -- the whole branch is committed and ONE PR raised at the end via /commit or /pr once every card is done (cross-repo work raises 2 linked PRs then). Gates on user agreement before any execution.'
+description: '`/slice` -- cut agreed work into independently-completable cards. Group by capability where it helps (e.g. CRUD -> 4 cards), Collapse Rule for trivial ones; strict vertical slicing is not required. Each card carries the L1 scenarios it covers, its L2 spec file(s) (BE Reqnroll .feature + FE cucumber-vite .feature -- decided here, written later in /execute, one per layer the card touches), an ordered work-sequence CHECKLIST templated by layer-span AND architecture, a category tag (implementation/data-migration/deployment/testing/refactor/config), a sensitivity tag (auth/tenant/PII), and acceptance. Cards do NOT commit or raise a PR each -- the whole branch is committed and ONE PR raised at the end via /commit or /pr once every card is done (cross-repo work raises 2 linked PRs then). Shows the ordered card list and writes the card files immediately -- no confirmation gate; revises files in place when the user requests changes.'
 ---
 
 # Pandahrms Slice
 
-Cut agreed work into independently-completable cards. Group by capability where it helps; strict vertical slicing is not required. Each card carries its own L2 spec file(s) and an ordered work-sequence checklist. Gate on user agreement before execution.
+Cut agreed work into independently-completable cards. Group by capability where it helps; strict vertical slicing is not required. Each card carries its own L2 spec file(s) and an ordered work-sequence checklist. Show the card list, write the files, proceed -- no confirmation gate.
 
 **Announce at start:** "I'm using Pandahrms slice to cut this into work cards."
 
@@ -163,9 +163,9 @@ sensitivity: sensitive | standard
 
 A card spanning BE + FE is one logical unit. No commit or PR per card; the 2 linked PRs (one per repo) are raised at the END for the whole work via `/pr`, each cross-linking the other. Flag the cross-repo span on the card.
 
-## User-agreement gate
+## Card set output
 
-After drafting the card set, show the user the ordered list -- each line: order, title, layers, category, sensitivity, one-line capability. Ask via AskUserQuestion to agree before any execution. On requested changes, revise and re-show. Do NOT write card files, and do NOT begin execution, until the user agrees. After agreement, write the card files to the resolved store.
+After drafting the card set, show the user the ordered list -- each line: order, title, layers, category, sensitivity, one-line capability. Then write the card files to the resolved store in the same turn -- no confirmation gate. When the user requests changes after seeing the list, revise the affected card files in place and re-show the list.
 
 ## Rules
 
@@ -176,9 +176,9 @@ After drafting the card set, show the user the ordered list -- each line: order,
 - Always check the sensitivity list. Auth, tenant boundary, billing, schema, PII force `sensitive` + /security-review in the sequence.
 - Cross-repo slice deploys BE then regenerates FE API types before FE work. Only monolith/MVC5/monorepo skips that bridge.
 - Slice DECIDES the L2 spec paths; the writing happens later.
-- Do not begin execution until the user agrees to the set. The gate is blocking.
+- Show the ordered card list, write the files, proceed -- no confirmation gate. Revise card files in place on user-requested changes.
 - Cross-repo card: the two linked PRs (one per repo) are raised at the end via `/pr`, not per card. Flag the cross-repo span on the card.
-- Draft cards in chat, get agreement, then write files. Don't write rejected proposals to the store.
+- Draft cards, show the list, write files in the same turn.
 
 ## Next step
 
