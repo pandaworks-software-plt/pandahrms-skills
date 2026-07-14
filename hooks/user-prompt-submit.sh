@@ -1,19 +1,15 @@
 #!/usr/bin/env bash
 # UserPromptSubmit hook for pandahrms-skills plugin
-# Injects a reminder to run pandahrms:optimise-prompt as the first tool call of every user turn.
+# Injects the slim per-turn repeat-back reminder. Full rubric: hooks/execution-rules.md, "Repeat-back (intent lock)".
 
 set -euo pipefail
 
-reminder='ENFORCE optimise-prompt on this turn.
+reminder='Repeat-back rule (rubric: execution-rules "Repeat-back (intent lock)").
 
-Before any other tool call, invoke `Skill: pandahrms:optimise-prompt` UNLESS the user message matches one of these mechanical exemptions:
-- A pure ack with no new verb or object: "yes", "ok", "got it", "continue", "stop", "skip", "cancel", "nevermind", "sounds good", "go ahead".
-- A direct reply to an in-flight AskUserQuestion.
-- A recursive self-call when optimise-prompt is already running.
-- A message whose first non-whitespace character is "/" (slash-command skill trigger -- the slash command itself is the explicit intent).
-- A message whose first non-whitespace character is "!" or "$" (explicit bypass prefix -- the user has opted out of the repeat-back step for this turn).
-
-This rule applies even in Auto mode. Auto mode is satisfied because optimise-prompt proceeds silently on CLEAR intent (it only calls AskUserQuestion when the request is genuinely AMBIGUOUS or UNDER-SPECIFIED). Running the skill on every turn costs one extra tool call; skipping it costs intent drift and rework.'
+Before any other tool call, restate the request in one B1-English line: "You want to <verb> <object> [qualifier]." Then proceed in the same turn.
+If any rubric trigger fires (hedging, fragment/single noun, trailing "?", pronoun with 2+ referents, verb with two meanings, two readings, missing required field, two tasks in one request), call AskUserQuestion FIRST.
+Exemptions: message starts with "/", "!" or "$"; pure acks ("yes", "ok", "go ahead", "stop", ...); a direct reply to an in-flight AskUserQuestion.
+This applies even in Auto mode -- the restatement line does not pause the turn.'
 
 # Escape outputs for JSON using pure bash
 escape_for_json() {

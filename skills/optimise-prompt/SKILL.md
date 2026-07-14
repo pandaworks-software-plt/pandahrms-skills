@@ -1,11 +1,11 @@
 ---
 name: optimise-prompt
-description: ALWAYS run this as the very first step of every user-facing turn -- BEFORE any other tool call. Acts as a repeat-back step so the user can confirm Claude read their message correctly. Rephrases the user's request in clear B1-Level English (technical terms kept) and emits the restatement as a visible chat message. When intent is unambiguous (CLEAR), prints a one-line restatement and proceeds in the same turn without pausing -- the user interrupts if Claude misread. When the request is ambiguous, contradictory, or missing critical info, calls AskUserQuestion with candidate intents and waits for the user to pick. Triggers on read-only questions, diagnostic questions, working-tree actions (write/edit/refactor/fix/add/remove/rename/drop/run/build/commit/migrate/deploy), one-line tweaks, single-file edits, single-className removals, config touches, and short follow-up directives. Mechanical skips only: short acks that carry no new verb or object (e.g. "yes", "ok", "got it", "sounds good", "go ahead", "continue", "stop", "skip", "cancel", "nevermind"), direct replies to an in-flight AskUserQuestion, recursive self-calls when the skill is already running, any message whose first non-whitespace character is "/" (slash-command skill trigger -- the slash command itself is the explicit intent), and any message whose first non-whitespace character is "!" or "$" (explicit bypass prefix -- the user has opted out of the repeat-back step for this turn). Also triggers on direct user invocation -- "rephrase this", "what do you think I'm asking", "clarify my prompt". Returns a single normalized intent statement that the caller uses as the canonical request from that point forward.
+description: Manual-only rephrase command. Invoked as `/optimise-prompt`, or by an explicit ask -- "rephrase this", "did you understand me", "repeat back what I asked", "what do you think I'm asking", "clarify my prompt". Rephrases the user's request in clear B1-Level English (technical terms kept), classifies it CLEAR / AMBIGUOUS / UNDER-SPECIFIED, and emits a visible restatement -- one line when CLEAR, an AskUserQuestion with candidate intents otherwise. Does NOT auto-run per turn -- the per-turn repeat-back lives in `hooks/execution-rules.md`; this skill fires on manual invocation only.
 ---
 
 # Optimise Prompt
 
-Rephrase user's request in B1-Level English (keep technical terms). Always emit a visible restatement. Pause only on AMBIGUOUS or UNDER-SPECIFIED.
+Manual rephrase command. Rephrase user's request in B1-Level English (keep technical terms). Always emit a visible restatement. Pause only on AMBIGUOUS or UNDER-SPECIFIED.
 
 ## Language
 
@@ -151,7 +151,7 @@ Classify every mid-skill user message:
 | **Continuation reply** | Direct answer to in-flight AskUserQuestion. | Absorb into the question. |
 | **Control ack** | Short ack, no new verb/object (`yes`, `ok`, `got it`, `sounds good`, `go ahead`, `continue`, `stop`, `skip`, `cancel`, `nevermind`). | Treat as control flow. |
 | **In-flight clarification** | Small refinement (`use 3 retries`, `cap is 50 not 100`). Verb + top-level object unchanged. | Absorb into current step. |
-| **Fresh directive** | New verb, new top-level object, contradiction of locked intent, extra scope, or skill redirect. | Re-invoke optimise-prompt before acting. |
+| **Fresh directive** | New verb, new top-level object, contradiction of locked intent, extra scope, or skill redirect. | Treat as a new request: run Phase 2 on it before acting. |
 
 Fresh-directive triggers (any one):
 

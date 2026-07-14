@@ -9,21 +9,6 @@ PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 warning_message=""
 
-# Build skill list from skills directory
-skills_list=""
-for skill_dir in "${PLUGIN_ROOT}/skills"/*/; do
-    if [ -f "${skill_dir}SKILL.md" ]; then
-        skill_name=$(basename "$skill_dir")
-        # Extract description from YAML frontmatter (BSD sed compatible)
-        description=$(awk '/^---$/{n++; next} n==1 && /^description:/{sub(/^description: */, ""); print; exit}' "${skill_dir}SKILL.md")
-        if [ -n "$skills_list" ]; then
-            skills_list="${skills_list}\n- pandahrms:${skill_name}: ${description}"
-        else
-            skills_list="- pandahrms:${skill_name}: ${description}"
-        fi
-    fi
-done
-
 # Escape outputs for JSON using pure bash
 escape_for_json() {
     local input="$1"
@@ -43,7 +28,6 @@ escape_for_json() {
     printf '%s' "$output"
 }
 
-skills_escaped=$(escape_for_json "$skills_list")
 warning_escaped=$(escape_for_json "$warning_message")
 
 # Load compact always-on execution rules (single source of truth, ships with plugin)
@@ -60,7 +44,7 @@ cat <<EOF
 {
   "hookSpecificOutput": {
     "hookEventName": "SessionStart",
-    "additionalContext": "Pandahrms skills available (use Skill tool to invoke):\n${skills_escaped}${warning_escaped}${rules_block}"
+    "additionalContext": "${warning_escaped}${rules_block}"
   }
 }
 EOF
