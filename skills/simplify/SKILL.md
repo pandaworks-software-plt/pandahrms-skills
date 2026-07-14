@@ -1,6 +1,6 @@
 ---
 name: simplify
-description: Triggers when the user explicitly requests a simplification pass on working-tree changes -- phrasings such as "/simplify", "run simplify", "simplify this", "simplify my changes", "do a code-reuse pass", "DRY this up", "make this leaner", "reduce duplication". Dispatches three parallel review subagents (Code Reuse, Code Quality, Efficiency) against the changed files, auto-applies mechanical fixes (rename, dead-code removal, single-helper extraction), and surfaces behavior-changing findings for user decision. Supports `--approve` to auto-apply every finding (mechanical and behavior-changing) without pausing. Does NOT commit, stage, push, run tests, start dev servers, or modify files outside the `git status` changed set.
+description: Triggers when the user explicitly requests a simplification pass on working-tree changes -- phrasings such as "/simplify", "run simplify", "simplify this", "simplify my changes", "do a code-reuse pass", "DRY this up", "make this leaner", "reduce duplication". Dispatches three parallel review subagents (Code Reuse, Code Quality, Efficiency) against the changed files, auto-applies mechanical fixes, and surfaces behavior-changing findings for user decision. Does NOT commit, stage, push, run tests, start dev servers, or modify files outside the `git status` changed set.
 ---
 
 # Simplify
@@ -9,72 +9,14 @@ description: Triggers when the user explicitly requests a simplification pass on
 
 Targeted simplification pass on working-tree changes. Three parallel review subagents look for duplication, quality drift, and inefficiency. Mechanical findings apply automatically. Behavior-changing findings pause for user pick. Never commits.
 
-## Pre-Flight: Optimise the prompt (mandatory before any other step)
-
-If `pandahrms:optimise-prompt` has not already run on the current user message, invoke it via the Skill tool with no arguments. Wait for it to return, then continue using the confirmed intent as the canonical request.
-
-Skip this pre-flight when:
-- Standalone pre-flight already ran on the current user message and locked an intent. Reuse the locked intent.
-- Current message is a direct reply to an AskUserQuestion the assistant just sent.
-- Current message is a one-word ack ("yes", "ok", "no", "go", "continue").
-- optimise-prompt is already running in the current call stack.
-
-**Re-invoke on mid-skill fresh directives.** After pre-flight, every user message received between simplify phases MUST be classified per the [Follow-up Directives](../optimise-prompt/SKILL.md#follow-up-directives) section of optimise-prompt. Continuation replies, control acks, and small refinements are absorbed by the current phase. Fresh directives (new scope, different files, "stop and commit", "skip the efficiency pass") MUST pause the current phase and re-invoke `pandahrms:optimise-prompt` before simplify acts on them.
-
-See [optimise-prompt](../optimise-prompt/SKILL.md) for the full algorithm.
-
 ## Flags
 
 - `--approve` -- auto-apply every finding (mechanical AND behavior-changing) without pausing. Replaces the Phase 5 AskUserQuestion with a one-line announcement.
+- `--mechanical-only` -- apply mechanical findings only; do NOT apply behavior-changing findings and do NOT ask about them -- record each as `not applied (mechanical-only)` in the Phase 6 summary. For unattended callers (e.g. `/code-review` autonomous mode).
 
-When `--approve` is set, announce the auto-pick on one line at Phase 5 (`--approve: applying all findings`) before proceeding. Do NOT call AskUserQuestion for behavior-changing findings.
+When `--approve` is set, announce the auto-pick on one line at Phase 5 (`--approve: applying all findings`) before proceeding. Do NOT call AskUserQuestion for behavior-changing findings. `--approve` and `--mechanical-only` are mutually exclusive; if both are passed, `--mechanical-only` wins.
 
 ## Workflow
-
-```dot
-digraph simplify {
-    "User requests simplify" [shape=doublecircle];
-    "Gather changes" [shape=box];
-    "git diff and git status" [shape=plaintext];
-    "Any changes?" [shape=diamond];
-    "No changes to simplify" [shape=doublecircle];
-    "Read all changed files" [shape=box];
-    "Dispatch 3 review agents in parallel" [shape=box, style=filled, fillcolor=lavender];
-    "Code Reuse agent" [shape=box, style=filled, fillcolor=lavender];
-    "Code Quality agent" [shape=box, style=filled, fillcolor=lavender];
-    "Efficiency agent" [shape=box, style=filled, fillcolor=lavender];
-    "Merge findings + classify" [shape=box];
-    "Mechanical findings?" [shape=diamond];
-    "Auto-apply mechanical fixes" [shape=box, style=filled, fillcolor=lightgreen];
-    "Behavior-changing findings?" [shape=diamond];
-    "Ask user per finding" [shape=diamond, style=filled, fillcolor=lightyellow];
-    "Apply approved findings" [shape=box];
-    "Print summary" [shape=doublecircle];
-
-    "User requests simplify" -> "Gather changes";
-    "Gather changes" -> "git diff and git status";
-    "git diff and git status" -> "Any changes?";
-    "Any changes?" -> "No changes to simplify" [label="no"];
-    "Any changes?" -> "Read all changed files" [label="yes"];
-    "Read all changed files" -> "Dispatch 3 review agents in parallel";
-    "Dispatch 3 review agents in parallel" -> "Code Reuse agent";
-    "Dispatch 3 review agents in parallel" -> "Code Quality agent";
-    "Dispatch 3 review agents in parallel" -> "Efficiency agent";
-    "Code Reuse agent" -> "Merge findings + classify";
-    "Code Quality agent" -> "Merge findings + classify";
-    "Efficiency agent" -> "Merge findings + classify";
-    "Merge findings + classify" -> "Mechanical findings?";
-    "Mechanical findings?" -> "Auto-apply mechanical fixes" [label="yes"];
-    "Mechanical findings?" -> "Behavior-changing findings?" [label="no"];
-    "Auto-apply mechanical fixes" -> "Behavior-changing findings?";
-    "Behavior-changing findings?" -> "Ask user per finding" [label="yes, no --approve"];
-    "Behavior-changing findings?" -> "Apply approved findings" [label="yes, --approve set"];
-    "Behavior-changing findings?" -> "Print summary" [label="no"];
-    "Ask user per finding" -> "Apply approved findings" [label="approved"];
-    "Ask user per finding" -> "Print summary" [label="skipped"];
-    "Apply approved findings" -> "Print summary";
-}
-```
 
 **Phase 0: Gather changes**
 
@@ -143,6 +85,8 @@ No tests, no migrations, no formatter runs. The skill's job is to land the textu
 
 If no behavior-changing findings remain, skip to Phase 6.
 
+If `--mechanical-only` is set, skip the ask: record each behavior-changing finding as `not applied (mechanical-only)` and go to Phase 6.
+
 If `--approve` is set, announce `--approve: applying all behavior-changing findings` and apply each one in sequence (one Edit per finding, same skip-on-failure rule as Phase 4). Then go to Phase 6.
 
 Otherwise, surface each behavior-changing finding via AskUserQuestion. Group up to 4 findings per call when they target the same file; otherwise one per call. Question shape:
@@ -189,9 +133,6 @@ End. Return control to caller or to user. No follow-up offers.
 
 | Mistake | Fix |
 |---------|-----|
-| Running tests to "verify" a rename | Out of scope. Skill lands textual change only. |
-| Editing a file outside `git status` to wire a finding | Skip the finding. Cross-file changes are behavior-changing by definition. |
 | Auto-applying a "small" behavior change because it looks safe | Phase 3 re-classify is literal. If a clause fails, route through Phase 5. |
-| Dispatching the three agents one after another | Always parallel -- single tool-call batch. |
 | Batching AskUserQuestion across unrelated files | Group only when same file. Otherwise one per call. |
 | Retrying a failed Edit with a different string | One Edit per finding. Skip on failure, record reason. |
