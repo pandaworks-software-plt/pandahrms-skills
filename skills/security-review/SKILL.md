@@ -1,6 +1,7 @@
 ---
 name: security-review
 description: Triggers when the user requests a security review of code or working-tree changes -- phrasings such as "/security-review", "run security review", "do a security review", "audit this for vulnerabilities", "OWASP pass on this branch", "check this PR for security issues", "auth audit", "authz audit", "pen test this". Audits auth, authz, input validation, injection, secrets, PII exposure, audit trails, and tenant isolation in working tree changes or a specified feature area. Reports findings and fixes approved issues. Does NOT commit, stage, or push.
+model: opus
 ---
 
 # Security Review
@@ -57,68 +58,14 @@ A change self-skips only when the combined change set (unstaged + staged + untra
 
 Phases run **strictly sequentially** Phase 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8. Do not begin a phase until previous emitted required output. No parallel subagents; all work in main thread.
 
-```dot
-digraph security_review {
-    "User triggers /security-review" [shape=doublecircle];
-    "Scope provided?" [shape=diamond];
-    "Use working tree diff" [shape=box];
-    "Use specified scope" [shape=box];
-    "Detect project type" [shape=box];
-    "Gather context" [shape=box];
-    "Any security-relevant changes?" [shape=diamond];
-    "Report: no security surface, exit" [shape=doublecircle];
-    "Run threat pass" [shape=box];
-    "Run OWASP checklist" [shape=box];
-    "Run Pandahrms-specific checks" [shape=box];
-    "Run secret/credential scan" [shape=box];
-    "Run dependency audit (if available)" [shape=box];
-    "Findings?" [shape=diamond];
-    "Report: clean, exit" [shape=doublecircle];
-    "Categorize by severity" [shape=box];
-    "Report findings to user" [shape=box];
-    "Critical/High present?" [shape=diamond];
-    "Ask: fix now?" [shape=diamond];
-    "Apply approved fixes" [shape=box];
-    "Re-verify fixes" [shape=box];
-    "Ask: /commit or test first?" [shape=diamond, style=filled, fillcolor=lightgreen];
-    "Run /commit" [shape=box, style=filled, fillcolor=lightgreen];
-    "Done - user will test" [shape=doublecircle];
-
-    "User triggers /security-review" -> "Scope provided?";
-    "Scope provided?" -> "Use specified scope" [label="yes"];
-    "Scope provided?" -> "Use working tree diff" [label="no"];
-    "Use working tree diff" -> "Detect project type";
-    "Use specified scope" -> "Detect project type";
-    "Detect project type" -> "Gather context";
-    "Gather context" -> "Any security-relevant changes?";
-    "Any security-relevant changes?" -> "Report: no security surface, exit" [label="no"];
-    "Any security-relevant changes?" -> "Run threat pass" [label="yes"];
-    "Run threat pass" -> "Run OWASP checklist";
-    "Run OWASP checklist" -> "Run Pandahrms-specific checks";
-    "Run Pandahrms-specific checks" -> "Run secret/credential scan";
-    "Run secret/credential scan" -> "Run dependency audit (if available)";
-    "Run dependency audit (if available)" -> "Findings?";
-    "Findings?" -> "Report: clean, exit" [label="no"];
-    "Findings?" -> "Categorize by severity" [label="yes"];
-    "Categorize by severity" -> "Report findings to user";
-    "Report findings to user" -> "Critical/High present?";
-    "Critical/High present?" -> "Ask: fix now?" [label="yes"];
-    "Critical/High present?" -> "Ask: /commit or test first?" [label="no, low/info only"];
-    "Ask: fix now?" -> "Apply approved fixes" [label="fix"];
-    "Ask: fix now?" -> "Ask: /commit or test first?" [label="skip"];
-    "Apply approved fixes" -> "Re-verify fixes";
-    "Re-verify fixes" -> "Ask: /commit or test first?";
-    "Ask: /commit or test first?" -> "Run /commit" [label="commit"];
-    "Ask: /commit or test first?" -> "Done - user will test" [label="test first"];
-}
-```
+Phase ledger: at every phase transition, print `Phase N/8 done -> Phase N+1`.
 
 **Phase 0: Scope**
 
 ### 0.1 Resolve scope to concrete file list
 
 - If user supplied literal path or glob (e.g. `/security-review src/auth`, `/security-review on Pandahrms.Performance.Api/Controllers/LoginController.cs`), use exactly that path set.
-- If user supplied natural-language scope (e.g. "the new login endpoint", "the export feature"), resolve to concrete file list using `git status`, `grep`, `find`. When more than 5 files match, or zero match, list the matched files inline in chat and ask the user inline in plain text to confirm before proceeding.
+- If user supplied natural-language scope (e.g. "the new login endpoint", "the export feature"), resolve to concrete file list using `git status`, `grep`, `find`. When more than 5 files match, or zero match, list the matched files inline in chat and confirm the file set via AskUserQuestion before proceeding.
 - If no scope supplied, default to git working tree captured by:
   - `git status` (untracked and modified files)
   - `git diff` and `git diff --cached` (unstaged and staged changes)
@@ -170,6 +117,8 @@ Append "weak spots" list at end of map -- specific concerns feeding into Phase 3
 
 **Phase 3: OWASP Checklist**
 
+Read `references/owasp-checklist.md` from this skill's base directory BEFORE starting Phase 3. It holds the A01-A08 tables and the Phase 4 Pandahrms table.
+
 Work rows in **strict numeric order**: A01, A02, A03, A04, A05, A06, A07, A08. A09 and A10 are covered downstream as noted but must still be acknowledged in report ("A09: see Phase 4 audit-trail row", "A10: see A03 SSRF row"). Do not skip a row because earlier rows produced findings.
 
 For each row, do **one of two things explicitly**:
@@ -178,89 +127,6 @@ For each row, do **one of two things explicitly**:
 - (b) Mark row "N/A" with one-line reason (e.g. "A02 N/A: no crypto, password storage, token signing, or TLS code in scope").
 
 Row qualifies as N/A only when none of the file types or APIs it inspects appear in scope. Do not silently omit a row -- every row gets either findings or N/A reason in report.
-
-### A01 - Broken Access Control
-
-| Check | What to look for |
-|-------|------------------|
-| **Missing `[Authorize]` / auth guard** | New controller, action, route handler, or server action without auth enforcement. `AllowAnonymous` used intentionally? |
-| **IDOR** | Endpoint takes id from client and loads by that id without verifying caller owns/has access. Always scope queries by `TenantId`, `OrgId`, or `UserId`. |
-| **Role/policy bypass** | Role/policy strings typo'd, hardcoded `true`, or commented out. Policies registered in DI? |
-| **Mass assignment** | Request DTO binds directly to entity with fields client should not set (`IsAdmin`, `TenantId`, `Status`). Use explicit mapping. |
-| **Server-side enforcement** | UI hides button but endpoint does not re-check permission. Every check must exist on server. |
-| **Path traversal** | File/blob paths built from user input without sanitization (`..`, absolute paths). |
-
-### A02 - Cryptographic Failures
-
-| Check | What to look for |
-|-------|------------------|
-| **Passwords** | Never stored plain or with weak hash (MD5, SHA1, unsalted SHA256). Use `PasswordHasher<TUser>`, bcrypt, or argon2. |
-| **Token signing** | JWT secrets not hardcoded, algorithms not `none` or `HS256` with weak key, issuer/audience validated. |
-| **TLS** | Cookies marked `Secure`. External HTTP calls use HTTPS. No `ServicePointManager.ServerCertificateValidationCallback = (_, _, _, _) => true`. |
-| **Encryption at rest** | Sensitive columns (SSN, salary, bank info) encrypted or isolated. EF value converters in place. |
-| **Insecure randomness** | Security-sensitive randomness (tokens, nonces) uses `RandomNumberGenerator` / `crypto.randomUUID`, not `Random` or `Math.random`. |
-
-### A03 - Injection
-
-| Check | What to look for |
-|-------|------------------|
-| **SQL injection** | Raw `FromSqlRaw`, `ExecuteSqlRaw`, string-concatenated SQL, or Dapper with interpolation. Use parameters. |
-| **NoSQL / LINQ dynamic** | Dynamic LINQ strings built from user input. |
-| **Command injection** | `Process.Start`, shell exec, `child_process` built from user input. |
-| **LDAP / XPath / ORM** | User input in LDAP filters, XPath queries, or ORM string predicates without escaping. |
-| **XSS** | React: `dangerouslySetInnerHTML`. Razor: `@Html.Raw`. Response templates echoing unescaped user input. |
-| **Log injection** | User input written to logs without sanitization of CR/LF. |
-| **SSRF** | Server makes outbound HTTP to a URL taken from client input without allowlist. |
-
-### A04 - Insecure Design
-
-| Check | What to look for |
-|-------|------------------|
-| **Missing rate limiting** | Login, password reset, OTP, export endpoints without throttling. |
-| **Predictable IDs** | Sequential public identifiers for sensitive resources. Use GUIDs for externally-exposed keys. |
-| **Business logic abuse** | Negative quantities, zero prices, status transitions not enforced, workflow steps skippable. |
-
-### A05 - Security Misconfiguration
-
-| Check | What to look for |
-|-------|------------------|
-| **CORS** | `AllowAnyOrigin` with credentials. Origin allowlist explicit. |
-| **CSP / security headers** | Missing `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`. |
-| **Verbose errors** | Stack traces, SQL errors, internal paths leaked to client in production. |
-| **Default creds / sample data** | Demo users, `admin:admin`, seed credentials shipped to prod. |
-| **Env vs appsettings** | Production secrets in committed `appsettings.json` instead of env/KeyVault. |
-
-### A06 - Vulnerable and Outdated Components
-
-Detect package manager from in-scope files and run matching command:
-
-- If any `*.csproj` in scope, run `dotnet list package --vulnerable --include-transitive`.
-- If `package.json` in scope and `pnpm-lock.yaml` exists at project root, run `pnpm audit --prod`.
-- If `package.json` in scope and `package-lock.json` exists at project root, run `npm audit --production`.
-- If `package.json` in scope and `yarn.lock` exists at project root, run `yarn npm audit --recursive --severity high`.
-
-If relevant CLI not installed (command not found), report "dependency audit skipped: <command> not installed" in Phase 6 report. Do not silently skip.
-
-CVE knowledge comes **only** from captured audit output. Do not cite CVE IDs from training-data memory. If audit output unavailable for any reason, report "lockfile changed; CVE check skipped" rather than inferring vulnerability status from prior knowledge.
-
-Report any **High** or **Critical** advisories tied to changed `*.csproj` or `package.json`. If a lockfile changed, diff it and flag new packages the audit output reports as vulnerable.
-
-### A07 - Identification and Authentication Failures
-
-| Check | What to look for |
-|-------|------------------|
-| **Session handling** | Cookies `HttpOnly`, `Secure`, `SameSite=Lax` or `Strict`. Token refresh / revocation implemented. |
-| **MFA / lockout** | Brute-force protections on login and OTP endpoints. Account lockout thresholds. |
-| **Password policy** | Minimum length, complexity, breached-password check where applicable. |
-| **Token storage (FE)** | Access tokens in `localStorage` is red flag -- prefer secure cookies or in-memory. |
-
-### A08 - Software and Data Integrity Failures
-
-| Check | What to look for |
-|-------|------------------|
-| **Deserialization** | `BinaryFormatter`, `JavaScriptSerializer` with type info, or `TypeNameHandling.All` in Newtonsoft. |
-| **Unsigned updates** | Dynamic asset loads from unverified URLs. |
-| **CI/CD supply chain** | New GitHub Actions pinned to SHA, not moving tags. |
 
 ### A09 - Security Logging and Monitoring Failures
 
@@ -272,16 +138,7 @@ Covered in A03 above.
 
 **Phase 4: Pandahrms-Specific Checks**
 
-| Check | What to look for |
-|-------|------------------|
-| **Tenant isolation** | Every DB query involving tenant-scoped tables filters by `TenantId`/`OrganisationId`. Global query filters in `DbContext.OnModelCreating` present and not bypassed with `IgnoreQueryFilters()` without justification. |
-| **Audit fields** | Entities needing tracking have `CreatedBy`, `CreatedAt`, `ModifiedBy`, `ModifiedAt`. Populated via base entity or middleware, not hand-set. |
-| **Audit trail on state-changing endpoints** | Every POST / PUT / PATCH / DELETE writes audit log record (who, what, when, which resource). New endpoints must use same audit mechanism as existing ones. Missing audit trail is **High** severity finding. |
-| **PII in responses** | Response DTOs do not leak fields like `PasswordHash`, `SecurityStamp`, internal `Id` of other tenants' records, or salary/bank info not needed by caller. |
-| **PII in logs** | No logging of passwords, tokens, full credit card, full NRIC/SSN. Redaction in place. |
-| **Cross-project contract** | If FE change calling BE endpoint, verify BE actually enforces the authorization FE assumes. If BE change, verify downstream FE / mobile is not relying on removed checks. |
-| **EF migrations** | New columns holding PII marked for encryption / masking. `DROP COLUMN` on sensitive columns reviewed for data retention policy. No unfiltered `UPDATE`/`DELETE` in migration SQL. |
-| **Bridge / external keys** | No API keys, service account tokens, or bridge secrets committed. Check `.env*`, `appsettings.*.json`, `launchSettings.json`, `.github/workflows/*`. |
+Work the Pandahrms table in `references/owasp-checklist.md`. Missing audit trail is **High** severity finding.
 
 **Phase 5: Secret and Credential Scan**
 
@@ -346,13 +203,13 @@ Every `Where:` reference must come from file actually opened by Read tool in thi
 
 ### Approval prompt
 
-If Critical or High findings exist, ask inline in plain text:
+If Critical or High findings exist, use `AskUserQuestion` to ask:
 
 > "The security review found [N Critical / M High] issues. Fix them now, or report and let you handle them?"
 
-Options the user can type back:
+Options:
 - **Fix now** -- apply remediations for approved findings.
-- **Skip** -- report stays as-is, user decides what to do.
+- **Skip (report only)** -- report stays as-is, user decides what to do.
 
 Never silently apply security fix without user approval. Security fixes can change behavior.
 
@@ -416,4 +273,3 @@ After Phase 8 ends, security-review is complete. Do not continue executing secur
 | Treating frontend validation as sufficient | FE validation is UX; server must re-validate every input. |
 | Ignoring a removed check | If `[Authorize]` or tenant filter was deleted, treat as Critical finding until shown intentional. |
 | Skipping dependency audit because "it's just a patch bump" | Run audit anyway; transitive CVEs hide in minor bumps. |
-| Not reading full file | Security depends on context -- vulnerability may live in unchanged block next to edit. |
