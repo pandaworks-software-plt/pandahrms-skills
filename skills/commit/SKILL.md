@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Triggers when the user explicitly requests a git commit of the whole branch's working-tree changes -- phrases like "commit my changes", "git commit", "ready to commit", "/commit", or "make atomic commits". Branch-scope commit step: a clean-tree gate over the whole branch that auto-fixes format + lint inline, then invokes `/verify` (the project-scoped build + test runner) and requires `VERIFY RESULT: PASS` before planning and executing atomic commits across the branch. The gate applies even to pre-existing or unrelated failures. Supports `/commit --skip` to bypass the entire Phase 1 gate (format, lint, and the `/verify` build + test run).
+description: 'Triggers when the user explicitly requests a git commit of the whole branch''s working-tree changes -- phrases like "commit my changes", "git commit", "ready to commit", "/commit", or "make atomic commits". Branch-scope commit gate -- auto-fixes format + lint inline, invokes `/verify` (the project-scoped build + test runner) and requires `VERIFY RESULT: PASS`, then plans and executes atomic commits across the branch. Does NOT skip the gate for pre-existing or unrelated failures unless `/commit --skip` is given.'
 ---
 
 # Commit
@@ -31,44 +31,11 @@ In skip mode:
 - Before Phase 2, emit verbatim: `Skip mode: Phase 1 gate bypassed. Format, lint, and /verify (build + tests) will NOT run. Proceeding directly to commit planning.`
 - All other phases run unchanged. Every Red Flag still applies -- no `git add -A`, no committing secrets, no `--amend`, no `--no-verify`, no destructive git commands.
 
-## Workflow
-
-```dot
-digraph commit {
-    "User triggers /commit" [shape=doublecircle];
-    "Skip mode?" [shape=diamond];
-    "Auto-fix format" [shape=box];
-    "Auto-fix lint" [shape=box];
-    "Invoke /verify" [shape=box];
-    "All gates pass?" [shape=diamond];
-    "Stop and report" [shape=octagon, style=filled, fillcolor=orange];
-    "Gather changes" [shape=box];
-    "Plan atomic commits" [shape=box];
-    "Present commit plan" [shape=box];
-    "User approves?" [shape=diamond];
-    "Execute commits" [shape=box];
-    "Done" [shape=doublecircle];
-
-    "User triggers /commit" -> "Skip mode?";
-    "Skip mode?" -> "Auto-fix format" [label="no"];
-    "Skip mode?" -> "Gather changes" [label="yes -- --skip flag"];
-    "Auto-fix format" -> "Auto-fix lint";
-    "Auto-fix lint" -> "Invoke /verify";
-    "Invoke /verify" -> "All gates pass?";
-    "All gates pass?" -> "Stop and report" [label="no -- tell user to fix"];
-    "All gates pass?" -> "Gather changes" [label="yes -- VERIFY RESULT: PASS"];
-    "Gather changes" -> "Plan atomic commits";
-    "Plan atomic commits" -> "Present commit plan";
-    "Present commit plan" -> "User approves?";
-    "User approves?" -> "Execute commits" [label="approve"];
-    "User approves?" -> "Stop and report" [label="abort"];
-    "Execute commits" -> "Done";
-}
-```
-
 ## Execution Order
 
 Phases execute strictly in order: Phase 1 -> Phase 2 -> Phase 3 -> Phase 4 -> Phase 5. Do not begin a phase until the prior phase has fully completed.
+
+**Phase ledger.** At every phase transition, print one line: `Phase N done -> Phase N+1`.
 
 If `--skip` is set per the Skip Mode section, skip Phase 1 entirely and start at Phase 2.
 
@@ -98,17 +65,36 @@ Detect ALL project types present in the workspace for the format/lint sub-steps 
 
 `/verify` owns build/test detection -- Phase 1C invokes it; this skill does not detect or run build/test commands itself.
 
+### Write-Pass Scope (Changed Files Only)
+
+The Phase 1A/1B **write** passes run scoped to the changed files. The **verify** passes stay whole-tree -- the gate is still whole-branch.
+
+Compute the changed set once, before Phase 1A:
+
+```bash
+{ git diff --name-only; git diff --cached --name-only; git status --porcelain | grep '^??' | cut -c4-; } | sort -u
+```
+
+Filter that list to the file types the tool handles (.NET -> `.cs`; biome / prettier / eslint -> the extensions their config covers). Pass the filtered paths to the write command. Empty filtered list for a tool -> skip that tool's write pass and run its verify pass only.
+
+**When a whole-tree verify pass fails ONLY on files outside the changed set**, STOP and ask via `AskUserQuestion`:
+
+- **"Fix tree-wide now (the fixes land as a separate chore commit in the plan)"** -> re-run the write pass whole-tree, re-verify, and group the out-of-set files as their own `chore` commit in Phase 3.
+- **"Skip this sub-step (gate on changed files only this run)"** -> continue past this sub-step; the changed files are clean.
+
+Never silently reformat the whole repo into feature commits.
+
 **Phase 1A: Format Auto-Fix**
 
-Run the formatter in **write mode** to auto-fix mechanical formatting violations. Files modified by this step get picked up by Phase 2 and included in the commit plan in Phase 3.
+Run the formatter in **write mode** to auto-fix mechanical formatting violations. Files modified by this step get picked up by Phase 2 and included in the commit plan in Phase 3. The write pass is scoped to the changed set per Write-Pass Scope above.
 
-- **.NET**: `dotnet format` on the solution/project (no `--verify-no-changes` flag -- this is the write pass).
+- **.NET**: `dotnet format --include <changed .cs paths>` (no `--verify-no-changes` flag -- this is the write pass).
 - **JS/TS** (detection precedence, first match wins):
-  1. `biome.json` / `biome.jsonc` -> `pnpm biome format --write .`
-  2. `.prettierrc.*` or `prettier` key in `package.json` -> `pnpm prettier --write .`
+  1. `biome.json` / `biome.jsonc` -> `pnpm biome format --write <changed paths>`
+  2. `.prettierrc.*` or `prettier` key in `package.json` -> `pnpm prettier --write <changed paths>`
   3. Otherwise: skip dedicated format step and rely on Phase 1B's linter to format.
 
-After the write pass, run verification to confirm 0 remaining issues:
+After the write pass, run verification whole-tree to confirm 0 remaining issues:
 
 - **.NET**: `dotnet format --verify-no-changes`
 - **JS/TS**: `pnpm biome format .` (verify) or `pnpm prettier --check .`
@@ -119,14 +105,14 @@ If verification still reports issues, STOP and emit diagnostic output verbatim f
 
 **Phase 1B: Lint Auto-Fix**
 
-Run the linter in **fix mode** to auto-fix mechanical lint violations, then run it in verify mode.
+Run the linter in **fix mode** to auto-fix mechanical lint violations, then run it in verify mode. The fix pass is scoped to the changed set per Write-Pass Scope above; the verify pass stays whole-tree.
 
 - **.NET**: `dotnet format` already covers analyzer-driven lint warnings; no separate step.
 - **JS/TS** (detection precedence, first match wins):
-  1. `biome.json` / `biome.jsonc` -> `pnpm biome check --write .` then `pnpm biome check .` (verify).
-  2. `eslint.config.*` (flat config) -> `pnpm lint --fix` then `pnpm lint` (verify).
+  1. `biome.json` / `biome.jsonc` -> `pnpm biome check --write <changed paths>` then `pnpm biome check .` (verify).
+  2. `eslint.config.*` (flat config) -> `pnpm exec eslint --fix <changed paths>` then `pnpm lint` (verify).
   3. `.eslintrc.*` (legacy config) -> same as above.
-  4. `package.json` has a `lint:fix` script -> run that, then `pnpm lint`.
+  4. `package.json` has a `lint:fix` script -> run the linter binary scoped (`pnpm exec eslint --fix <changed paths>`); fall back to the bare `lint:fix` script only when the binary does not resolve. Then `pnpm lint` (verify).
   5. `package.json` has a `lint` script only -> run `pnpm lint` in verify mode (no auto-fix available).
   6. None of the above -> skip lint sub-step.
 
@@ -135,6 +121,19 @@ If the verify pass shows remaining errors (i.e. errors the linter could not auto
 `Lint errors remain after auto-fix. These are real code issues that need targeted edits. For each violation above: fix the offending code, or add a one-line "// reason" suppression when the rule does not apply here. Re-run /commit when verify passes.`
 
 **Phase 1C: /verify (Build + Test)**
+
+BEFORE invoking `/verify`, check for a prior PASS on an unchanged tree:
+
+1. Read `work_folder` from the per-work `_overview.md`, when one exists. No work folder -> skip this check and invoke `/verify`.
+2. Read `<work-folder>/.verify-result.json`.
+3. Compute the current tree hash:
+
+   ```bash
+   { git diff; git diff --cached; git status --porcelain; } | shasum -a 256 | cut -d' ' -f1
+   ```
+
+4. File exists AND `"result": "PASS"` AND its `tree_hash` equals the freshly computed hash -> SKIP the `/verify` run, treat the build/test gate as met, and continue to Phase 2. Announce one line: `verify skipped: tree unchanged since last PASS (<timestamp>)`.
+5. Anything else (no file, `"result": "FAIL"`, hash mismatch) -> invoke `/verify` exactly as below.
 
 Invoke `/verify` (no args) over the whole branch's working tree. `/verify` runs the full whole-graph build / type-check + full test suite + changed-file coverage gate and emits one structured result. Run it AFTER Phase 1A/1B so it sees the post-fix tree.
 
@@ -235,7 +234,7 @@ Show a numbered table:
 | 4 | test(widget) | HandlerTests.cs | add CreateWidget handler unit tests |
 ```
 
-After presenting the plan, ask inline in plain text: "Proceed with this commit plan?" listing the two canonical options inline for the user to type back:
+After presenting the plan, ask "Proceed with this commit plan?" via `AskUserQuestion` with exactly these two options:
 
 - **"Approve -- execute the commits"** -> Phase 4.
 - **"Abort -- leave the working tree untouched"** -> STOP. Do not commit.
