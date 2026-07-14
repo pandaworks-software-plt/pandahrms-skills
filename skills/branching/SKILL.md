@@ -17,39 +17,6 @@ When you branch from a remote ref like `origin/feature/other-work`, git automati
 
 ## Process
 
-```dot
-digraph create_branch {
-    "User requests branch" [shape=doublecircle];
-    "Gather purpose + source" [shape=box];
-    "Source is non-main?" [shape=diamond];
-    "Warn + confirm intent" [shape=box];
-    "Determine branch type" [shape=box];
-    "Compose branch name" [shape=box];
-    "AskUser to confirm" [shape=box];
-    "User confirms?" [shape=diamond];
-    "Fetch + checkout local source" [shape=box];
-    "Create branch from local ref" [shape=box];
-    "Verify no upstream" [shape=diamond];
-    "Show proof to user" [shape=doublecircle];
-
-    "User requests branch" -> "Gather purpose + source";
-    "Gather purpose + source" -> "Source is non-main?" ;
-    "Source is non-main?" -> "Warn + confirm intent" [label="yes"];
-    "Source is non-main?" -> "Determine branch type" [label="no"];
-    "Warn + confirm intent" -> "Determine branch type";
-    "Determine branch type" -> "Compose branch name";
-    "Compose branch name" -> "AskUser to confirm";
-    "AskUser to confirm" -> "User confirms?";
-    "User confirms?" -> "Fetch + checkout local source" [label="yes"];
-    "User confirms?" -> "Compose branch name" [label="no, change something"];
-    "User confirms?" -> "Done (user handles branching)" [label="skip"];
-    "Done (user handles branching)" [shape=doublecircle];
-    "Fetch + checkout local source" -> "Create branch from local ref";
-    "Create branch from local ref" -> "Verify no upstream";
-    "Verify no upstream" -> "Show proof to user" [label="no upstream (correct)"];
-}
-```
-
 ## Step-by-Step
 
 ### 1. Gather Purpose and Source Branch
@@ -115,11 +82,27 @@ Do NOT proceed to create the branch until the user explicitly confirms.
 
 If the user chooses **Skip**, stop the branch creation process entirely and let them manage branching on their own. Continue with whatever task triggered the branch creation.
 
-### 6. Fetch and Create from Local Ref
+### 6. Check Working Tree, Then Fetch and Create from Local Ref
 
 **CRITICAL: Never branch from `origin/` refs. Always branch from a local branch.**
 
 Branching from a local ref does not inherit any upstream, so there is nothing to fix afterward.
+
+First, check the working tree:
+
+```bash
+git status --porcelain
+```
+
+**Dirty tree (output non-empty):** SKIP `git fetch` / `git checkout {source-branch}` / `git pull`. Create the branch directly from the current HEAD — the uncommitted work moves onto the new branch:
+
+```bash
+git checkout -b {branch-name}
+```
+
+Tell the user the branch was cut from the current HEAD because the tree holds uncommitted changes.
+
+**Clean tree (output empty):** keep the existing sequence:
 
 ```bash
 # Fetch latest from remote
@@ -177,6 +160,10 @@ After branch creation, verify ALL of these:
 git fetch origin
 git checkout main && git pull        # Ensure local source is up to date
 git checkout -b feature/my-feature   # Branch from local ref — no upstream inherited
+
+# Dirty-tree variant: git status --porcelain non-empty -> skip fetch/checkout/pull
+git status --porcelain
+git checkout -b feature/my-feature   # Branch directly from current HEAD — uncommitted work moves with it
 
 # Verify no upstream was inherited
 git branch -vv

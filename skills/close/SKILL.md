@@ -9,16 +9,6 @@ description: '`/close` -- close a finished piece of Pandahrms work after every c
 
 Mutating close of a finished piece of work. Verifies every card is already in `done/`, updates the ticket status for ticket work, writes the dev-diary log, marks the work closed. Manual. Stops if any card is still in `active/`.
 
-## Pre-Flight: Optimise the prompt
-
-If `pandahrms:optimise-prompt` has not run on the current user message, invoke it via the Skill tool with no arguments. Wait for it to return, then continue with the confirmed intent.
-
-Skip when:
-- Standalone pre-flight already ran on this message and locked an intent. Reuse it.
-- Message is a direct reply to an AskUserQuestion the assistant just sent.
-- Message is a one-word ack ("yes", "ok", "no", "go", "continue").
-- optimise-prompt is already running in the call stack.
-
 ## Phase 1: VERIFY (gate)
 
 Read `work_folder` from the per-work `_overview.md` frontmatter -- single source of truth for the path. Scan `<work-folder>/active/` and `<work-folder>/done/`.

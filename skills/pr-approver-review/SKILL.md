@@ -1,6 +1,7 @@
 ---
 name: pr-approver-review
-description: '`/pr-approver-review <PR-number> [fast|deep]` -- senior-approver review of an ALREADY-OPENED GitHub PR by number -- form your own findings and approval gate first, then cross-check the `claude[bot]` review. For a numbered PR (optionally with related / cross-repo PRs), NOT working-tree or pre-commit diffs (those are `/code-review`). Reads code at the PR head commit, enforces Pandahrms project rules as real severity, scores an approval gate, and returns a verdict plus a distinct senior take. Read-only -- holds merge judgement, not merge authority; never commits, pushes, merges, or posts to the PR.'
+description: '`/pr-approver-review <PR-number> [fast|deep]` -- senior-approver review of an ALREADY-OPENED GitHub PR by number -- form your own findings and approval gate first, then cross-check the `claude[bot]` review. Reads code at the PR head commit, enforces Pandahrms project rules as real severity, scores an approval gate, and returns a verdict plus a distinct senior take. Read-only -- never commits, pushes, merges, or posts to the PR. NOT for working-tree or pre-commit diffs (those are `/code-review`).'
+model: opus
 ---
 
 # Pandahrms /pr-approver-review

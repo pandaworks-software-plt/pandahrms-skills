@@ -1,6 +1,6 @@
 ---
 name: status
-description: The read-only status step of the Pandahrms flow. Invoked by `/execute` when it finishes the LAST card in the per-work card folder (to present the completion conclusion), and manually as `/status` or an explicit request for THIS work's card status -- "status of the cards", "what's left in this work", "what's pending on these cards". Scans every card's status, reports the in-progress card's current sequence step, surfaces piled/deferred tasks, and concludes with a completion summary when all cards are done. Read-only -- changes nothing; a requested change becomes a NEW card via /slice. Does NOT auto-trigger on generic "where are we" chatter -- it is scoped to the per-work card folder.
+description: The read-only status step of the Pandahrms flow. Invoked as `/status`, by an explicit request for THIS work's card status -- "status of the cards", "what's left in this work", "what's pending on these cards" -- and by `/execute` when it finishes the LAST card. Scans every card's status, reports the in-progress card's current sequence step, surfaces piled/deferred tasks, and concludes with a completion summary when all cards are done. Read-only -- changes nothing. Does NOT auto-trigger on generic "where are we" chatter.
 ---
 
 # Status

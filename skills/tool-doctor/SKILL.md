@@ -1,6 +1,6 @@
 ---
 name: tool-doctor
-description: '`/tool-doctor` -- audit the work machine AND the current project for the deterministic code-quality guard tools used by the review flow (ripgrep, gitleaks, ast-grep, linters/analyzers, coverage, jscpd). Scans read-only first, prints a readiness table (guard -> tool -> machine status -> project status -> built-in fallback -> recommendation), then OFFERS, with per-item confirmation, to install missing machine tools and add missing project config. Never installs or edits anything without explicit confirmation; never runs `sudo` silently; never auto-edits the repo. External, once-per-project setup -- the dev runs it by hand to set up tools; it is NOT part of the card flow and no other skill invokes it.'
+description: '`/tool-doctor` -- audit the work machine AND the current project for the deterministic code-quality guard tools used by the review flow (ripgrep, gitleaks, ast-grep, linters/analyzers, coverage, jscpd). Scans read-only first, prints a readiness table (guard -> tool -> machine status -> project status -> built-in fallback -> recommendation), then OFFERS, with per-item confirmation, to install missing machine tools and add missing project config. Never installs or edits anything without explicit confirmation, and never runs `sudo` silently. NOT part of the card flow -- no other skill invokes it.'
 ---
 
 # Tool Doctor

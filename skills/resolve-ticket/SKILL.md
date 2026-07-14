@@ -1,6 +1,6 @@
 ---
 name: resolve-ticket
-description: Manually invoked as `/resolve-ticket <ticket_number>` (or by an explicit mention of "resolve-ticket" / "resolve this ticket") to move ONE workspace-prod ticket to a resolved, ready-for-release state -- card-less, no work folder, no card scan, no docspace log. Takes a single ticket reference (a UUID or a human number like T26050092), fetches it via the workspace-prod MCP `get_ticket` tool, then runs the ticket updates in order: dev status -> `ready-for-release` first (ensuring the ticket sits in `developer` with `needsDev=true` so dev status is editable), then status -> `resolved` with a plain customer-facing `solution`, then `resolutionNotes` (Developer Resolution, engineering detail), then a customer-facing resolved `comment`. Drafts every field from the session context, applies the relevance gate + plain-text rule + customer-facing tone rule, and STOPS for an explicit user confirmation before any write. Mutating -- it changes ticket state. Does NOT move cards, write logs, run git, or raise PRs. Does NOT auto-trigger -- pasting a ticket URL or saying "look at this ticket" is NOT enough; the user must invoke `/resolve-ticket` or name the skill.
+description: Manually invoked as `/resolve-ticket <ticket_number>` (or by an explicit mention of "resolve-ticket" / "resolve this ticket") to move ONE workspace-prod ticket (a UUID or a human number like T26050092) to a resolved, ready-for-release state -- card-less. Fetches it via the workspace-prod MCP `get_ticket` tool, then drafts and applies dev status, status + customer-facing solution, resolutionNotes (Developer Resolution), and a resolved comment, STOPPING for explicit user confirmation before any write. Does NOT auto-trigger -- pasting a ticket URL or saying "look at this ticket" is NOT enough.
 ---
 
 # Resolve Ticket
@@ -12,16 +12,6 @@ Card-less ticket resolution. Take one ticket ref, move the workspace-prod ticket
 ## Input
 
 Single argument: ticket reference. Accepts a UUID or a human ticket number (e.g. `T26050092`). Missing -> ask via AskUserQuestion. `get_ticket` resolves both forms.
-
-## Pre-Flight: Optimise the prompt
-
-If `pandahrms:optimise-prompt` has not run on the current user message, invoke it via the Skill tool with no arguments. Wait for it to return, then continue with the confirmed intent.
-
-Skip when:
-- Standalone pre-flight already ran on this message and locked an intent. Reuse it.
-- Message is a direct reply to an AskUserQuestion the assistant just sent.
-- Message is a one-word ack ("yes", "ok", "no", "go", "continue").
-- optimise-prompt is already running in the call stack.
 
 ## Phase 1: Fetch
 

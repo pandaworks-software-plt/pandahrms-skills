@@ -1,6 +1,6 @@
 ---
 name: discover-ticket
-description: The ticket intake door of the Pandahrms flow. `/discover-ticket <ticket-ref>`. Takes a single ticket reference -- a UUID or a human ticket number like T26050092. Fetches the ticket via the workspace-prod MCP `get_ticket` tool, reads its description sections and existing `typeSpecificData.acceptanceCriteria`, validates and fills gaps in that acceptance criteria (never generates it from scratch), and emits the same converged output contract as `/discover` (objective/root-cause + plain-statement acceptance criteria + module), with the Source field carrying ticketNumber, customer, and affected sys version. Writes to a per-ticket card folder `<TICKET>-<slug>/_overview.md` inside the current repo (never outside the repo root).
+description: The ticket intake door of the Pandahrms flow. `/discover-ticket <ticket-ref>` -- a single ticket reference, a UUID or a human ticket number like T26050092. Fetches the ticket via the workspace-prod MCP `get_ticket` tool, validates and fills gaps in its existing acceptance criteria (never generates it from scratch), and emits the same converged output contract as `/discover` (objective/root-cause + plain-statement acceptance criteria + module) into a per-ticket card folder `<TICKET>-<slug>/_overview.md` inside the current repo. Does NOT write outside the repo root.
 ---
 
 # Discover (ticket door)

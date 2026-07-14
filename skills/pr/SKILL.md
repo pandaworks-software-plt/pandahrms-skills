@@ -1,6 +1,6 @@
 ---
 name: pr
-description: 'Triggers on requests to raise the PR for finished work -- `/pr`, "raise a PR", "raise the pr", "open the PR". Raises the single PR for a piece of work once every card is done. There are no per-card PRs -- this is the one PR for the whole branch. Determines the branch first -- if the current branch is protected, asks the user how to branch and creates it before committing -- then runs `/commit` (clean-tree gate + atomic commits), then raises the PR. Cross-repo work raises linked PRs that cross-link each other. The PR body includes the ticket number / ticket URL when the work came from a ticket. Never auto-creates a branch.'
+description: 'Triggers on requests to raise the PR for finished work -- `/pr`, "raise a PR", "raise the pr", "open the PR". Raises the single PR for the whole branch once every card is done -- determines the branch first (asking the user how to branch when the current one is protected), runs `/commit` (clean-tree gate + atomic commits), then raises the PR, with the ticket number / ticket URL in the body and linked PRs for cross-repo work. Never auto-creates a branch. There are no per-card PRs.'
 ---
 
 # Pandahrms /pr
