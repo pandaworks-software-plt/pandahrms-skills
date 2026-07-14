@@ -1,6 +1,6 @@
 ---
 name: execute
-description: 'Triggers on requests to run a work card -- `/execute card-NN`, "start card 01", "run the next card", "execute card", "do the next card". `/execute card-NN` runs that specific card''s ordered sequence, or bare `/execute` runs the next available card (lowest-order active card not done). A guided run with stop-gates -- mechanical work auto-runs between gates; stops after each layer''s code review and before deploy. Detects project architecture to include or skip the deploy + FE-regen bridge. Spec-first TDD with RED/GREEN/VERIFICATION markers, inlined SOLID + DDD. Orchestrates single-responsibility skills: per layer it runs scoped feature tests then invokes `/lint-gate` (deterministic guards) and `/code-review` (LLM judgment, fed the lint-gate result); at card pre-complete it invokes `/verify` ONCE on the final tree (full build + full test + coverage) and requires `VERIFY RESULT: PASS`. Does NOT commit per card and does NOT raise per-card PRs -- each card''s changes accumulate uncommitted in the working tree; the whole branch is committed and ONE PR raised at the end via `/commit` or `/pr` once every card is done. Moves the finished card to done and appends a Closed block. Append `--blast-mode` to run every available card back to back with no stop-gates: the agent resolves each decision point on its own and records it as a `DECISION` line, `/commit` and `/pr` are prohibited (deploy + FE regen still run), a card that cannot pass is marked BLOCKED and the run continues unless the block also blocks the remaining cards, and the run ends with a wrap-up of cards done, cards blocked, and every autonomous decision saved to the work `_overview.md` and printed to chat.'
+description: 'Triggers on requests to run a work card -- `/execute card-NN`, "start card 01", "run the next card", "execute card", "do the next card". Runs that card''s ordered sequence (or the next available card when bare) as a guided, spec-first TDD run with stop-gates, invoking `/lint-gate` and `/code-review` per layer and `/verify` at card pre-complete, then moves the card to done; `--blast-mode` runs every available card back to back with no stop-gates. Does NOT commit per card and does NOT raise per-card PRs -- the whole branch is committed and ONE PR raised at the end via `/commit` or `/pr`.'
 ---
 
 # Pandahrms Execute
@@ -53,7 +53,7 @@ HARD STOPS stay mandatory even under `--approve` -- never auto-proceed past:
 - any `/security-review` finding,
 - any major `/code-review` finding the review skill could not auto-fix.
 
-Flag forwarding: pass `--approve` narrowly to the leaf review (`/code-review --no-commit --approve`). Do NOT let it widen `/code-review`'s auto-apply beyond that skill's documented per-phase defaults.
+Mode forwarding: under `--approve`, invoke the leaf review as `/code-review autonomous`. Do NOT widen its auto-apply beyond that skill's documented per-mode behavior.
 
 Announce the auto-pick on one line at each auto-proceeded gate (e.g. `--approve: proceeding past code review`).
 
@@ -65,7 +65,13 @@ Announce the auto-pick on one line at each auto-proceeded gate (e.g. `--approve:
 
 **Decision points instead of stop-gates.** The normal hard stops -- scoped/full test failure, `/verify` FAIL, card/spec conflict, `/security-review` finding, major `/code-review` finding -- do NOT pause the run. At each:
 
-- Resolve it autonomously when safe (apply the fix, take the spec-backed reading). Announce one line `DECISION -- <point>: <choice> (<reason>)` and append the same to the card's Progress.
+- Resolve it autonomously ONLY when it falls in this CLOSED list. Where a `DECISION` line is required, announce one line `DECISION -- <point>: <choice> (<reason>)` and append the same to the card's Progress.
+  - (a) A scoped test's assertion contradicts the card's referenced spec scenario -> fix the test to match the spec. DECISION line required.
+  - (b) Infrastructure flake (network, port, container startup) -> retry once; a second failure -> BLOCKED.
+  - (c) Mechanical lint/format finding -> apply the mechanical fix. DECISION line required.
+  - (d) Anything touching auth, tenant boundary, money, schema/migration, or PII -> BLOCKED. Never auto-resolve.
+  - (e) Card/spec conflict -> BLOCKED.
+  - Default: a decision point not on this list -> BLOCKED. Never invent a new safe class mid-run.
 - When it cannot be safely resolved (a card that will not reach `/verify` PASS after fix attempts, an irreconcilable card/spec conflict), mark the card BLOCKED: leave it in `active/`, append a `BLOCKED -- <reason>` Progress entry, move to the next available card.
 
 Never fake a pass, never commit broken code, never silently absorb a block. Every `DECISION` and every `BLOCKED` is recorded and surfaced in the wrap-up.
@@ -74,7 +80,7 @@ Never fake a pass, never commit broken code, never silently absorb a block. Ever
 
 **Card done in blast mode** = all work + `/verify` PASS, same as a normal run (no commit in either mode). Move the done card `active/` -> `done/` and append a `## Closed: <date>` block.
 
-**Diff scope.** With no commits between cards the working-tree diff accumulates. Scope each card's `/lint-gate` and `/code-review` to the files THAT card touched, not the whole accumulated diff. `/verify` stays project-scoped.
+**Diff scope.** With no commits between cards the working-tree diff accumulates. Scope each card's `/lint-gate` and `/code-review` to that card's `## Manifest` list (see Card file manifest), not the whole accumulated diff. `/verify` stays project-scoped.
 
 **Wrap-up (always, at the end).** Append a dated `## Blast run <date>` section to the work `_overview.md` AND print it to chat. Include:
 
@@ -88,8 +94,8 @@ Never fake a pass, never commit broken code, never silently absorb a block. Ever
 
 Run these inline as leaf actions, NOT a skill chain. `/execute` drives the whole slice and composes the leaf skills.
 
-- Lint gate = invoke `/lint-gate` over the layer's `git diff` (deterministic guards: linter, Tool Gate, structural tier, L1->L2 traceability). It returns `### Findings` (`[tool:<name>]` tags) + a verbatim `OWNED: <categories>` line. `/execute` invokes it; `/code-review` does NOT auto-invoke it.
-- Code review = invoke `/code-review --no-commit`, passing the `/lint-gate` result (the `OWNED:` line + `[tool:*]` findings) so code-review drops the OWNED judgment rows. LLM judgment only (review + fixes; the flag skips its commit phase). On a sensitive card, invoke `/code-review --no-commit --security-deferred` so its shallow Phase-2 security trims to a deferral note (the deep pass below covers it). `/execute` is the SINGLE owner of `/security-review`: run `/security-review --no-commit` ONCE when the card's sensitivity tag is set. `/code-review --no-commit` defers the deep security pass to its caller, so it runs exactly once per sensitive card (no double invocation, no double scan). The review skills never commit, and `/execute` does not commit per card -- the branch is committed at the end via `/commit` or `/pr`.
+- Lint gate = invoke `/lint-gate` over the layer's `git diff` (deterministic guards: linter, Tool Gate, structural tier, L1->L2 traceability). It returns `### Findings` (`[tool:<name>]` tags) + a verbatim `OWNED: <categories>` line. `/execute` invokes it; `/code-review` does NOT auto-invoke it. `/lint-gate` ALSO writes that same report to `<work-folder>/.lint-gate-result.md`. Pass THAT PATH to `/code-review` as the lint-gate result -- never relay the report by prose.
+- Code review = invoke `/code-review orchestrated` (or `/code-review autonomous` under `--approve` / blast), passing the `<work-folder>/.lint-gate-result.md` path as the lint-gate result so code-review skips the OWNED checks. LLM judgment only (review + fixes; orchestrated and autonomous skip its commit phase). Orchestrated mode defers the security section to its caller: `/execute` is the SINGLE owner of `/security-review` -- run `/security-review --no-commit` ONCE when the card's sensitivity tag is set, so the deep pass runs exactly once per sensitive card (no double invocation, no double scan). The review skills never commit, and `/execute` does not commit per card -- the branch is committed at the end via `/commit` or `/pr`.
 - Deploy = deploy BE to local Docker.
 - Regen = regenerate FE API types from the deployed swagger (openapi).
 
@@ -101,11 +107,12 @@ BE before FE inside the card. Finish BE → deploy BE to local Docker so swagger
 
 ## Pre-complete verify
 
-Invoke `/verify` ONCE per card, placed LAST -- after every layer's `/code-review --no-commit` (+ `/simplify`) edits have landed, on the final tree, as the last step of the card. This is the card pre-complete stage (see Check scope). `/verify` is the single project-scoped runner: full whole-graph build + full test suite + changed-file coverage existence gate. A `VERIFY RESULT: PASS` completes the card.
+Invoke `/verify` ONCE per card, placed LAST -- after every layer's `/code-review` (+ `/simplify`) edits have landed, on the final tree, as the last step of the card. This is the card pre-complete stage (see Check scope). `/verify` is the single project-scoped runner: full whole-graph build + full test suite + changed-file coverage existence gate. A `VERIFY RESULT: PASS` completes the card.
 
 - During work, only feature-scoped tests ran (see TDD per layer). Neither the full suite nor a full build has run yet on the final code -- `/verify` covers both now.
 - Require `VERIFY RESULT: PASS`. On `VERIFY RESULT: FAIL`, STOP and surface the verbatim failing build/test output; the card is not done. Coverage `uncovered:` is advisory -- it does not flip PASS/FAIL.
-- If ANY edit lands after this `/verify` PASS (a fix, a simplify pass), the PASS is void -> re-invoke `/verify` and require PASS again before the card is marked done.
+- `/verify` ALSO writes its result to `<work-folder>/.verify-result.json`. The card is done ONLY when that file shows `"result": "PASS"` AND its `tree_hash` matches the freshly computed hash of `{ git diff; git diff --cached; git status --porcelain; } | shasum -a 256 | cut -d' ' -f1`.
+- If ANY edit lands after this `/verify` PASS (a fix, a simplify pass), the PASS is void -> re-invoke `/verify` and require PASS again before the card is marked done. Mechanical check: recompute the `tree_hash` command above and compare it with the `tree_hash` in `.verify-result.json` -- a mismatch means the PASS is void, so re-run `/verify`.
 - Cross-repo card: run `/verify` in EACH touched repo, require PASS in both.
 
 ## End of card (no commit)
@@ -123,10 +130,10 @@ The DEPLOY BE step runs from the working tree (local Docker) and needs no commit
 
 Per-layer checks during work target ONLY the `git diff` changed files. The project-scoped passes run ONCE at the card pre-complete stage (Pre-complete verify), not per layer.
 
-- During layer work (diff-scoped): feature-scoped tests, `/lint-gate` (changed-file linter + guards), `/code-review --no-commit` (diff-only LLM judgment).
+- During layer work (diff-scoped): feature-scoped tests, `/lint-gate` (changed-file linter + guards), `/code-review orchestrated` (diff-only LLM judgment).
 - Card pre-complete stage (project-scoped, once): `/verify` (full test suite + full build/type-check + coverage).
 
-No commit runs between cards -- the working-tree diff accumulates across cards. Scope each card's per-layer `/lint-gate` and `/code-review` to the files THAT card touched, not the whole accumulated diff. `/verify` stays project-scoped.
+No commit runs between cards -- the working-tree diff accumulates across cards. Scope each card's per-layer `/lint-gate` and `/code-review` to that card's `## Manifest` list (see Card file manifest), not the whole accumulated diff. `/verify` stays project-scoped.
 
 Build/type-check is never a per-layer diff check -- it is inherently whole-graph (a changed shared type can break an unchanged consumer outside the diff), so it runs full, once, at pre-complete inside `/verify`.
 
@@ -178,6 +185,16 @@ The card carries its ordered sequence as a checklist.
 - A card is DONE when every checklist step is ticked and `/verify` returns `VERIFY RESULT: PASS`. No commit step -- changes stay in the working tree.
 - `/execute` OWNS the card move. The moment the card is done, move it `<work-folder>/active/` → `<work-folder>/done/` and APPEND a `## Closed: <date>` block at the END of the card file (append, never prepend). `/close` does NOT move cards.
 - When that move leaves `<work-folder>/active/` empty (the last card is done), INVOKE `/status` as a leaf action to present the completion conclusion.
+
+## Card file manifest
+
+The card's touched set is mechanical -- it is the card's `## Manifest` list, never a judgment call.
+
+- At card START, run `git status --porcelain` and write the resulting file list into the card under a `## Manifest (start)` heading. That is the pre-existing dirty tree, not this card's work.
+- After EVERY Edit/Write this card performs, append that file's repo-relative path to the card's `## Manifest` list. Dedupe -- each path appears once.
+- The card's touched set = the `## Manifest` list.
+- At card END, cross-check: every file in (`git status --porcelain` now MINUS `## Manifest (start)`) must appear in `## Manifest`. Add any missing path to `## Manifest` with a note that the end cross-check found it.
+- Scope this card's `/lint-gate` and `/code-review` to the `## Manifest` list. `/verify` stays project-scoped.
 
 ## Handoff
 
