@@ -1,7 +1,7 @@
 {
   "name": "pandahrms",
   "description": "Pandahrms skills for Claude Code: a manual, standalone work flow -- /discover, /discover-ticket, and /discover-project intake, /spec (layered Gherkin behaviour spec), /slice (work cards), /execute (guided card run with TDD and stop-gates), /status, /close (which invokes /resolve-ticket for ticket work), /resolve-ticket (card-less ticket resolution), /pr -- plus a decomposed review/verify/commit family split by scope and job: /lint-gate (diff-scoped deterministic guard runner -- linter, scans, analyzers, L1->L2 traceability), /verify (project-scoped runner -- full build + full test + coverage, the single source /commit and /execute invoke), /code-review (diff-scoped LLM judgment), /pr-approver-review (senior-approver review of an already-opened GitHub PR by number, cross-checking claude[bot]), /security-review, /simplify, and /commit (branch-scope commit gate invoking /verify, raising one commit pass + one PR at the end of work) -- plus safe branching, EF Core migrations, handoff-compact, tool-doctor, and the optimise-prompt pre-flight repeat-back",
-  "version": "4.11.1",
+  "version": "4.11.2",
   "author": { "name": "Pandaworks" },
   "license": "UNLICENSED",
   "keywords": ["pandahrms", "skills", "gherkin", "specs", "discover", "spec", "slice", "execute", "lint-gate", "verify", "review", "pr-approver-review", "security", "commit", "branching", "close", "resolve-ticket"]
