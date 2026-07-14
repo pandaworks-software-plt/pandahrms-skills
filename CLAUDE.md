@@ -12,8 +12,8 @@ The plugin is a set of manual, standalone skills. There is no orchestrator -- th
 pandahrms-skills/
 ├── .claude-plugin/plugin.json   # Plugin metadata and version
 ├── skills/                      # Claude Code skills (SKILL.md files)
-│   │  # Pre-flight (runs first on every user turn -- repeat-back / intent lock)
-│   ├── optimise-prompt/               # Rephrase user request in B1-English (keep technical terms) each turn so the user can confirm Claude read it right
+│   │  # Pre-flight (manual; the per-turn repeat-back / intent lock lives in hooks/execution-rules.md, reminded by the UserPromptSubmit hook)
+│   ├── optimise-prompt/               # Manual-only rephrase: restate the user's request in B1-English (keep technical terms) on demand
 │   │  # Flow skills (manual, standalone; run in order, no orchestrator)
 │   ├── discover/                      # Free-form intake door: a new feature / enhancement / bug -> objective + acceptance criteria
 │   ├── discover-ticket/               # Ticket intake door (workspace-prod MCP) -> same output contract as /discover
@@ -23,13 +23,13 @@ pandahrms-skills/
 │   ├── execute/                       # Run one card: guided run with stop-gates, spec-first TDD, inline review/deploy/regen
 │   ├── execute-sonnet/                # Same as /execute but pinned to Sonnet (frontmatter model: sonnet); invoked as /pandahrms:execute-sonnet. --blast-mode spawns a dynamic Workflow that queues cards as sequential flow items, each card a Sonnet-pinned subagent
 │   ├── status/                        # Read-only summary: auto-fires when /execute finishes the last card, also a manual status report
-│   ├── close/                         # Mutating close: re-check, invoke /resolve-ticket for ticket work, write log, tidy cards
+│   ├── close/                         # Mutating close: verify all cards done, invoke /resolve-ticket for ticket work, write log, mark the work closed (does not move cards)
 │   ├── resolve-ticket/                # Card-less ticket resolution: one ticket ref -> dev status ready-for-release + status resolved + solution/resolutionNotes/comment (confirm before mutate)
 │   ├── pr/                            # Optional final PR: runs /commit first, then raises the PR (ticket ref in body)
 │   │  # Quality skills (leaf actions inside /execute; also standalone)
-│   ├── lint-gate/                     # Diff-scoped deterministic guard runner: linter + Tool Gate scans + analyzer/dup + L1->L2 traceability (no LLM judgment)
-│   ├── verify/                        # Project-scoped runner: full build + full test + coverage; the single source /commit + /execute invoke
-│   ├── code-review/                   # Diff-scoped LLM-judgment only (consumes a /lint-gate result), fix issues, /simplify (no commits)
+│   ├── lint-gate/                     # Diff-scoped deterministic guard runner: linter + Tool Gate scans + analyzer/dup + L1->L2 traceability (no LLM judgment); writes <work-folder>/.lint-gate-result.md
+│   ├── verify/                        # Project-scoped runner: full build + full test + coverage; the single source /commit + /execute invoke; writes <work-folder>/.verify-result.json
+│   ├── code-review/                   # Diff-scoped LLM judgment in 3 modes (standalone | orchestrated | autonomous); consumes the .lint-gate-result.md path, fixes issues, runs /simplify (no commits)
 │   ├── security-review/               # Security review (OWASP + Pandahrms-specific), no commits
 │   ├── simplify/                      # 3-agent parallel reuse/quality/efficiency pass on working-tree changes (no commits)
 │   ├── commit/                        # Branch-scope commit gate: invokes /verify, plan and execute atomic commits (one commit pass at end of work)
