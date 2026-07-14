@@ -1,6 +1,6 @@
 ---
 name: lint-gate
-description: Manually invoked as `/lint-gate` (or by an explicit "run the lint gate" / "deterministic guard pass on my changes" mention). A standalone, diff-scoped DETERMINISTIC guard runner over the working-tree changes -- no LLM judgment. Runs the project linter scoped to changed files, then a Tool Gate (TODO/FIXME/XXX, secrets, leftover-debug, repo-conventions), an OPTIONAL structural analyzer/dup tier (god-class, long-switch complexity, new-of-service, empty-catch, exact duplication), and an L1->L2 `.feature` traceability check (each card-claimed L1 scenario must have an L2 scenario by EXACT name). Each guard detects its tool, uses it if present, and falls back to a built-in when absent. Emits structured findings tagged `[tool:<name>]` and returns the set of OWNED categories so a caller can drop those judgment rows. Does NOT auto-trigger -- only on the `/lint-gate` slash command or an explicit mention; a pending diff alone is not enough. Does NOT commit, stage, push, run tests, or apply fixes.
+description: Manually invoked as `/lint-gate` (or by an explicit "run the lint gate" / "deterministic guard pass on my changes" mention). A diff-scoped DETERMINISTIC guard runner over the working-tree changes -- project linter on changed files, a Tool Gate (TODO/FIXME/XXX, secrets, leftover-debug, repo-conventions), an OPTIONAL structural analyzer/dup tier, and an L1->L2 `.feature` traceability check -- emitting findings tagged `[tool:<name>]` plus the set of OWNED categories. Does NOT auto-trigger (a pending diff alone is not enough), and does NOT commit, stage, push, run tests, or apply fixes.
 ---
 
 # Lint Gate
@@ -93,7 +93,7 @@ Lower-priority tier. Where a tool is present it OWNS the mechanical DETECTION of
 
 | Smell | Tool (mechanical detection) | Owned category |
 |-------|-----------------------------|----------------|
-| God class / giant class | `wc -l` line-count rule (flag 100+ lines of logic) or an analyzer | `god-class` |
+| God class / giant class | `wc -l` size rule -- flag ONLY when the FILE is >= 300 lines, OR the diff ADDED >= 100 lines to that file (`git diff --numstat` added column) -- or an analyzer | `god-class` |
 | Long switch / high cyclomatic chain | `complexity` / cyclomatic analyzer | `long-switch` |
 | `new` of a service / service-locator lookup | `ast-grep` rule | `new-of-service` |
 | Empty / swallowing catch | `no-empty-catch` lint or `ast-grep` rule | `empty-catch` |
@@ -176,6 +176,16 @@ One line per guard: which path ran and any `/tool-doctor` gap:
 - `Repo-conventions: checked | no CLAUDE.md`
 - `God-class / Long-switch / New-of-service / Empty-catch / Exact-dup: <tool> | LLM fallback`
 - `Traceability: <covered N / uncovered N / pending N>`
+
+## Result file
+
+After emitting the chat report, ALSO write the full report -- `### Findings` + the `OWNED:` line + `### Guard summary`, verbatim -- to `<work-folder>/.lint-gate-result.md`.
+
+- Work folder = the `work_folder` value read from the per-work `_overview.md`.
+- When no work folder is known: skip the file and add one line to the report -- `result file: skipped (no work folder)`.
+- The chat report still stands; the file is IN ADDITION to it, never a replacement.
+
+Consumer rule: callers pass this file's path to `/code-review` instead of relaying the report by prose.
 
 ## Rules
 

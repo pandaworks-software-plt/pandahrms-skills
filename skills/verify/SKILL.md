@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Manually invoked as `/verify` (or by an explicit mention of "verify" / "run verify"). The single canonical project-scoped deterministic runner for a Pandahrms repo -- full whole-graph build / type-check + full test suite + changed-file coverage existence gate -- emitting one structured PASS/FAIL result with per-stage status (build, tests, coverage). Whole-codebase, never diff-scoped; coverage rides the test run. The one source of build/test detection that other skills invoke instead of inlining commands. Does NOT auto-trigger -- only on the `/verify` slash command or an explicit "verify"/"run verify" request; a finished card or a request to commit alone is not enough. Does NOT run git, commit, push, or edit files.
+description: Manually invoked as `/verify` (or by an explicit mention of "verify" / "run verify"). The single canonical project-scoped deterministic runner for a Pandahrms repo -- full whole-graph build / type-check + full test suite + changed-file coverage existence gate -- emitting one structured PASS/FAIL result with per-stage status (build, tests, coverage). Whole-codebase, never diff-scoped. Does NOT auto-trigger -- a finished card or a request to commit alone is not enough -- and does NOT run git, commit, push, or edit files.
 ---
 
 # Verify
@@ -38,7 +38,7 @@ JS/TS detection precedence (first match wins):
 
 .NET:
 
-- `dotnet build --no-restore` on the solution/project.
+- `dotnet build` on the solution/project (implicit restore).
 
 Pass condition: 0 build errors. Warnings (chunk-size, deprecated-API notices) do not fail the stage.
 
@@ -55,6 +55,8 @@ JS/TS detection precedence (first match wins):
 1. `package.json` has a `test` script -> `pnpm test`.
 2. Detect framework directly: `vitest` -> `pnpm vitest run`; `jest` -> `pnpm jest`. Playwright in this codebase means the Playwright MCP browser tools, NOT a CLI runner -- do NOT invoke `pnpm playwright test`.
 3. No tests detected -> stage records `not-configured`.
+
+Tests-exist tripwire: when test files exist on disk (any of `**/*.test.*`, `**/*.spec.*`, `**/*Tests.csproj`, `**/*.Tests.csproj`) and no runner was detected, the stage records `failed (tests exist but no runner detected)` and the overall result is `FAIL`.
 
 .NET:
 
@@ -99,6 +101,29 @@ Overall `PASS` <-> build is not `failed` AND tests have 0 failures. Build `not-c
 
 Below the block, when a stage `failed` or tests failed, include the captured verbatim error output / failing test names so the caller can act. When coverage fell back to the LLM with no tool, include the `/tool-doctor` gap note.
 
+## Result file
+
+After emitting the chat result block, ALSO write the same result to `<work-folder>/.verify-result.json` when a work folder is known (read `work_folder` from the per-work `_overview.md`). When no work folder exists, skip the file write and add one line under the chat block:
+
+```
+result file: skipped (no work folder)
+```
+
+JSON shape (exact keys):
+
+```json
+{
+  "result": "PASS|FAIL",
+  "build": "<stage status>",
+  "tests": "<stage status>",
+  "coverage": "<stage status>",
+  "timestamp": "<output of: date -u +%Y-%m-%dT%H:%M:%SZ>",
+  "tree_hash": "<output of: { git diff; git diff --cached; git status --porcelain; } | shasum -a 256 | cut -d' ' -f1>"
+}
+```
+
+Consumer rule: "A PASS in this file is valid for a caller ONLY while `tree_hash` matches the caller's freshly computed hash of the same command. A changed tree voids the PASS."
+
 ## Failure handling
 
 - Tool missing (command not found, exit 127): mark that single stage `not-configured`, note the missing tool name in the result, and continue the other stages. Do not invent a substitute command.
@@ -114,4 +139,5 @@ Below the block, when a stage `failed` or tests failed, include the captured ver
 | "A changed file has no test -- I'll fail the result" | Uncovered files are advisory; they do not flip overall PASS/FAIL. Surface the list. |
 | "I'll edit the test so the suite passes" | This runner never mutates the tree. Report the failure verbatim. |
 | "No build script, but I'll guess a command" | No recognized script -> record `not-configured`. Never invent commands. |
+| "No test script found, so I'll pass the stage" | Test files on disk with no detected runner = `failed` stage, not `not-configured`. |
 | "Type-check passed, so the build is clean" | `type-check` is a weaker fallback -- tag it `clean (partial: type-check only)`. |
