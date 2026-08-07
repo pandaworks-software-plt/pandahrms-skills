@@ -79,7 +79,7 @@ Each skill is manual and standalone -- you run each step. There is no orchestrat
    -> /pr          final PR for the whole work, once every card is done (runs /commit first)
 ```
 
-The always-on execution rules (TDD markers, gates, sensitivity list, output discipline, the per-turn repeat-back) ship via the plugin's SessionStart hook (`hooks/execution-rules.md`), with a slim UserPromptSubmit reminder each turn -- no per-member setup.
+The always-on execution rules (TDD markers, gates, sensitivity list, output discipline) ship via the plugin's SessionStart hook (`hooks/execution-rules.md`) -- no per-member setup.
 
 ## License
 

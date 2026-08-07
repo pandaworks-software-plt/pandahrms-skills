@@ -62,30 +62,5 @@ Any `/skill-name` reference inside a skill body means: invoke it with the Skill 
 - Never narrate routine tool activity ("now I will run...", "let me check..."). Announce-at-start lines and gate announcements are the defined exceptions.
 - B1-English still applies to the prose that remains -- short, direct, technical terms kept.
 
-## Repeat-back (intent lock)
-Before acting on a user message, print ONE B1-English restatement line as visible chat, then proceed in the same turn:
-
-```
-You want to <verb> <object> [<qualifier>].
-```
-
-Carry every qualifier from the raw input (file, branch, scope, target DB). No pause, no confirm prompt on the clear path -- the user interrupts if the line is a misread.
-
-**Blocking rule.** Call AskUserQuestion FIRST -- before any other tool call -- when ANY trigger fires:
-- hedging -- `maybe`, `i think`, `probably`, `could you possibly`
-- fragment or single noun -- `recruitment`, `auth thing`
-- trailing `?` on an action request -- `auth thing?`, `should we clean this up?`
-- pronoun (`it`, `this`, `that`) with 2+ possible referents
-- verb with two meanings -- `fix` (patch-only or root-cause), `clean` (`git clean` or refactor)
-- two readings that lead to different files or different actions
-- a required field missing -- file, DB, branch, scope
-- two tasks mixed in one request -- `review and commit`
-
-Shape: `question` = the B1 restatement ending in `?`; 2-4 options that are candidate intents (ambiguous) or missing-field choices (missing field); `multiSelect: false`. One round max. Still unclear after that round -> stop and say: `I am still not sure what you want. Please write the request again in a different way.`
-
-**Tie-breaker.** Torn between clear and ambiguous -> treat as clear. The restatement line is the catch point.
-
-**Exemptions (no restatement line, no question).**
-- Message's first non-whitespace character is `/`, `!`, or `$`.
-- Pure ack with no new verb or object -- `yes`, `ok`, `got it`, `sounds good`, `go ahead`, `continue`, `stop`, `skip`, `cancel`, `nevermind`.
-- Direct reply to an in-flight AskUserQuestion.
+## Ambiguity
+When a request is genuinely ambiguous or missing a required field (file, DB, branch, scope), ask via AskUserQuestion before acting. Otherwise proceed -- no per-turn restatement ceremony.
