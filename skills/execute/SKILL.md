@@ -204,25 +204,6 @@ The card ends on `/verify` PASS, uncommitted. When every card is done, commit th
 
 Never silently absorb a problem or a mid-run user correction. Surface it; record what was wrong AND the corrected behavior. On a card/spec conflict, STOP and report -- don't work around it.
 
-## Red Flags
-
-| Thought | Reality |
-|---------|---------|
-| "I'll dispatch subagents for the card's steps" | Run natively in the current context -- no subagent dispatch, no batches. |
-| "I'll auto-run straight through deploy" | STOP after each layer's code review and before deploy. |
-| "Monolith, but I'll deploy + regen anyway" | Skip deploy + regen for monolith / MVC5 / monorepo. Run only for separate BE-API + FE-SPA. |
-| "I'll write code, then add the test" | Write the L2 `.feature` (RED) first; no production code before a failing test. |
-| "This EF mapping has a HasConversion doing real work -- still just a mapping" | Real logic needs a real test. VERIFICATION is mechanical-only. |
-| "I'll new up the repository inside the domain service" | Inject it. DIP -- domain depends on abstractions. |
-| "Card and spec disagree -- I'll pick the card" | STOP and report the conflict. |
-| "I'll hand-edit the generated types to start FE early" | Deploy BE, regen from live swagger, then FE work. |
-| "The review skill will commit after its pass" | Review skills are review + fixes only. `/execute` does not commit per card -- the branch is committed at the end via `/commit` or `/pr`. |
-| "I'll commit this card now that it's done" | No per-card commit in any mode. The card ends on `/verify` PASS; the whole branch is committed once at the end via `/commit` or `/pr`. |
-| "`/close` will move the finished card" | `/execute` owns the card move + `## Closed:` append. `/close` does not move cards. |
-| "Blast mode -- I'll commit each card as I go" | No per-card commit in any mode. Blast mode additionally bars `/commit` and `/pr`; all changes stay uncommitted. |
-| "A card won't pass -- I'll stop the whole blast run" | Mark it BLOCKED, continue the next card. End the run only when the blocker also blocks the remaining cards. |
-| "Card/spec conflict in blast mode -- I'll quietly pick a side" | Record every autonomous call as `DECISION --`; BLOCK on an irreconcilable conflict. Nothing silent. |
-
 ## Next step
 
 End by telling the user their next skill: if active cards remain, run `/execute` for the next card; when the last card finishes, `/execute` invokes `/status` itself to present the conclusion.
