@@ -1,6 +1,6 @@
 # pandahrms-skills
 
-**Version:** 4.12.0
+**Version:** 4.13.0
 
 Pandahrms-specific skills plugin for Claude Code.
 
