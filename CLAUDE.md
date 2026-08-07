@@ -12,8 +12,6 @@ The plugin is a set of manual, standalone skills. There is no orchestrator -- th
 pandahrms-skills/
 ├── .claude-plugin/plugin.json   # Plugin metadata and version
 ├── skills/                      # Claude Code skills (SKILL.md files)
-│   │  # Pre-flight (manual; the per-turn repeat-back / intent lock lives in hooks/execution-rules.md, reminded by the UserPromptSubmit hook)
-│   ├── optimise-prompt/               # Manual-only rephrase: restate the user's request in B1-English (keep technical terms) on demand
 │   │  # Flow skills (manual, standalone; run in order, no orchestrator)
 │   ├── discover/                      # Free-form intake door: a new feature / enhancement / bug -> objective + acceptance criteria
 │   ├── discover-ticket/               # Ticket intake door (workspace-prod MCP) -> same output contract as /discover
@@ -21,7 +19,6 @@ pandahrms-skills/
 │   ├── spec/                          # Write/update the L1 behaviour Gherkin spec in pandahrms-spec (conditional on behaviour change)
 │   ├── slice/                         # Cut agreed work into independently-completable cards (each holds its L2 spec files + an ordered work sequence)
 │   ├── execute/                       # Run one card: guided run with stop-gates, spec-first TDD, inline review/deploy/regen
-│   ├── execute-sonnet/                # Same as /execute but pinned to Sonnet (frontmatter model: sonnet); invoked as /pandahrms:execute-sonnet. --blast-mode spawns a dynamic Workflow that queues cards as sequential flow items, each card a Sonnet-pinned subagent
 │   ├── status/                        # Read-only summary: auto-fires when /execute finishes the last card, also a manual status report
 │   ├── close/                         # Mutating close: verify all cards done, invoke /resolve-ticket for ticket work, write log, mark the work closed (does not move cards)
 │   ├── resolve-ticket/                # Card-less ticket resolution: one ticket ref -> dev status ready-for-release + status resolved + solution/resolutionNotes/comment (confirm before mutate)
@@ -37,7 +34,6 @@ pandahrms-skills/
 │   ├── pr-approver-review/            # Senior-approver review of an already-opened GitHub PR by number: own findings + gate first, then cross-check claude[bot]
 │   ├── branching/                     # Safe branch creation with upstream protection
 │   ├── ef-migrations/                 # Entity Framework Core migrations
-│   ├── handoff-compact/               # Write a session handoff doc, then compact
 │   └── tool-doctor/                   # External, once-per-project setup: audit machine + project for the guard tools, offer install/config (per-item confirm)
 ├── hooks/                       # Claude Code hooks (session-start, etc.)
 └── docs/                        # Plans and documentation

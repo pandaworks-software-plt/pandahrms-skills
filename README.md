@@ -18,7 +18,6 @@ The plugin is a set of manual, standalone skills. There is no orchestrator -- yo
 | **spec** | `/pandahrms:spec` | Write/update the L1 behaviour Gherkin spec in pandahrms-spec; conditional on behaviour change; user-agreement gate |
 | **slice** | `/pandahrms:slice` | Cut agreed work into independently-completable cards; each card holds its L2 spec files + an ordered work sequence |
 | **execute** | `/pandahrms:execute` | Run one card: guided run with stop-gates, spec-first TDD, inline `/lint-gate` + `/code-review` per layer, `/verify` at card pre-complete; `/execute card-NN` or bare `/execute` for the next card |
-| **execute-sonnet** | `/pandahrms:execute-sonnet` | Sonnet-pinned variant of `/execute`; `--blast-mode` queues the cards as a Workflow of Sonnet subagents |
 | **status** | `/pandahrms:status` | Read-only summary: auto-fires when `/execute` finishes the last card, also a manual status report |
 | **close** | `/pandahrms:close` | Mutating close: verify all cards done, invoke `/resolve-ticket` for ticket work, write the log, mark the work closed |
 | **resolve-ticket** | `/pandahrms:resolve-ticket` | Card-less ticket resolution: one ticket ref -> resolved, ready-for-release state (confirm before mutate) |
@@ -39,11 +38,9 @@ The plugin is a set of manual, standalone skills. There is no orchestrator -- yo
 
 | Skill | Slash Command | Description |
 |-------|---------------|-------------|
-| **optimise-prompt** | `/pandahrms:optimise-prompt` | Manual rephrase: restate your request in B1 English on demand (the per-turn repeat-back lives in the plugin hooks) |
 | **pr-approver-review** | `/pandahrms:pr-approver-review` | Senior-approver review of an already-opened GitHub PR by number |
 | **branching** | `/pandahrms:branching` | Safe branch creation with upstream protection and folder-based naming |
 | **ef-migrations** | `/pandahrms:ef-migrations` | EF Core migration commands for Performance and Recruitment APIs |
-| **handoff-compact** | `/pandahrms:handoff-compact` | Write a session handoff doc, then compact |
 | **tool-doctor** | `/pandahrms:tool-doctor` | Once-per-project setup: audit machine + project for the guard tools, offer install/config per item |
 
 ## Installation
