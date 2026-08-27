@@ -79,7 +79,7 @@ Each skill is manual and standalone -- you run each step. There is no orchestrat
    -> /pr          final PR for the whole work, once every card is done (runs /commit first)
 ```
 
-The always-on execution rules (TDD markers, gates, sensitivity list, output discipline) ship via the plugin's SessionStart hook (`hooks/execution-rules.md`) -- no per-member setup.
+The always-on execution rules (TDD markers, gates, sensitivity list, output discipline) ship via the plugin's SessionStart hook (`hooks/execution-rules.md`) -- no per-member setup. The hook only injects them for Pandahrms/Pandaworks work (a `pandaworks-software-plt`/`pandaworks-sw` git origin, a `.pandahrms-rules` marker file in the tree, or `PANDAHRMS_RULES=1`); every other session gets an empty context instead.
 
 ## License
 
