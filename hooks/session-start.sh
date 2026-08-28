@@ -86,9 +86,14 @@ origin_is_pandaworks() {
     [[ "$url" =~ github\.com[:/](pandaworks-software-plt|pandaworks-sw)/ ]]
 }
 
-# Condition 2: a `.pandahrms-rules` marker file in cwd or any ancestor, up to /.
+# Condition 2: a `.pandahrms-rules` marker file in cwd or any ancestor, up to the
+# filesystem root. The walk stops at "/" on Unix, but a Windows path handed to us
+# by Claude Code (e.g. C:\Works\VS-GitHub\Pandaworks) never reaches it: git-bash
+# `dirname C:` returns `C:`, a fixed point. Guarding only on "/" therefore spun
+# forever, and because this is a blocking SessionStart hook it hung the whole
+# session -- so also stop as soon as the parent stops changing.
 marker_file_present() {
-    local dir="$1"
+    local dir="$1" parent
     [ -n "$dir" ] || return 1
     while [ -n "$dir" ]; do
         if [ -f "$dir/.pandahrms-rules" ]; then
@@ -97,7 +102,11 @@ marker_file_present() {
         if [ "$dir" = "/" ]; then
             return 1
         fi
-        dir="$(dirname "$dir" 2>/dev/null || true)"
+        parent="$(dirname "$dir" 2>/dev/null || true)"
+        if [ -z "$parent" ] || [ "$parent" = "$dir" ]; then
+            return 1
+        fi
+        dir="$parent"
     done
     return 1
 }
