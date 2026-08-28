@@ -1,0 +1,22 @@
+# Git for Windows ships with core.autocrlf=true, so without this every clone on
+# a teammate's Windows machine rewrites the hook scripts to CRLF. git-bash then
+# dies on the stray CR ("$'\r': command not found", "set: pipefail\r: invalid
+# option name") and, because SessionStart is a blocking hook, the CLI never
+# becomes ready.
+#
+# hooks/run-hook.cmd is a cmd/sh polyglot: macOS executes the same file through
+# /bin/sh, so it must stay LF too even though it is a .cmd. It contains no
+# parenthesised if/for block and no `goto`, which are the only constructs
+# cmd.exe actually mis-parses in an LF-only batch file.
+
+* text=auto eol=lf
+
+*.sh   text eol=lf
+*.cmd  text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary

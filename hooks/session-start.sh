@@ -20,6 +20,9 @@
 # this hook also runs under git-bash on Windows via run-hook.cmd, where jq/python3
 # are not guaranteed to be installed, so cwd is pulled out of the JSON payload with
 # plain sed/grep, matching the pure-bash style already used below for JSON escaping.
+#
+# Portability contract: bash 3.2 (macOS /bin/bash) and git-bash on Windows. No
+# bash 4 syntax (no associative arrays, no ${var^^}, no printf '\uXXXX').
 
 set -euo pipefail
 
@@ -29,23 +32,21 @@ PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 warning_message=""
 
-# Escape outputs for JSON using pure bash
+# Escape a string for embedding in a JSON string literal.
+#
+# Uses bash's native global substitution rather than a character-by-character
+# loop: the loop cost ~0.6s for the 4.9KB rules file on macOS and several times
+# that under MSYS2, on every startup/resume/clear/compact of a blocking hook.
+# The backslash pass MUST run first, or the backslashes introduced by the later
+# passes would themselves be escaped again.
 escape_for_json() {
-    local input="$1"
-    local output=""
-    local i char
-    for (( i=0; i<${#input}; i++ )); do
-        char="${input:$i:1}"
-        case "$char" in
-            $'\\') output+='\\' ;;
-            '"') output+='\"' ;;
-            $'\n') output+='\n' ;;
-            $'\r') output+='\r' ;;
-            $'\t') output+='\t' ;;
-            *) output+="$char" ;;
-        esac
-    done
-    printf '%s' "$output"
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
 }
 
 warning_escaped=$(escape_for_json "$warning_message")
@@ -55,7 +56,18 @@ warning_escaped=$(escape_for_json "$warning_message")
 # Read the SessionStart JSON payload from stdin. Never let an empty/absent stdin
 # (or any command below) abort the hook under `set -e` -- every call that can
 # fail is guarded with `|| true` or an `if` test.
-stdin_payload="$(cat 2>/dev/null || true)"
+#
+# `read -t` rather than `cat`: a plain `cat` blocks forever when stdin is an open
+# pipe that never sends EOF, which is reachable on Windows where the payload
+# crosses cmd.exe -> bash.exe. This is a BLOCKING SessionStart hook, so that hang
+# freezes the whole CLI -- the spinner never stops and later slash commands queue
+# behind it. `-d ''` reads to EOF (JSON contains no NUL) and still populates the
+# variable when the timeout fires, so a slow writer degrades to a partial read
+# rather than a hang.
+stdin_payload=""
+if [ ! -t 0 ]; then
+    IFS= read -r -d '' -t 5 stdin_payload 2>/dev/null || true
+fi
 
 # Pull the "cwd" field out of the JSON with sed/grep -- no jq/python3 dependency.
 extract_cwd() {
@@ -66,13 +78,61 @@ extract_cwd() {
         || true
 }
 
+# Decode JSON string escapes in an extracted path.
+#
+# grep/sed hand back the RAW string body, so a Windows cwd arrives as
+# `C:\\Works\\Repo` (JSON for `C:\Works\Repo`). Feeding that to `git -C` or a
+# `[ -f ... ]` test looks up a path that does not exist, so without this the
+# scope gate could never match on Windows and the rules silently never loaded.
+#
+# Scans left to right rather than running global replaces, because `\\n` (a
+# literal backslash then n) and `\n` (a newline) only stay distinct in a
+# single ordered pass. Paths are short, so the loop cost is negligible.
+# `\uXXXX` is left verbatim: decoding it needs bash 4.2 printf, and a non-ASCII
+# repo path can still opt in via .pandahrms-rules or PANDAHRMS_RULES=1.
+json_unescape() {
+    local s="$1" out="" i=0 c n
+    while [ "$i" -lt "${#s}" ]; do
+        c="${s:$i:1}"
+        if [ "$c" = '\' ] && [ "$i" -lt "$(( ${#s} - 1 ))" ]; then
+            i=$(( i + 1 ))
+            n="${s:$i:1}"
+            case "$n" in
+                n)  out="$out"$'\n' ;;
+                r)  out="$out"$'\r' ;;
+                t)  out="$out"$'\t' ;;
+                b)  out="$out"$'\b' ;;
+                f)  out="$out"$'\f' ;;
+                u)  out="$out\\u" ;;
+                *)  out="$out$n" ;;
+            esac
+        else
+            out="$out$c"
+        fi
+        i=$(( i + 1 ))
+    done
+    printf '%s' "$out"
+}
+
 session_cwd="$(extract_cwd "$stdin_payload")"
+if [ -n "$session_cwd" ]; then
+    session_cwd="$(json_unescape "$session_cwd")"
+fi
 if [ -z "$session_cwd" ]; then
     session_cwd="${CLAUDE_PROJECT_DIR:-}"
 fi
 if [ -z "$session_cwd" ]; then
     session_cwd="${PWD:-}"
 fi
+
+# Normalise a Windows drive path to forward slashes. git and the `[ -f ]` test
+# both accept them under git-bash, and POSIX `dirname` only walks on "/" -- given
+# backslashes it collapses `C:\Works\Repo` to "." in a single step, which killed
+# the ancestor walk below. Only drive-letter paths are touched, so a backslash in
+# a genuine POSIX filename is left alone.
+case "$session_cwd" in
+    [A-Za-z]:*) session_cwd="${session_cwd//\\//}" ;;
+esac
 
 # Condition 1: cwd is inside a git work tree whose origin remote is a Pandaworks
 # org repo. `git -C` walks up from $session_cwd to find the work tree itself, so
@@ -87,11 +147,10 @@ origin_is_pandaworks() {
 }
 
 # Condition 2: a `.pandahrms-rules` marker file in cwd or any ancestor, up to the
-# filesystem root. The walk stops at "/" on Unix, but a Windows path handed to us
-# by Claude Code (e.g. C:\Works\VS-GitHub\Pandaworks) never reaches it: git-bash
-# `dirname C:` returns `C:`, a fixed point. Guarding only on "/" therefore spun
-# forever, and because this is a blocking SessionStart hook it hung the whole
-# session -- so also stop as soon as the parent stops changing.
+# filesystem root -- "/" on Unix, or a drive root such as `C:/` on Windows. Stop
+# as soon as the parent stops changing too: `dirname` is a fixed point at both
+# roots and at ".", and because this is a blocking SessionStart hook an unguarded
+# walk spun forever and hung the whole session.
 marker_file_present() {
     local dir="$1" parent
     [ -n "$dir" ] || return 1
@@ -99,9 +158,9 @@ marker_file_present() {
         if [ -f "$dir/.pandahrms-rules" ]; then
             return 0
         fi
-        if [ "$dir" = "/" ]; then
-            return 1
-        fi
+        case "$dir" in
+            /|//|.|[A-Za-z]:|[A-Za-z]:/) return 1 ;;
+        esac
         parent="$(dirname "$dir" 2>/dev/null || true)"
         if [ -z "$parent" ] || [ "$parent" = "$dir" ]; then
             return 1
