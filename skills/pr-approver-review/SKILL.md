@@ -1,6 +1,6 @@
 ---
 name: pr-approver-review
-description: '`/pr-approver-review <PR-number> [fast|deep]` -- senior-approver review of an ALREADY-OPENED GitHub PR by number -- form your own findings and approval gate first, then cross-check the `claude[bot]` review. Reads code at the PR head commit, enforces Pandahrms project rules as real severity, scores an approval gate, and returns a verdict plus a distinct senior take. Read-only -- never commits, pushes, merges, or posts to the PR. NOT for working-tree or pre-commit diffs (those are `/code-review`).'
+description: '`/pr-approver-review <PR-number> [fast|deep]` -- senior-approver review of an ALREADY-OPENED GitHub PR by number -- form your own findings and approval gate first (the independent phase always runs in a dispatched subagent), then cross-check the `claude[bot]` review. Reads code at the PR head commit, enforces Pandahrms project rules as real severity, scores an approval gate, and returns a verdict plus a distinct senior take. Read-only -- never commits, pushes, merges, or posts to the PR. NOT for working-tree or pre-commit diffs (those are `/code-review`).'
 model: opus
 ---
 
@@ -16,18 +16,29 @@ You are a senior approver reviewing PR **#<PR>** in Pandahrms (ASP.NET MVC 5, mu
 
 **Four rules across the whole review:**
 
-1. **Independent first.** Form your own findings and gate BEFORE reading the `claude[bot]` review. Do not fetch its comment bodies until Step 4.
+1. **Independent first -- ALWAYS in a dispatched subagent.** Steps 1-3 run in ONE subagent (Agent tool), never inline. Orchestrator dispatches, waits, then runs Steps 4-5. Bot comment bodies are fetched only in Step 4.
 2. **Verify before report.** Read cited code at the PR HEAD COMMIT (not the local working tree -- it may be another branch) before stating any finding. Drop what you cannot see. Tag every finding `[VERIFIED]` (read it) or `[INFERRED]` (suspected -- low confidence). Applies equally to every bot claim in Step 4.
 3. **Project rules are correctness, not style.** A missing tenant filter leaks data; a missing `.csproj` entry breaks the deploy.
 4. **The diff is not the unit of review -- the change is.** A diff proves what changed, never what *should* have changed. When a PR removes a bad line, that removal is the ONLY evidence the diff can show, and it reads as "handled" even when an identical bad line survives in the unchanged lines of the same file. Every bug a diff hides is invisible by construction -- the Step 2a sweeps are the only way to see that class of defect, so they are not optional thoroughness.
 
 Resolve the repo slug once: `gh repo view --json nameWithOwner -q .nameWithOwner` -> `<OWNER/REPO>`. Read code at head: `gh api "repos/<OWNER/REPO>/contents/<url-encoded-path>?ref=<headRefOid>" --jq .content | base64 -d`.
 
+## Dispatch -- Steps 1-3 always run in a subagent
+
+Orchestrator sequence, no exceptions (Fast and Deep alike):
+
+1. Announce, resolve `<OWNER/REPO>`.
+2. Dispatch ONE `general-purpose` subagent (Agent tool, `model: opus`, `run_in_background: false`) and wait. Do not fetch bot data or read PR code while it runs.
+3. Subagent prompt MUST contain verbatim: rules 2-4 above, the repo-slug + read-at-head commands, Steps 1-3 in full (including Step 2a sweeps and red flags), the item-4 return-block spec below, plus `<PR>`, `<mode>`, `<OWNER/REPO>`, and this role line: "You are the independent review phase of a senior-approver review of PR #<PR> in Pandahrms (ASP.NET MVC 5, multi-tenant HR). Run Steps 1-3 inline yourself. Never dispatch subagents. You are read-only. Never fetch bot comment bodies or reviews."
+4. Subagent returns one block: chosen mode, `headRefOid`, `claude-review` check status, related-PR verdicts (each as `repo#n [lens -- verdict]` plus merge order), gate table with CONCERN/FAIL reasons, Step 2a sweep lines, findings (Blocking / Non-blocking / Nit, each `file:line` + `[VERIFIED]`/`[INFERRED]`), preliminary verdict, a 2-4 line change summary (what changed, why, what most deserves a human's eyes), candidate manual checks before merge, and senior-take candidates (most likely to break in production · what a strong senior would criticise -- one line each).
+5. Orchestrator adopts the returned block as its own Steps 1-3 result, then runs Step 4 (verify each bot claim at head yourself; re-run gate/verdict if a MISSED shifts them) and Step 5 output.
+6. Subagent fails (error, timeout, incomplete block): re-dispatch ONCE. Second failure -> stop and report the failure. Never run Steps 1-3 inline.
+
 ## Step 1 -- Gather & choose mode
 
-- `gh pr view <PR> --json title,body,baseRefName,headRefOid,additions,deletions,changedFiles,files,reviews`
+- `gh pr view <PR> --json title,body,baseRefName,headRefOid,additions,deletions,changedFiles,files`
 - `gh pr diff <PR>`
-- `gh pr checks <PR>` -- note if the `claude-review` check FINISHED (needed for Step 4; if pending, review now and cross-check when it lands, or flag it skipped).
+- `gh pr checks <PR>` -- note if the `claude-review` check FINISHED (status only -- record it in the return block; orchestrator runs the Step 4 cross-check, or flags it skipped if never finished).
 - Do NOT fetch bot comment bodies yet.
 
 **Mode -- default Fast.** Use **Deep** if `<mode>` is `deep`, or any high-risk signal: payroll/statutory/tax/money/accrual math · auth, authz, `LoginState`, access control · DB schema, migration, raw SQL · the multi-tenant query layer · diff > ~400 lines or > ~15 files · a related-PR set. State the chosen mode in output. `<mode> = fast` forces Fast even when high-risk -- say so when overriding.
