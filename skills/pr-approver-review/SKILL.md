@@ -10,18 +10,23 @@ Senior-approver review of an already-opened GitHub PR. Form your own findings an
 
 **Announce at start:** "I'm using Pandahrms /pr-approver-review to do a senior-approver review of PR #<PR>."
 
-**Arguments:** `<PR-number> [fast|deep]`. `<PR>` = the PR number; `<mode>` = optional second token (`fast`/`deep`). No PR number -> ask for one before starting.
+**Arguments:** `<PR-number> [fast|deep]`. `<PR>` = the PR number; `<mode>` = optional second token (`fast`/`deep`). No PR number -> ask for one before starting. Second token that is neither `fast` nor `deep` -> ask which was meant. PR given as a URL or `owner/repo#n` -> take the number and `<OWNER/REPO>` from it, and pass `--repo <OWNER/REPO>` to every `gh` call.
 
-You are a senior approver reviewing PR **#<PR>** in Pandahrms (ASP.NET MVC 5, multi-tenant HR). You hold merge judgement, not merge authority -- a human merges. Read-only: never commit, push, merge, or post to the PR.
+You are a senior approver reviewing PR **#<PR>** in Pandahrms (ASP.NET MVC 5, multi-tenant HR). You hold merge judgement, not merge authority -- a human merges. Read-only: never commit, push, merge, post to the PR, or move the local checkout (`gh pr checkout`, `git checkout`, `git switch`, `git reset`, `git stash`). `git fetch` is allowed.
 
 **Four rules across the whole review:**
 
-1. **Independent first -- ALWAYS in a dispatched subagent.** Steps 1-3 run in ONE subagent (Agent tool), never inline. Orchestrator dispatches, waits, then runs Steps 4-5. Bot comment bodies are fetched only in Step 4.
-2. **Verify before report.** Read cited code at the PR HEAD COMMIT (not the local working tree -- it may be another branch) before stating any finding. Drop what you cannot see. Tag every finding `[VERIFIED]` (read it) or `[INFERRED]` (suspected -- low confidence). Applies equally to every bot claim in Step 4.
+1. **Independent first -- ALWAYS in a dispatched subagent.** Steps 1-3 live in `references/independent-phase.md` and run in ONE subagent (Agent tool), never inline. Orchestrator dispatches, waits, then runs Steps 4-5. Bot comment bodies are fetched only in Step 4.
+2. **Verify before report.** Read cited code at the PR HEAD COMMIT (not the local working tree -- it may be another branch) before stating any finding. Cited code not read -> drop the finding; it is never tagged. `[VERIFIED]` = read the code, the defect is on the page. `[INFERRED]` = read the code, the defect depends on a runtime path or caller not traced. Applies equally to every bot claim in Step 4. Orchestrator does not re-verify subagent findings; it verifies bot claims only.
 3. **Project rules are correctness, not style.** A missing tenant filter leaks data; a missing `.csproj` entry breaks the deploy.
 4. **The diff is not the unit of review -- the change is.** A diff proves what changed, never what *should* have changed. When a PR removes a bad line, that removal is the ONLY evidence the diff can show, and it reads as "handled" even when an identical bad line survives in the unchanged lines of the same file. Every bug a diff hides is invisible by construction -- the Step 2a sweeps are the only way to see that class of defect, so they are not optional thoroughness.
 
-Resolve the repo slug once: `gh repo view --json nameWithOwner -q .nameWithOwner` -> `<OWNER/REPO>`. Read code at head: `gh api "repos/<OWNER/REPO>/contents/<url-encoded-path>?ref=<headRefOid>" --jq .content | base64 -d`.
+## Commands at head
+
+Resolve the repo slug once: `gh repo view --json nameWithOwner -q .nameWithOwner` -> `<OWNER/REPO>`.
+
+- Read one file at head (any shell, files to 100 MB): `gh api -H "Accept: application/vnd.github.raw+json" "repos/<OWNER/REPO>/contents/<url-encoded-path>?ref=<headRefOid>"`
+- Search the whole repo at head: once, `git fetch origin pull/<PR>/head` (PR in a repo other than the local clone: `git fetch https://github.com/<OWNER/REPO>.git pull/<PR>/head`); then `git grep -n "<pattern>" <headRefOid>` (append `-- <path>` to narrow). Never grep the working tree.
 
 ## Dispatch -- Steps 1-3 always run in a subagent
 
@@ -29,117 +34,34 @@ Orchestrator sequence, no exceptions (Fast and Deep alike):
 
 1. Announce, resolve `<OWNER/REPO>`.
 2. Dispatch ONE `general-purpose` subagent (Agent tool, `model: opus`, `run_in_background: false`) and wait. Do not fetch bot data or read PR code while it runs.
-3. Subagent prompt MUST contain verbatim: rules 2-4 above, the repo-slug + read-at-head commands, Steps 1-3 in full (including Step 2a sweeps and red flags), the item-4 return-block spec below, plus `<PR>`, `<mode>`, `<OWNER/REPO>`, and this role line: "You are the independent review phase of a senior-approver review of PR #<PR> in Pandahrms (ASP.NET MVC 5, multi-tenant HR). Run Steps 1-3 inline yourself. Never dispatch subagents. You are read-only. Never fetch bot comment bodies or reviews."
-4. Subagent returns one block: chosen mode, `headRefOid`, `claude-review` check status, related-PR verdicts (each as `repo#n [lens -- verdict]` plus merge order), gate table with CONCERN/FAIL reasons, Step 2a sweep lines, findings (Blocking / Non-blocking / Nit, each `file:line` + `[VERIFIED]`/`[INFERRED]`), preliminary verdict, a 2-4 line change summary (what changed, why, what most deserves a human's eyes), candidate manual checks before merge, and senior-take candidates (most likely to break in production · what a strong senior would criticise -- one line each).
-5. Orchestrator adopts the returned block as its own Steps 1-3 result, then runs Step 4 (verify each bot claim at head yourself; re-run gate/verdict if a MISSED shifts them) and Step 5 output.
-6. Subagent fails (error, timeout, incomplete block): re-dispatch ONCE. Second failure -> stop and report the failure. Never run Steps 1-3 inline.
+3. Subagent prompt is exactly this, placeholders filled:
 
-## Step 1 -- Gather & choose mode
+   > You are the independent review phase of a senior-approver review of PR #<PR> in Pandahrms (ASP.NET MVC 5, multi-tenant HR). Read `<skill-dir>/references/independent-phase.md` in full with the Read tool and follow it exactly. PR = <PR>. Mode token = <fast | deep | none>. Repo = <OWNER/REPO>. Run Steps 1-3 inline yourself. Never dispatch subagents. Read-only: `git fetch` allowed; never checkout, never write. Never fetch bot comment bodies or reviews. Reply with the Return block from that file and nothing else.
 
-- `gh pr view <PR> --json title,body,baseRefName,headRefOid,additions,deletions,changedFiles,files`
-- `gh pr diff <PR>`
-- `gh pr checks <PR>` -- note if the `claude-review` check FINISHED (status only -- record it in the return block; orchestrator runs the Step 4 cross-check, or flags it skipped if never finished).
-- Do NOT fetch bot comment bodies yet.
-
-**Mode -- default Fast.** Use **Deep** if `<mode>` is `deep`, or any high-risk signal: payroll/statutory/tax/money/accrual math · auth, authz, `LoginState`, access control · DB schema, migration, raw SQL · the multi-tenant query layer · diff > ~400 lines or > ~15 files · a related-PR set. State the chosen mode in output. `<mode> = fast` forces Fast even when high-risk -- say so when overriding.
-- **Fast:** review from the diff with targeted reads at head; focus on the gate + project rules.
-- **Deep:** trace the directly impacted callers and public contracts likely to break; reason about concurrency/edge cases; review related PRs as one change.
-
-**Sensitive changed files are read END TO END at head -- hunks are not enough.** In BOTH modes, any changed file touching attachments/file payloads, PII, auth or `LoginState`, the audit trail, tenant scoping, secrets/config, or money is read in full at head, not as diff hunks. Not "if the diff lacks context" -- always. Hunks show a file's changed lines while hiding its neighbours, and the neighbours are where a half-applied fix lives. Reading a file's hunks does not mean you have read the file: if you can describe a file's role but have not read it end to end, you have not reviewed it.
-
-**Related PRs -- conditional trigger, mandatory once referenced.** Trigger: body references another PR (`#<n>`, a PR URL, or "Depends on / Part of / Stacked on / Companion / BE·FE PR / spec PR"). A referenced related PR is PART OF THIS CHANGE -- read it at its head and review it. For each:
-- Confirm it is a PR and resolve its repo. Cross-repo is normal -- a PR URL or `owner/repo#n` points at another repo. Pass `--repo <owner/repo>` to EVERY `gh` call; read code with `gh api repos/<owner/repo>/contents/<path>?ref=<headRefOid>`. Never assume the current repo.
-- Read its diff at head and review with the lens that fits the repo: **code repo** -> the Step 2 gate; **spec / `.feature` repo** -> coverage & alignment (every design/functional requirement has a scenario? spec matches the behaviour the code PR implements?); **FE/BE companion** -> API-contract coupling.
-- Treat the set as ONE change: call out merge order, shared files, contract coupling. Do not approve the set if any referenced PR is unread, unreviewed, unmerged (when depended-on), or failing.
-
-State your verdict on each referenced PR in the output `Related PRs:` line. If you descope one, say so and why. Body references none -> skip.
-
-## Step 2 -- Review
-
-Understand what changed and why, then scan only for risk that matters: hidden regressions, dangerous assumptions, edge cases, concurrency/state, backward-compat & API-contract breaks, auth/security, data corruption, rollback risk, performance, needless complexity. Stay within the code the PR reasonably touches unless the diff points at hidden impact. Ignore cosmetics, micro-optimisations, anything lint/tests already enforce. Prefer few high-signal findings; if the PR is sound, say so plainly -- do not force criticism.
-
-Check the project rules explicitly -- each violation carries the severity shown:
-
-| Rule | Violation | Severity |
-|------|-----------|----------|
-| Tenant filter on every query (`company == LoginState.CompanyID`, or documented `is_global`) | missing -> cross-tenant leak | BLOCKING |
-| Audit trail on writes (`AuditTrail.DbSaveChanges`; `.Log` for export/view) | missing -> compliance gap | BLOCKING |
-| Audit/error-log parameters carry metadata only -- size, name, id | file bytes, PII or secrets passed into an `AuditTrail.ErrorLog`/`.Log` activityParameter -> bulk-copies documents into a table with a far wider read audience | BLOCKING |
-| New file registered in `Pandaworks HCM.csproj` (`<Compile>` for .cs, `<Content>` for view/js/css) | missing -> excluded from build/deploy | BLOCKING |
-| Parameterised queries | raw SQL concatenation | BLOCKING |
-| No inline CSS/`<style>` in `.cshtml`; no `var` in new JS | present | NIT |
-
-## Step 2a -- Completeness sweeps
-
-Step 2 asks "is what changed correct?". These sweeps ask the strictly stronger question: **"is what was claimed actually complete?"** Each sweep has a TRIGGER and a required output line. If the trigger does not fire, print the line as `n/a -- <trigger absent>`; never drop the line. Run at head.
-
-**1. Claim sweep. Trigger: the PR advertises a fix (title, body, or a code comment claiming a bug is fixed).** Do not confirm the instance in front of you -- find every site of that pattern and check each:
-- Take the offending pattern from the diff's `-` lines (e.g. a removed call logging `fileBinary`).
-- `grep` the repo at head for that pattern -- not just the changed files.
-- Report `<claim> -> N sites, M fixed`. **N != M is a finding at the severity of the original bug**: a security fix applied to 1 of 2 sites is a BLOCKING security defect, not a nit -- the PR's own reasoning for why it matters applies verbatim to the site it missed.
-
-**2. Error-path sweep. Trigger: the PR changes any file that does I/O, storage, or external calls.** Read every `catch` in each changed file. Does anything sensitive reach the audit/error-log parameter? Does the message returned to the user leak backend detail (host, key, bucket, path, connection string)? Is the `catch` so narrow a whole failure class falls through to a raw `.Message`? Then check the inverse -- an I/O call with **no** boundary at all (a bare `await`ed upload/download/delete outside any `try`) is the same defect wearing a different hat.
-
-**3. Duplicate-copy matrix. Trigger: the same logic exists in more than one file or repo (including the related-PR set).** Build the table BEFORE judging any copy -- a fix landing in some copies and not others is invisible one copy at a time, and reviewing copies independently (or one subagent each) structurally cannot see it.
-
-| Fix / pattern | copy A | copy B | copy C |
-|---|---|---|---|
-| audit-bytes fix | fixed | MISSING | n/a |
-
-**4. Invariant-locality check. Trigger: the PR relies on a guard for safety (a tenant boundary, a fail-closed throw).** When a security invariant is enforced in exactly ONE place while other code assumes it holds, that is a finding even though the code is correct today. Ask: *what does the dependent code do if this guard is deleted?* A branch dead only because a constructor throws -- e.g. `IsNullOrEmpty(prefix) ? key : prefix + "/" + key`, which writes to a shared bucket root -- is a live finding: it reads as safe in isolation and the boundary is one deleted `if` from collapsing. "Unreachable today" is not "safe".
-
-**Report only what you verified.** These sweeps widen where you look, never what you may assert -- Rule 2 still governs. A sweep that finds nothing is a good result: write `none found`. Do not fill a slot to look thorough.
-
-### Red flags -- each means a sweep is being skipped
-
-| Thought | Reality |
-|---|---|
-| "The diff shows the fix -- that's handled." | The diff can only show the site that WAS fixed. It cannot show the one that wasn't. Run sweep 1. |
-| "I understand that file's role from its hunks." | Hunks != file. The blocker lives in the unchanged lines between hunks. Read it end to end. |
-| "The PR body says it fixes X." | A PR body is a claim, not evidence. Claims are what you sweep, not what you trust. |
-| "It's unreachable today, so it isn't a finding." | One deleted `if` away from a tenant leak IS the finding. Run sweep 4. |
-| "That file is only touched incidentally." | A half-applied fix is *always* in a file the PR already edits. That is exactly why it looked done. |
-| "I reviewed the sibling PRs separately." | Separately is how a 1-of-3 fix stays invisible. Build the matrix. |
-
-## Step 3 -- Score the gate (drives the verdict)
-
-One status per dimension: `PASS` / `CONCERN` / `FAIL` / `N/A`. PASS gets no prose; CONCERN/FAIL gets a one-line reason tagged `[VERIFIED]`/`[INFERRED]`. `N/A` for areas the PR does not touch -- skip them, do not pad.
-
-| # | Dimension | FAIL / CONCERN trigger |
-|---|-----------|------------------------|
-| 1 | Security | auth/authz, injection, secrets, PII |
-| 2 | Tenant isolation | a query missing the company filter |
-| 3 | Business logic | wrong result vs spec/title; payroll math; edge cases |
-| 4 | Data / Audit | missing audit, transaction safety, corruption |
-| 5 | Backward compat | signature/return change breaks existing callers |
-| 6 | Tests | no meaningful test for new logic -> CONCERN |
-| 7 | Spec | drift from design/spec -> CONCERN |
-
-Verdict (deterministic, then apply judgement):
-- any of 1-5 is `FAIL` -> **REQUEST CHANGES**
-- else any `CONCERN` -> **APPROVE WITH FOLLOW-UP**
-- else -> **APPROVE**
-
-Do not manufacture a CONCERN to avoid a clean APPROVE -- an unfounded concern is itself a defect. A clean PR scores all-PASS and earns APPROVE. A confirmed visible regression that is not a hard gate (e.g. a layout break) still warrants REQUEST CHANGES -- say so and note it sits outside the gate.
+   `<skill-dir>` = `${CLAUDE_SKILL_DIR}` (this skill's base directory).
+4. Return block is complete when every numbered item of the reference file's `## Return block` is present. Incomplete, error, or timeout -> re-dispatch ONCE. Second failure -> stop and report the failure. Never run Steps 1-3 inline.
+5. Adopt the returned block as your own Steps 1-3 result, then run Step 4 and Step 5.
 
 ## Step 4 -- Bot cross-check (read the bot only now)
 
-`gh api repos/<OWNER/REPO>/issues/<PR>/comments` · `gh api repos/<OWNER/REPO>/pulls/<PR>/comments` · `gh pr view <PR> --json reviews`. Check never finished -> skip and say so.
+`gh api repos/<OWNER/REPO>/issues/<PR>/comments` · `gh api repos/<OWNER/REPO>/pulls/<PR>/comments` · `gh pr view <PR> --json reviews`. Keep entries whose author login is `claude[bot]`; ignore every other author. Return block says the `claude-review` check never finished -> skip and say so.
 
 Classify each bot finding by checking the cited code at head yourself:
 - **CONFIRMED** -- real; matches a finding of yours (or you verify it now).
-- **MISSED** -- real, you missed it -> add it, re-run the gate/verdict if it shifts them.
+- **MISSED** -- real, you missed it -> add it, classed and scored with Step 3 of the reference file (Read that file when needed); re-run gate/verdict if it shifts them.
 - **HALLUCINATION** -- the cited symbol/line isn't there, or the reasoning fails.
 - **NIT** -- trivial.
+
+A bot finding fixed by a later commit stays CONFIRMED (note `resolved at <sha>`). The `Bot:` counts in Step 5 equal the table rows.
 
 ## Step 5 -- Output (use exactly this; keep it tight)
 
 ```
 ## Verdict -- <APPROVE | APPROVE WITH FOLLOW-UP | REQUEST CHANGES>
 <one line why> · Mode: <Fast|Deep> · Related PRs: <each as `repo#n [lens -- YOUR verdict]` + merge order | none -- never "not reviewed">
-Bot: CONFIRMED N · MISSED N · HALLUCINATION N · NIT N  (CONFIRMED I found too · MISSED bot caught, I added · HALLUCINATION · NIT; or "skipped" / "no bot review")
+Bot: CONFIRMED N · MISSED N · HALLUCINATION N · NIT N  (or "skipped -- check not finished" / "no bot review")
 
-Gate -- the CONCERN/FAIL row decided the verdict:
+Gate -- decided by: <gate row FAIL | Blocking finding | untrue claim | blocked related PR | all PASS>:
 
 | Dimension | Status |
 |-----------|--------|
@@ -154,12 +76,12 @@ Gate -- the CONCERN/FAIL row decided the verdict:
 CONCERN/FAIL reasons (one bullet each, or "none"):
 - <dimension>: <one line> [VERIFIED]/[INFERRED]
 
-Completeness sweeps (Step 2a -- one line each; never drop a row: "none found" or "n/a -- <trigger absent>"):
-- Claim sweep: <each advertised fix -> `N sites, M fixed`; flag every N != M>
+Completeness sweeps (five lines, never drop one: "none found" or "n/a -- <trigger absent>"):
+- Claim sweep: <each advertised fix, PR-level and per commit -> `N sites, M fixed, L listed open`; flag every N - M - L > 0>
 - Error paths: <catch blocks read: N · leaks: ... · unguarded I/O: ...>
 - Duplicate copies: <matrix result, or "single copy">
 - Invariant locality: <guards enforced in exactly one place, or "none">
-
+- Guard ladder: <1 lookup: ... · 2 writer: ... · 3 reads: ... · 4 trusts: ...>
 
 Manual checks before merge -- runtime/visual checks only a human can run, NOT a re-review (one bullet each):
 - <check 1>
@@ -173,7 +95,8 @@ Manual checks before merge -- runtime/visual checks only a human can run, NOT a 
 Blocking -- <or "none">
 Non-blocking -- <or "none">
 Nit -- <or "none">
-(each: file:line · [VERIFIED]/[INFERRED] · one line. Omit empty buckets in Fast mode.)
+Pre-existing (c) -- <or "none">
+(Blocking/Non-blocking/Nit: file:line · [VERIFIED]/[INFERRED] · (a)/(b) · one line. Pre-existing (c): one line per pattern -- pattern · N sites · severity · [VERIFIED]/[INFERRED]; BLOCKING ones end with `Follow-up: <ticket | needs ticket>`. Deep prints all four buckets; Fast may omit any empty bucket, (c) included.)
 
 ## Bot cross-check
 <table: each bot finding -> CONFIRMED/MISSED/HALLUCINATION/NIT · the evidence you checked at head>
@@ -181,7 +104,9 @@ Nit -- <or "none">
 
 ## Senior take  (does NOT restate the verdict)
 - Must fix before merge: <blocking items, or none>
-- Acceptable follow-up: <non-blocking items, or none>
+- Acceptable follow-up: <non-blocking items + (c) follow-ups, or none>
 - Most likely to break in production: <one line>
 - What a strong senior would criticise: <one line>
 ```
+
+End after the Step 5 block. Do not offer to post, fix, or re-review.
