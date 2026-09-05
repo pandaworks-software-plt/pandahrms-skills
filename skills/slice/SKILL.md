@@ -1,7 +1,6 @@
 ---
 name: slice
 description: '`/slice` -- cut agreed work into independently-completable cards. Groups by capability where it helps, with a Collapse Rule for trivial ones. Each card carries the L1 scenarios it covers, its L2 .feature spec file(s), an ordered work-sequence CHECKLIST templated by layer-span AND architecture, a category tag, a sensitivity tag, and acceptance. Shows the ordered card list and writes the card files immediately -- no confirmation gate. Cards do NOT commit or raise a PR each -- the whole branch is committed and ONE PR raised at the end via /commit or /pr once every card is done.'
-model: opus
 ---
 
 # Pandahrms Slice

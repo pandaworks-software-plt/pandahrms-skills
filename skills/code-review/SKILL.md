@@ -1,7 +1,6 @@
 ---
 name: code-review
 description: Triggers on mentions of code review of working-tree changes -- `/code-review`, "review my changes", "check my changes", "review the diff", "review before commit". A diff-scoped LLM-judgment review of the changed files in 3 named modes (standalone | orchestrated | autonomous) -- judgment checklist, fixes, optional Codex second opinion, /simplify. Consumes a /lint-gate result file and skips OWNED checks. Does NOT run the linter, build, tests, or deterministic guards -- those belong to /lint-gate and /verify -- and does NOT commit directly; only standalone mode may invoke /commit.
-model: opus
 ---
 
 # Code Review
@@ -9,6 +8,8 @@ model: opus
 Diff-scoped LLM-judgment review over the git working-tree changes. Judges SOLID intent, naming meaning, semantic reuse, audit-pattern conformance, input-validation adequacy, PII/data-exposure, error-handling adequacy, readability, and spec meaning. Fixes issues and runs /simplify. Changes code, never commits directly; standalone mode may invoke `/commit` in Phase 7.
 
 Scope boundary: this skill runs only `git status` / `git diff` / `git diff --cached`, file reads, and the phase-defined sub-skills (`/simplify`, `/security-review`, `/spec`, `/commit`). Linter, build, tests, coverage, and deterministic guards belong to `/lint-gate` and `/verify`. It never produces commit messages, PR descriptions, changelogs, migration plans, docs, branches, or PRs -- suggest in the Phase 7 summary instead.
+
+Invoke sub-skills with the active host's skill mechanism. In Codex, when nested skill invocation is not exposed as a tool, read the sibling `../<skill-name>/SKILL.md` and execute it inline.
 
 ## Modes
 
@@ -20,12 +21,12 @@ Invocation: `/code-review [mode]`. Mode omitted -> `standalone`.
 
 | Phase | standalone | orchestrated | autonomous |
 |-------|------------|--------------|------------|
-| 0 Triage (trivial diff) | AskUserQuestion: full review or commit | skip question, full review | skip question, full review |
+| 0 Triage (trivial diff) | ask: full review or commit | skip question, full review | skip question, full review |
 | 2 Security section | full shallow checklist | one-line deferral note (caller owns the deep pass) | full shallow checklist |
-| 3 Fix approval (Major) | AskUserQuestion | AskUserQuestion | auto-apply all Major fixes |
-| 4 /security-review | detect surface, AskUserQuestion, may invoke | SKIP phase -- caller owns /security-review | SKIP phase -- caller owns /security-review |
-| 5 Spec check | runs; AskUserQuestion on gaps | runs; AskUserQuestion on gaps | runs; skip the ask, record the gap, never invoke /spec |
-| 7 Commit question | AskUserQuestion: /commit or test first | none -- emit summary, return to caller | none -- emit summary, return to caller |
+| 3 Fix approval (Major) | ask user | ask user | auto-apply all Major fixes |
+| 4 /security-review | detect surface, ask user, may invoke | SKIP phase -- caller owns /security-review | SKIP phase -- caller owns /security-review |
+| 5 Spec check | runs; ask user on gaps | runs; ask user on gaps | runs; skip the ask, record the gap, never invoke /spec |
+| 7 Commit question | ask: /commit or test first | none -- emit summary, return to caller | none -- emit summary, return to caller |
 
 Toggles (combine with any mode): `--codex` forces the Codex dispatch; `--no-codex` forces skip. These are the only flags.
 
@@ -41,7 +42,7 @@ Callers pass the lint-gate result as a FILE PATH: `<work-folder>/.lint-gate-resu
 
 Run `git diff` and `git diff --cached` to assess the change. Trivial = a small mechanical diff with no new functions, classes, or exported symbols -- judgment call, never by file type alone.
 
-- **standalone + trivial:** AskUserQuestion -- run the full review, or commit directly? **commit** -> invoke `/commit`, end skill.
+- **standalone + trivial:** ask the user -- run the full review, or commit directly? **commit** -> invoke `/commit`, end skill.
 - **orchestrated / autonomous:** always full review, no question, no commit shortcut.
 
 ## Phase 1: Gather changes
@@ -54,15 +55,15 @@ Read the full content of every changed file -- review full files, not just hunks
 
 ### Codex second opinion
 
-Dispatch ONE Codex review agent for the entire diff (never split per file/category/phase) when Codex is installed AND the diff warrants it.
+Dispatch ONE external Codex review agent for the entire diff (never split per file/category/phase) when the Codex Rescue skill is installed AND the diff warrants it. When the active host is Codex, skip this external second opinion silently to avoid self-review.
 
-**Detection.** Codex is installed if a `codex:`-prefixed skill appears in the available-skills block, or the user invoked one earlier this conversation. Not installed -> skip silently.
+**Detection.** Codex Rescue is installed if `codex:codex-rescue` appears in the available-skills block, or the user invoked it earlier this conversation. Not installed -> skip silently.
 
 **Dispatch decision (by diff content, not size -- a small auth change still dispatches):** skip for test-only, verification-only (pure config / EF mapping / DTO projection), or pure structural refactor diffs; dispatch for security-sensitive or behavior-changing diffs, and when unsure. `--codex` / `--no-codex` override. Record the outcome for Phase 7.
 
-**Dispatch pattern.** Agent tool, `subagent_type: "codex:codex-rescue"`, description `"Codex second-opinion review"`. Prompt = the verbatim content of `references/codex-review-prompt.md` (this skill's base directory) -- Codex has no conversation context. Dispatch in the same tool-call batch as the first Phase 2 reads; never wait for Codex before starting the own checklist, never block on its failure or timeout (note "Codex unavailable" and continue).
+**Dispatch pattern.** Use the host's subagent tool with `subagent_type: "codex:codex-rescue"` and description `"Codex second-opinion review"`. Prompt = verbatim content of `references/codex-review-prompt.md` (this skill's base directory) -- the reviewer has no conversation context. Dispatch in the same parallel batch as the first Phase 2 reads; never wait for it before starting the primary checklist, never block on failure or timeout (note "Codex unavailable" and continue).
 
-**Handling Codex output:** parse JSON findings (parse failure -> one Major finding, category `other`, `[Codex - unparsed]`, raw text verbatim, never auto-fixed). Dedupe same file+line+category as `[Claude + Codex]`; otherwise tag `[Codex]` / `[Claude]`. Codex is advisory -- on disagreement the higher severity wins.
+**Handling Codex output:** parse JSON findings (parse failure -> one Major finding, category `other`, `[Codex - unparsed]`, raw text verbatim, never auto-fixed). Dedupe same file+line+category as `[Primary + Codex]`; otherwise tag `[Codex]` / `[Primary]`. External Codex is advisory -- on disagreement the higher severity wins.
 
 ## Phase 2: Review (LLM judgment)
 
@@ -118,7 +119,7 @@ Backend projects only. Frontend-only -> skip this section.
 | Dead code | `dead-code` | Unused or unreachable code. Commented-out code is a finding. |
 | Leftover debug | `debug-leftover` | `console.log` / `debugger` / `Console.WriteLine` left in the diff. |
 | Silent TODOs | `todo` | TODO/FIXME/XXX added by the diff. |
-| Repo conventions | `repo-conventions` | Mechanical rules from the repo-root CLAUDE.md (size limits, banned imports, required headers). |
+| Repo conventions | `repo-conventions` | Mechanical rules from the active host's repo-root instruction file (`AGENTS.md` for Codex, `CLAUDE.md` for Claude Code): size limits, banned imports, required headers. |
 | Readability | -- | Self-documenting code. No unnecessary complexity or over-engineering. Clear, meaningful naming. |
 
 **End-of-phase merge (when Codex was dispatched):** wait for Codex (or its timeout), parse, dedupe, categorize the MERGED set -- higher severity wins.
@@ -137,13 +138,13 @@ Backend projects only. Frontend-only -> skip this section.
 
 ## Phase 3: Fix
 
-Work from the merged finding set (Claude + Codex + lint-gate `[tool:*]`), preserving attribution in the user-facing report.
+Work from the merged finding set (Primary + external Codex + lint-gate `[tool:*]`), preserving attribution in the user-facing report.
 
 **Scope of edits:** apply fixes ONLY to files already in `git status` as modified/added, OR the single file required to wire up a finding (e.g. the DI registration file). Never refactor adjacent code, fix pre-existing unrelated issues, or tidy files opened for context only.
 
 1. Auto-fix Minor issues silently; list what changed (with attribution) in the summary.
 2. Report Major issues: what, why it matters, proposed fix, attribution.
-3. **standalone / orchestrated:** AskUserQuestion -- apply the Major fixes, or skip? After emitting the question STOP: no edits until the user approves a specific finding.
+3. **standalone / orchestrated:** ask the user -- apply the Major fixes, or skip? After emitting the question STOP: no edits until the user approves a specific finding.
 4. Apply approved fixes (scope-of-edits rule still binds).
 
 **autonomous:** skip the question, announce `autonomous: applying all major fixes`, apply every Major finding.
@@ -156,7 +157,7 @@ Work from the merged finding set (Claude + Codex + lint-gate `[tool:*]`), preser
 
 **UI-only definition (shared with Phase 5):** every changed file is pure styling, or a component file whose hunks touch ONLY markup, className/style, UI-primitive imports, or copy. Any hunk touching a function body, hook, store, API call, or event handler -> NOT UI-only.
 
-Security-relevant surface present -> AskUserQuestion:
+Security-relevant surface present -> ask the user:
 
 > "Changes include security-sensitive surface ([summary]). Run /security-review for a deeper OWASP + Pandahrms security audit?"
 
@@ -172,7 +173,7 @@ Skip entirely if changes are UI-only (Phase 4 definition).
 1. **Locate pandahrms-spec** (first that exists): `$(dirname $PWD)/pandahrms-spec`, `$PWD/../../pandahrms-spec`, `$HOME/Developer/pandaworks/_pandahrms/pandahrms-spec`. None -> report "Spec repo not found at any expected location", go to Phase 6 -- never block on a missing spec repo.
 2. **Identify affected specs:** module, feature area, behaviors added/changed/removed. Search `pandahrms-spec/specs/` for the relevant `.feature` files.
 3. **Compare MEANING** per behavioral change (new action -> scenario exists? validation/status/permission change -> matching `@validation`/`@status`/`@authorization` scenario? bug fix -> `@bugfix` scenario?). Categorize: **Covered** / **Outdated** / **Missing**.
-4. All covered -> report "Specs are in sync with changes." Otherwise list each discrepancy, then (standalone / orchestrated) AskUserQuestion -- update specs now (invokes `/spec`) or skip and record the gap. **autonomous:** announce `autonomous: skipping spec update, recording gap`; NEVER invoke `/spec`.
+4. All covered -> report "Specs are in sync with changes." Otherwise list each discrepancy, then (standalone / orchestrated) ask the user -- update specs now (invokes `/spec`) or skip and record the gap. **autonomous:** announce `autonomous: skipping spec update, recording gap`; NEVER invoke `/spec`.
 
 **Never write `.feature` files in this skill** -- spec creation/update goes through `/spec` only.
 
@@ -196,7 +197,7 @@ Summarize all changes made during review:
 
 **orchestrated / autonomous:** emit the summary and STOP -- no commit question, return control to the caller.
 
-**standalone:** AskUserQuestion:
+**standalone:** ask the user:
 
 > "Code review complete. Proceed to /commit, or test first?"
 

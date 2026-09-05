@@ -1,0 +1,36 @@
+{
+  "name": "pandahrms",
+  "version": "4.18.0",
+  "description": "Pandahrms development workflow skills for discovery, specifications, implementation, verification, review, commits, and pull requests.",
+  "author": {
+    "name": "Pandaworks",
+    "url": "https://github.com/pandaworks-software-plt"
+  },
+  "repository": "https://github.com/pandaworks-software-plt/pandahrms-skills",
+  "license": "UNLICENSED",
+  "keywords": [
+    "pandahrms",
+    "development-workflow",
+    "gherkin",
+    "code-review",
+    "testing"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Pandahrms",
+    "shortDescription": "Pandahrms engineering workflow skills",
+    "longDescription": "Run the Pandahrms engineering workflow from discovery and Gherkin specifications through implementation, verification, review, commits, and pull requests.",
+    "developerName": "Pandaworks",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Code",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/pandaworks-software-plt/pandahrms-skills",
+    "defaultPrompt": [
+      "Discover and scope this Pandahrms change.",
+      "Run the next Pandahrms work card.",
+      "Review my Pandahrms working-tree changes."
+    ]
+  }
+}

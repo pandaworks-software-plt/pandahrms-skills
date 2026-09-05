@@ -4,7 +4,7 @@
     "name": "Pandaworks"
   },
   "metadata": {
-    "description": "Pandahrms-specific skills for Claude Code",
+    "description": "Pandahrms-specific skills for Claude Code and Codex",
     "version": "1.0.0"
   },
   "plugins": [

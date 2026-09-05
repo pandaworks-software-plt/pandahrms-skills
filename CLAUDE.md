@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This is the **pandahrms-skills** repository -- a Claude Code plugin containing Pandahrms-specific skills, hooks, and documentation for the Pandahrms monorepo workspace.
+This is the **pandahrms-skills** repository -- a dual-host Claude Code and Codex plugin containing Pandahrms-specific skills, hooks, and documentation for the Pandahrms monorepo workspace.
 
 ## Structure
 
@@ -11,7 +11,9 @@ The plugin is a set of manual, standalone skills. There is no orchestrator -- th
 ```
 pandahrms-skills/
 ├── .claude-plugin/plugin.json   # Plugin metadata and version
-├── skills/                      # Claude Code skills (SKILL.md files)
+├── .codex-plugin/plugin.json    # Codex plugin metadata and version
+├── .agents/plugins/marketplace.json # Codex repo marketplace
+├── skills/                      # Shared Claude Code and Codex skills (SKILL.md files)
 │   │  # Flow skills (manual, standalone; run in order, no orchestrator)
 │   ├── discover/                      # Free-form intake door: a new feature / enhancement / bug -> objective + acceptance criteria
 │   ├── discover-ticket/               # Ticket intake door (workspace-prod MCP) -> same output contract as /discover
@@ -35,13 +37,13 @@ pandahrms-skills/
 │   ├── branching/                     # Safe branch creation with upstream protection
 │   ├── ef-migrations/                 # Entity Framework Core migrations
 │   └── tool-doctor/                   # External, once-per-project setup: audit machine + project for the guard tools, offer install/config (per-item confirm)
-├── hooks/                       # Claude Code hooks (session-start, etc.)
+├── hooks/                       # Shared lifecycle hooks (session-start, etc.)
 └── docs/                        # Plans and documentation
 ```
 
 ## Versioning
 
-- Version is tracked in `.claude-plugin/plugin.json` under the `"version"` field
+- Version is tracked in both `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json`; keep them synchronized
 - Follow semver: bump patch for fixes/tweaks, minor for new skills or significant changes
 - Stay on the current major (v4) by default. Use minor bumps even for changes that look breaking (e.g. skill renames, slash-command changes) -- those are absorbed via the minor channel here
 - Do NOT bump the major version unless the user explicitly asks for it
@@ -51,7 +53,7 @@ pandahrms-skills/
 
 - Each skill lives in `skills/<skill-name>/SKILL.md`
 - Skills use YAML frontmatter (`name`, `description`) followed by markdown content
-- The `description` field determines when Claude Code invokes the skill -- keep it precise
+- The `description` field determines when Claude Code or Codex invokes the skill -- keep it precise
 - **Plugin content must be self-contained.** Never reference per-member files such as `~/.claude/rules/*` (TDD.md, SOLID.md, Security.md, etc.) from any SKILL.md body, frontmatter `description`, hook, or plugin doc. A teammate who installs the plugin may not have those files, so the reference dangles. Inline the principle you need (the TDD loop, the SOLID rules, the OWASP/security checks) directly. The plugin ships its own rules; it never depends on a member's home-directory config.
 - Test skill changes by invoking the skill in a Pandahrms project workspace
 - SKILL.md body content must NOT contain any of these three prose types:
@@ -62,7 +64,7 @@ pandahrms-skills/
 
 ## SKILL.md Prose Compression Rules
 
-SKILL.md bodies are loaded into Claude's context on every invocation, so prose is paying rent. Write skill bodies in compressed form. The frontmatter `description` field is exempt -- it stays in normal English so trigger language remains precise.
+SKILL.md bodies are loaded into the active host's context on every invocation, so prose is paying rent. Write skill bodies in compressed form. The frontmatter `description` field is exempt -- it stays in normal English so trigger language remains precise.
 
 **Drop:**
 - Articles: a, an, the (where omission is unambiguous)

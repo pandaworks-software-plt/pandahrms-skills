@@ -7,11 +7,13 @@ description: 'Triggers on requests to raise the PR for finished work -- `/pr`, "
 
 Determine the branch, commit, then raise the one PR for the whole work.
 
+Invoke sub-skills with the active host's skill mechanism. In Codex, when nested skill invocation is not exposed as a tool, read the sibling `../<skill-name>/SKILL.md` and execute it inline.
+
 **Announce at start:** "I'm using Pandahrms /pr to commit and raise the PR for this work."
 
 ## 1. Branch first (user-owned)
 
-Determine the branch BEFORE committing. If the current branch is `main`, `master`, `develop`, or `development`, do NOT `/commit` or PR there. Ask via AskUserQuestion how to branch and CREATE the branch before committing:
+Determine the branch BEFORE committing. If the current branch is `main`, `master`, `develop`, or `development`, do NOT `/commit` or PR there. Ask the user how to branch and CREATE the branch before committing:
 - "Create a branch now" -- invoke `pandahrms:branching` (confirms name + source with the user).
 - "I'll branch myself" -- pause, wait for the user to say the branch is ready.
 

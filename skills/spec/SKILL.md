@@ -1,7 +1,6 @@
 ---
 name: spec
-description: '`/spec` -- write or update the L1 behaviour spec in the L1 spec repo (location read from the `Spec repo:` line in the global CLAUDE.md; asks the user and saves it there when the location is not stated) from intake output (objective + acceptance criteria + module). The L1 spec is the tech-agnostic product truth in Gherkin -- no UI mechanics, no API/endpoint detail. Presents a scenario-index table for user agreement, then asks whether to commit/PR to the L1 spec repo -- never auto-commits. Does NOT write L2 executable specs (those come later during execution).'
-model: opus
+description: '`/spec` -- write or update the L1 behaviour spec in the L1 spec repo (location read from the `Spec repo:` line in the active host''s global instructions; asks the user and saves it there when the location is not stated) from intake output (objective + acceptance criteria + module). The L1 spec is the tech-agnostic product truth in Gherkin -- no UI mechanics, no API/endpoint detail. Presents a scenario-index table for user agreement, then asks whether to commit/PR to the L1 spec repo -- never auto-commits. Does NOT write L2 executable specs (those come later during execution).'
 ---
 
 # /spec -- L1 Behaviour Spec
@@ -13,19 +12,19 @@ INPUT: the per-work `_overview.md`. Read its `work_folder` frontmatter field for
 ## GATE-0 -- behaviour change?
 
 Behaviour change = new rule, changed rule, or bug that changes what "correct" means.
-- No behaviour change (pure UI restyle, refactor preserving observable outputs, rename, formatting) -> propose SKIP via AskUserQuestion; on confirm, return control.
+- No behaviour change (pure UI restyle, refactor preserving observable outputs, rename, formatting) -> ask the user to confirm SKIP; on confirm, return control.
 - Yes -> continue.
 
 ## LOCATE
 
 Resolve the L1 spec repo location (call the result `<spec-repo>`) in this order -- first hit wins:
 
-1. **Stated location** -- if the session context or the user's global `~/.claude/CLAUDE.md` names where the L1 spec lives (e.g. a `Spec repo: <path>` line under a `## Spec` heading), use that path. Never re-derive it. Never guess a default path.
-2. **Ask** -- if it does not resolve, AskUserQuestion for the L1 spec repo path. Do not guess a path; do not offer a default.
+1. **Stated location** -- if the session context or the active host's global instructions (`~/.codex/AGENTS.md` for Codex, `~/.claude/CLAUDE.md` for Claude Code) name where the L1 spec lives (e.g. a `Spec repo: <path>` line under a `## Spec` heading), use that path. Never re-derive it. Never guess a default path.
+2. **Ask** -- if it does not resolve, ask the user for the L1 spec repo path. Do not guess a path; do not offer a default.
 
-After the user answers via step 2, append a `Spec repo: <path>` line to the user's global `~/.claude/CLAUDE.md` (under a `## Spec` heading, create the file and the heading if absent) so later runs in every project skip the ask. The user's answer is the authorization to write -- do not re-confirm. Never write this line to a project `CLAUDE.md`.
+After the user answers via step 2, append a `Spec repo: <path>` line to the active host's global instructions (`~/.codex/AGENTS.md` for Codex, `~/.claude/CLAUDE.md` for Claude Code). Put it under a `## Spec` heading; create the file and heading if absent. The user's answer is authorization to write -- do not re-confirm. Never write this line to a project instruction file.
 
-Branch alignment (before reading any `.feature`): compare `git -C <spec-repo> rev-parse --abbrev-ref HEAD` with the working project's `git rev-parse --abbrev-ref HEAD`. On mismatch, AskUserQuestion: checkout matching branch / stay and proceed / abort. Never auto-checkout, auto-fetch, or auto-pull.
+Branch alignment (before reading any `.feature`): compare `git -C <spec-repo> rev-parse --abbrev-ref HEAD` with the working project's `git rev-parse --abbrev-ref HEAD`. On mismatch, ask the user: checkout matching branch / stay and proceed / abort. Never auto-checkout, auto-fetch, or auto-pull.
 
 Find `specs/<module>/<feature>/*.feature`. `module` comes from intake -- never hard-code a module list. `<feature>` = kebab-case of the affected feature area (e.g. `adhoc-review`). Full path: `specs/<module>/<feature>/<entity>-<area>.feature`. Check existing FIRST: update the matching `.feature`; create a new file only when none fits.
 
@@ -137,7 +136,7 @@ Scenario-level:
 - Bug fix -> a `@bugfix` scenario capturing the correct behaviour.
 - Refactor -> `@refactor` scenarios documenting preserved behaviour.
 
-If a mandatory `@validation` scenario needs behaviour not present in the intake acceptance criteria, STOP and ask the user for that behaviour via AskUserQuestion -- never invent the rule.
+If a mandatory `@validation` scenario needs behaviour not present in the intake acceptance criteria, STOP and ask the user for that behaviour -- never invent the rule.
 
 ### File splitting
 
@@ -175,7 +174,7 @@ Highlight assumptions and gaps. Wait for explicit agreement. On change requests,
 
 After agreement, write the `.feature` file(s) to `specs/<module>/<feature>/` in `<spec-repo>`.
 
-Then AskUserQuestion: commit/PR the spec, or leave it written and stop?
+Then ask the user: commit/PR the spec, or leave it written and stop?
 - **No** -> leave the `.feature` files written in the working tree, stop. Nothing staged, nothing committed.
 - **Yes** -> in `<spec-repo>`: stage ONLY the `.feature` files this skill produced (`git -C <spec-repo> add <each .feature path>`) -- never `git add .`/`-A`, never any non-`.feature` path; leave all other working-tree files untouched. Commit them in `<spec-repo>`. Then optionally open a PR if the user wants one.
 

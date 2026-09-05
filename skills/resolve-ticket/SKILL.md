@@ -1,6 +1,6 @@
 ---
 name: resolve-ticket
-description: Manually invoked as `/resolve-ticket <ticket_number>` (or by an explicit mention of "resolve-ticket" / "resolve this ticket") to move ONE workspace-prod ticket (a UUID or a human number like T26050092) to a resolved, ready-for-release state -- card-less. Fetches it via the workspace-prod MCP `get_ticket` tool, then drafts and applies dev status, status + customer-facing solution, resolutionNotes (Developer Resolution), and a resolved comment, STOPPING for explicit user confirmation before any write. Does NOT auto-trigger -- pasting a ticket URL or saying "look at this ticket" is NOT enough.
+description: Manually invoked as `/resolve-ticket TICKET_NUMBER` (or by an explicit mention of "resolve-ticket" / "resolve this ticket") to move ONE workspace-prod ticket (a UUID or a human number like T26050092) to a resolved, ready-for-release state -- card-less. Fetches it via the workspace-prod MCP `get_ticket` tool, then drafts and applies dev status, status + customer-facing solution, resolutionNotes (Developer Resolution), and a resolved comment, STOPPING for explicit user confirmation before any write. Does NOT auto-trigger -- pasting a ticket URL or saying "look at this ticket" is NOT enough.
 ---
 
 # Resolve Ticket
@@ -11,14 +11,14 @@ Card-less ticket resolution. Take one ticket ref, move the workspace-prod ticket
 
 ## Input
 
-Single argument: ticket reference. Accepts a UUID or a human ticket number (e.g. `T26050092`). Missing -> ask via AskUserQuestion. `get_ticket` resolves both forms.
+Single argument: ticket reference. Accepts a UUID or a human ticket number (e.g. `T26050092`). Missing -> ask the user. `get_ticket` resolves both forms.
 
 ## Phase 1: Fetch
 
 Call `mcp__workspace-prod__get_ticket` with `id` = the ref. Capture: `id` (UUID), `ticketNumber`, `status`, `needsDev`, `devStatus`, `customer`, `title`, `type`. Use the UUID `id` for every mutating call below.
 
 - Call errors or no ticket -> report the failure and STOP. No writes.
-- `status` already `resolved` or `closed` -> surface the current state and ask via AskUserQuestion whether to re-write the fields anyway or stop.
+- `status` already `resolved` or `closed` -> surface the current state and ask the user whether to re-write the fields anyway or stop.
 
 ## Phase 2: Draft the fields
 
@@ -34,7 +34,7 @@ Apply the Field rules (below) to every value before showing it.
 
 ## Phase 3: Confirm (gate)
 
-Show the planned state transitions and the three drafted field values in one message, then call AskUserQuestion: proceed / edit / cancel.
+Show the planned state transitions and the three drafted field values in one message, then ask the user: proceed / edit / cancel.
 
 - Planned transitions line: current `status`/`devStatus`/`needsDev` -> the targets (`developer` + `needsDev=true` if needed, dev status `ready-for-release`, status `resolved`).
 - `proceed` -> Phase 4. `edit` -> revise the named field(s), re-show, ask again. `cancel` -> STOP, no writes.

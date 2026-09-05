@@ -1,0 +1,20 @@
+{
+  "name": "pandahrms-skills",
+  "interface": {
+    "displayName": "Pandahrms Skills"
+  },
+  "plugins": [
+    {
+      "name": "pandahrms",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

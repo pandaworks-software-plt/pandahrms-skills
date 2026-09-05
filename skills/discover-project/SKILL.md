@@ -1,6 +1,6 @@
 ---
 name: discover-project
-description: The project-queue intake door of the Pandahrms flow. `/discover-project <projectNumber> [--all]`. Fetches the project's tickets via the workspace-prod MCP `list_tickets` tool -- the pending dev queue by default, every linked ticket with `--all` -- and prints them as a numbered table for the user to pick from, pointing at `/discover-ticket <ticketNumber>` for the one they choose. Read-only router -- it writes no files and emits no output contract.
+description: The project-queue intake door of the Pandahrms flow. `/discover-project PROJECT_NUMBER [--all]`. Fetches the project's tickets via the workspace-prod MCP `list_tickets` tool -- the pending dev queue by default, every linked ticket with `--all` -- and prints them as a numbered table for the user to pick from, pointing at `/discover-ticket TICKET_NUMBER` for the one they choose. Read-only router -- it writes no files and emits no output contract.
 ---
 
 # Discover (project-queue door)

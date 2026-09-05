@@ -1,6 +1,6 @@
 ---
 name: lint-gate
-description: Manually invoked as `/lint-gate` (or by an explicit "run the lint gate" / "deterministic guard pass on my changes" mention). A diff-scoped DETERMINISTIC guard runner over the working-tree changes -- project linter on changed files, a Tool Gate (TODO/FIXME/XXX, secrets, leftover-debug, repo-conventions), an OPTIONAL structural analyzer/dup tier, and an L1->L2 `.feature` traceability check -- emitting findings tagged `[tool:<name>]` plus the set of OWNED categories. Does NOT auto-trigger (a pending diff alone is not enough), and does NOT commit, stage, push, run tests, or apply fixes.
+description: Manually invoked as `/lint-gate` (or by an explicit "run the lint gate" / "deterministic guard pass on my changes" mention). A diff-scoped DETERMINISTIC guard runner over the working-tree changes -- project linter on changed files, a Tool Gate (TODO/FIXME/XXX, secrets, leftover-debug, repo-conventions), an OPTIONAL structural analyzer/dup tier, and an L1-to-L2 `.feature` traceability check -- emitting tool-tagged findings plus the set of OWNED categories. Does NOT auto-trigger (a pending diff alone is not enough), and does NOT commit, stage, push, run tests, or apply fixes.
 ---
 
 # Lint Gate
@@ -70,11 +70,11 @@ Cheap deterministic scans over the diff. Each row: tool -> built-in fallback. A 
 | TODO/FIXME/XXX | `rg -n 'TODO\|FIXME\|XXX'` over changed files -> `git grep -n 'TODO\|FIXME\|XXX'` | `todo` |
 | Secrets / leaked credentials | `gitleaks` (see secret-scan surface below) -> regex over the diff + untracked files | `secrets` |
 | Leftover debug | linter `no-console`/`no-debugger` (if enabled, ran clean) -> `grep -n 'console\.log\|debugger\|Console\.WriteLine'` | `debug-leftover` |
-| Repo conventions | `wc -l` per changed file vs repo-root `CLAUDE.md` mechanical size limit; `grep` for a banned import / required header named in that `CLAUDE.md` | `repo-conventions` |
+| Repo conventions | `wc -l` per changed file vs the active host's repo-root instruction file (`AGENTS.md` for Codex, `CLAUDE.md` for Claude Code); `grep` for a banned import / required header named there | `repo-conventions` |
 
 Rules:
 - Every `TODO`/`FIXME`/`XXX` hit in the diff is a finding (Major severity).
-- Repo-conventions reads ONLY mechanical rules from the repo-root `CLAUDE.md` -- a numeric file-size limit, a named banned import, a required-header string. Non-mechanical "judgment" conventions are NOT in scope here (they stay with the caller's LLM).
+- Repo-conventions reads ONLY mechanical rules from the active host's repo-root instruction file -- a numeric file-size limit, a named banned import, a required-header string. Non-mechanical "judgment" conventions are NOT in scope here (they stay with the caller's LLM).
 - A guard with no machine tool still runs its built-in -- never skipped.
 - Record per guard which path ran: `TODO: rg` / `git grep`; `Secrets: gitleaks` / `regex fallback`; `Debug: linter` / `grep`; `Repo-conventions: checked`.
 
@@ -173,7 +173,7 @@ One line per guard: which path ran and any `/tool-doctor` gap:
 - `TODO: rg | git grep`
 - `Secrets: gitleaks | regex fallback` (staged + unstaged + untracked all scanned)
 - `Debug: linter | grep`
-- `Repo-conventions: checked | no CLAUDE.md`
+- `Repo-conventions: checked | no host instruction file`
 - `God-class / Long-switch / New-of-service / Empty-catch / Exact-dup: <tool> | LLM fallback`
 - `Traceability: <covered N / uncovered N / pending N>`
 

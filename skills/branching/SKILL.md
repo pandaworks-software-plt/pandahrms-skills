@@ -21,7 +21,7 @@ When you branch from a remote ref like `origin/feature/other-work`, git automati
 
 ### 1. Gather Purpose and Source Branch
 
-If the user already provided the purpose and/or source branch in their message, confirm them. Otherwise, use AskUserQuestion to ask:
+If the user already provided the purpose and/or source branch in their message, confirm them. Otherwise, ask the user:
 
 - **Purpose:** What is this branch for?
 - **Source branch:** Which branch should it be created from? (Default recommendation: `main`)
@@ -32,7 +32,7 @@ If the source branch is NOT `main` or `develop`, explicitly warn the user:
 
 > "You are branching from `feature/other-work`, which is a feature branch -- not main. This means your branch will be based on in-progress work. Are you sure?"
 
-Use AskUserQuestion to confirm intent before proceeding.
+Ask the user to confirm intent before proceeding.
 
 ### 3. Determine Branch Type
 
@@ -70,7 +70,7 @@ Examples:
 
 ### 5. Confirm Before Creating (MANDATORY)
 
-Before creating the branch, you MUST use AskUserQuestion to confirm. Present:
+Before creating the branch, you MUST ask the user to confirm. Present:
 
 - **Branch name:** `{type}/{short-kebab-description}`
 - **Purpose:** {what the user described}

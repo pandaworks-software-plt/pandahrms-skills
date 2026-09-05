@@ -1,6 +1,6 @@
 ---
 name: discover-ticket
-description: The ticket intake door of the Pandahrms flow. `/discover-ticket <ticket-ref>` -- a single ticket reference, a UUID or a human ticket number like T26050092. Fetches the ticket via the workspace-prod MCP `get_ticket` tool, validates and fills gaps in its existing acceptance criteria (never generates it from scratch), and emits the same converged output contract as `/discover` (objective/root-cause + plain-statement acceptance criteria + module) into a per-ticket card folder `<TICKET>-<slug>/_overview.md` inside the current repo. Does NOT write outside the repo root.
+description: The ticket intake door of the Pandahrms flow. `/discover-ticket TICKET_REF` -- a single UUID or human ticket number like T26050092. Fetches the ticket via the workspace-prod MCP `get_ticket` tool, validates and fills gaps in its existing acceptance criteria (never generates it from scratch), and emits the same converged output contract as `/discover` into a per-ticket card folder inside the current repo. Does NOT write outside the repo root.
 ---
 
 # Discover (ticket door)
@@ -9,7 +9,7 @@ Fetch a ticket, validate its acceptance criteria, converge, emit the shared outp
 
 ## Input
 
-Single argument: ticket reference. Accepts a UUID or a human ticket number (e.g. `T26050092`). If missing, ask for it via AskUserQuestion. One ticket per run.
+Single argument: ticket reference. Accepts a UUID or a human ticket number (e.g. `T26050092`). If missing, ask the user for it. One ticket per run.
 
 ## Workflow
 
@@ -30,7 +30,7 @@ Read from the fetched ticket:
 
 Derive intent type from the ticket:
 - `isBug` true (or `type` indicates a bug) -> `bug`.
-- Otherwise map `type` to `new-feature` or `enhancement`. If the ticket `type` maps to either and the choice is ambiguous, ask the user via AskUserQuestion. Do not guess silently.
+- Otherwise map `type` to `new-feature` or `enhancement`. If the ticket `type` maps to either and the choice is ambiguous, ask the user. Do not guess silently.
 
 ### Phase 3: Validate + fill gaps in acceptance criteria
 

@@ -1,7 +1,6 @@
 ---
 name: pr-approver-review
-description: '`/pr-approver-review <PR-number> [fast|deep]` -- senior-approver review of an ALREADY-OPENED GitHub PR by number -- form your own findings and approval gate first (the independent phase always runs in a dispatched subagent), then cross-check the `claude[bot]` review. Reads code at the PR head commit, enforces Pandahrms project rules as real severity, scores an approval gate, and returns a verdict plus a distinct senior take. Read-only -- never commits, pushes, merges, or posts to the PR. NOT for working-tree or pre-commit diffs (those are `/code-review`).'
-model: opus
+description: '`/pr-approver-review PR_NUMBER [fast|deep]` -- senior-approver review of an ALREADY-OPENED GitHub PR by number -- form your own findings and approval gate first (the independent phase always runs in a dispatched subagent), then cross-check the `claude[bot]` review. Reads code at the PR head commit, enforces Pandahrms project rules as real severity, scores an approval gate, and returns a verdict plus a distinct senior take. Read-only -- never commits, pushes, merges, or posts to the PR. NOT for working-tree or pre-commit diffs (those are `/code-review`).'
 ---
 
 # Pandahrms /pr-approver-review
@@ -16,7 +15,7 @@ You are a senior approver reviewing PR **#<PR>** in Pandahrms (ASP.NET MVC 5, mu
 
 **Four rules across the whole review:**
 
-1. **Independent first -- ALWAYS in a dispatched subagent.** Steps 1-3 live in `references/independent-phase.md` and run in ONE subagent (Agent tool), never inline. Orchestrator dispatches, waits, then runs Steps 4-5. Bot comment bodies are fetched only in Step 4.
+1. **Independent first -- ALWAYS in a dispatched subagent.** Steps 1-3 live in `references/independent-phase.md` and run in ONE subagent using the active host's subagent tools, never inline. Orchestrator dispatches, waits, then runs Steps 4-5. Bot comment bodies are fetched only in Step 4.
 2. **Verify before report.** Read cited code at the PR HEAD COMMIT (not the local working tree -- it may be another branch) before stating any finding. Cited code not read -> drop the finding; it is never tagged. `[VERIFIED]` = read the code, the defect is on the page. `[INFERRED]` = read the code, the defect depends on a runtime path or caller not traced. Applies equally to every bot claim in Step 4. Orchestrator does not re-verify subagent findings; it verifies bot claims only.
 3. **Project rules are correctness, not style.** A missing tenant filter leaks data; a missing `.csproj` entry breaks the deploy.
 4. **The diff is not the unit of review -- the change is.** A diff proves what changed, never what *should* have changed. When a PR removes a bad line, that removal is the ONLY evidence the diff can show, and it reads as "handled" even when an identical bad line survives in the unchanged lines of the same file. Every bug a diff hides is invisible by construction -- the Step 2a sweeps are the only way to see that class of defect, so they are not optional thoroughness.
@@ -33,12 +32,12 @@ Resolve the repo slug once: `gh repo view --json nameWithOwner -q .nameWithOwner
 Orchestrator sequence, no exceptions (Fast and Deep alike):
 
 1. Announce, resolve `<OWNER/REPO>`.
-2. Dispatch ONE `general-purpose` subagent (Agent tool, `model: opus`, `run_in_background: false`) and wait. Do not fetch bot data or read PR code while it runs.
+2. Dispatch ONE foreground subagent using the active host's subagent tools and wait. Use `general-purpose` when the host requires a subagent type. On Claude Code request `model: opus`; on Codex use the inherited current/default model. Do not fetch bot data or read PR code while it runs.
 3. Subagent prompt is exactly this, placeholders filled:
 
-   > You are the independent review phase of a senior-approver review of PR #<PR> in Pandahrms (ASP.NET MVC 5, multi-tenant HR). Read `<skill-dir>/references/independent-phase.md` in full with the Read tool and follow it exactly. PR = <PR>. Mode token = <fast | deep | none>. Repo = <OWNER/REPO>. Run Steps 1-3 inline yourself. Never dispatch subagents. Read-only: `git fetch` allowed; never checkout, never write. Never fetch bot comment bodies or reviews. Reply with the Return block from that file and nothing else.
+   > You are the independent review phase of a senior-approver review of PR #<PR> in Pandahrms (ASP.NET MVC 5, multi-tenant HR). Read `<skill-dir>/references/independent-phase.md` in full with the host's file-reading tools and follow it exactly. PR = <PR>. Mode token = <fast | deep | none>. Repo = <OWNER/REPO>. Run Steps 1-3 inline yourself. Never dispatch subagents. Read-only: `git fetch` allowed; never checkout, never write. Never fetch bot comment bodies or reviews. Reply with the Return block from that file and nothing else.
 
-   `<skill-dir>` = `${CLAUDE_SKILL_DIR}` (this skill's base directory).
+   `<skill-dir>` = directory containing this `SKILL.md` (`${CLAUDE_SKILL_DIR}` on Claude Code).
 4. Return block is complete when every numbered item of the reference file's `## Return block` is present. Incomplete, error, or timeout -> re-dispatch ONCE. Second failure -> stop and report the failure. Never run Steps 1-3 inline.
 5. Adopt the returned block as your own Steps 1-3 result, then run Step 4 and Step 5.
 

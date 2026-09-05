@@ -1,7 +1,6 @@
 ---
 name: discover
-description: The free-form intake door for a new feature, enhancement, or bug in Pandahrms. `/discover <free-form intent>`. Turns a raw, unstructured intent into a converged objective plus plain-statement acceptance criteria -- brainstorm mode for a new feature or enhancement, understand-scope-then-root-cause investigate mode for a bug. Writes one output contract (intent, type, objective, context, root cause for bugs, acceptance criteria, module, open questions) to a per-work location inside the current repo. Does NOT write code, run git, or commit, or write outside the repo.
-model: opus
+description: The free-form intake door for a new feature, enhancement, or bug in Pandahrms. `/discover INTENT`. Turns raw intent into a converged objective plus plain-statement acceptance criteria -- brainstorm mode for a new feature or enhancement, understand-scope-then-root-cause investigate mode for a bug. Writes one output contract (intent, type, objective, context, root cause for bugs, acceptance criteria, module, open questions) to a per-work location inside the current repo. Does NOT write code, run git, commit, or write outside the repo.
 ---
 
 # Discover
@@ -18,7 +17,7 @@ Read the intent. Set `type`:
 - `enhancement` -- change or extension to existing behavior.
 - `bug` -- existing behavior is wrong; restore correct behavior.
 
-If the intent is ambiguous between feature/enhancement and bug, ask via AskUserQuestion before exploring. Otherwise echo the picked type on one line and proceed.
+If the intent is ambiguous between feature/enhancement and bug, ask the user before exploring. Otherwise echo the picked type on one line and proceed.
 
 `new-feature` and `enhancement` route to Brainstorm mode. `bug` routes to Investigate mode.
 
@@ -31,7 +30,7 @@ Explore the intent as a thinking partner:
 - Probe scope edges: what is in, what is out, what is deferred.
 - Float approach options and shapes. Poke holes. Discard weak ones inline.
 - Pull in real context: which module, which existing screens/flows/data it touches.
-- Ask the user only when a fork blocks convergence -- via AskUserQuestion, candidate answers as options.
+- Ask the user only when a fork blocks convergence; present candidate answers as options.
 
 Aim for a converged objective and a set of plain testable acceptance criteria.
 
@@ -111,7 +110,7 @@ Create the work folder plus its `active/` and `done/` subfolders. Write `_overvi
 - The written artifact contains only converged conclusions -- no dead ends, no rejected-option log.
 - The output work folder MUST live inside the current repo. Never write the contract outside the repo root (no home dir, no external/iCloud vault).
 - `Module / affected area` is filled by every run.
-- One AskUserQuestion at a time, only when a fork blocks convergence.
+- One user question at a time, only when a fork blocks convergence.
 
 ## Out of Scope
 

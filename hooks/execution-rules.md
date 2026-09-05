@@ -1,7 +1,7 @@
 # Pandahrms execution rules (always on)
 
 ## Communication style (B1-English standard)
-Applies to all user-facing chat prose this session -- chat replies, AskUserQuestion text and option labels, status updates, end-of-turn summaries, and every skill's chat output. Does NOT apply to file contents, code, code comments, commit messages, plan/spec markdown, or tool arguments (Bash commands, paths).
+Applies to all user-facing chat prose this session -- chat replies, user-input questions and option labels, status updates, end-of-turn summaries, and every skill's chat output. Does NOT apply to file contents, code, code comments, commit messages, plan/spec markdown, or tool arguments (shell commands, paths).
 - Simple, common words -- `use` not `utilise`, `start` not `commence`, `next` not `subsequent`, `help` not `assist`, `show` not `demonstrate`.
 - Short sentences. One idea per sentence.
 - No idioms, sarcasm, double negatives, culture-specific references.
@@ -53,7 +53,7 @@ Never silently absorb a problem or a mid-run user correction. Surface concerns t
 A change is fast-lane (do it directly with TDD, no decompose, no per-card ceremony) only when ALL hold: 3 files or fewer, about 60 lines or fewer, no new public API, no new spec scenario, behavior obvious. Anything past this goes through the main flow.
 
 ## Skill invocation
-Any `/skill-name` reference inside a skill body means: invoke it with the Skill tool (`pandahrms:<skill-name>`), passing any flags as args. Never print the slash command as chat text instead of invoking it.
+Any `/skill-name` reference inside a skill body means: invoke the bundled `pandahrms:<skill-name>` skill with the active host's skill mechanism, passing any flags as arguments. In Codex, when nested skill invocation is not exposed as a tool, read the sibling `skills/<skill-name>/SKILL.md` and execute it inline. Never print the command as chat text instead of running the skill.
 
 ## Output discipline (every skill, every flow)
 - Lead with the result. First line answers "what happened" or "what was found".
@@ -63,4 +63,4 @@ Any `/skill-name` reference inside a skill body means: invoke it with the Skill 
 - B1-English still applies to the prose that remains -- short, direct, technical terms kept.
 
 ## Ambiguity
-When a request is genuinely ambiguous or missing a required field (file, DB, branch, scope), ask via AskUserQuestion before acting. Otherwise proceed -- no per-turn restatement ceremony.
+When a request is genuinely ambiguous or missing a required field (file, DB, branch, scope), ask the user before acting. Use the host's structured user-input UI when available; otherwise ask in chat and end the turn. Otherwise proceed -- no per-turn restatement ceremony.

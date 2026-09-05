@@ -20,7 +20,7 @@ Read `work_folder` from the per-work `_overview.md` frontmatter -- single source
 
 Read the per-work `_overview.md` intake. Detect ticket work by the presence of a `Source`/ticket field. No ticket field -> skip this phase.
 
-Ticket field present -> invoke `/resolve-ticket <ticket-ref>` via the Skill tool, passing the ticket ref from the `_overview`. Draft the field content from the `_overview` intake + the session's card work, then hand it to `/resolve-ticket`. That skill owns the full ticket update: dev status -> `ready-for-release`, status -> `resolved` with a plain customer-facing `solution`, `resolutionNotes` (Developer Resolution), and a customer-facing resolved comment -- with the relevance gate, plain-text rule, customer-facing tone rule, and the confirm-before-mutate gate. Wait for it to return before Phase 3.
+Ticket field present -> invoke the bundled `/resolve-ticket <ticket-ref>` skill using the active host's skill mechanism, passing the ticket ref from the `_overview`. In Codex, load and follow `../resolve-ticket/SKILL.md` inline when nested skill invocation is not exposed as a tool. Draft the field content from the `_overview` intake + the session's card work, then hand it to `/resolve-ticket`. That skill owns the full ticket update: dev status -> `ready-for-release`, status -> `resolved` with a plain customer-facing `solution`, `resolutionNotes` (Developer Resolution), and a customer-facing resolved comment -- with the relevance gate, plain-text rule, customer-facing tone rule, and the confirm-before-mutate gate. Wait for it to return before Phase 3.
 
 `/resolve-ticket` STOPS on a rejected required transition -> if it stops, do not run Phase 3; report and let the user resolve the ticket state first.
 

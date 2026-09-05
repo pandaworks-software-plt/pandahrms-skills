@@ -16,7 +16,7 @@
 # the same JSON envelope, just with an empty additionalContext, rather than
 # skipping output.
 #
-# Team-neutral: no per-member ~/.claude/rules paths, no jq/python3 dependency --
+# Team-neutral: no per-member host configuration paths, no jq/python3 dependency --
 # this hook also runs under git-bash on Windows via run-hook.cmd, where jq/python3
 # are not guaranteed to be installed, so cwd is pulled out of the JSON payload with
 # plain sed/grep, matching the pure-bash style already used below for JSON escaping.
@@ -119,7 +119,7 @@ if [ -n "$session_cwd" ]; then
     session_cwd="$(json_unescape "$session_cwd")"
 fi
 if [ -z "$session_cwd" ]; then
-    session_cwd="${CLAUDE_PROJECT_DIR:-}"
+    session_cwd="${CODEX_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-}}"
 fi
 if [ -z "$session_cwd" ]; then
     session_cwd="${PWD:-}"

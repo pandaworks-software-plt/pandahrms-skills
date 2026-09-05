@@ -1,7 +1,6 @@
 ---
 name: security-review
 description: Triggers when the user requests a security review of code or working-tree changes -- phrasings such as "/security-review", "run security review", "do a security review", "audit this for vulnerabilities", "OWASP pass on this branch", "check this PR for security issues", "auth audit", "authz audit", "pen test this". Audits auth, authz, input validation, injection, secrets, PII exposure, audit trails, and tenant isolation in working tree changes or a specified feature area. Reports findings and fixes approved issues. Does NOT commit, stage, or push.
-model: opus
 ---
 
 # Security Review
@@ -16,11 +15,11 @@ MUST NOT at any phase:
 
 - Run `git commit`, `git commit --amend`, `git push`, `git rebase`, `git reset --hard`, `git stash`, `git add`, or any history-altering, staging, or remote-publishing command. Fixes go to working tree only; staging is user's responsibility.
 - Invoke any other skill except through explicit user choice in Phase 8.
-- Send working-tree contents, diffs, file paths, or finding details to any external service (WebFetch, WebSearch, MCP servers, paste services, gists). Only allowed network calls are dependency-audit invocations of project's own package-manager CLI (`dotnet`, `pnpm`, `npm`).
+- Send working-tree contents, diffs, file paths, or finding details to any external service (web/search tools, MCP servers, paste services, gists). Only allowed network calls are dependency-audit invocations of project's own package-manager CLI (`dotnet`, `pnpm`, `npm`).
 - Rotate, re-issue, or relocate secrets when fixing leaked-credential findings. Only remove leaked value from source file and report leak; rotation is user responsibility.
 - Modify `appsettings.Production.json`, KeyVault references, GitHub Actions secrets, or any production configuration store as a "fix."
 - Apply security fix without explicit user approval recorded in Phase 7.
-- Write `Where:` reference (file:line) for a line not opened with Read tool in this run.
+- Write `Where:` reference (file:line) for a line not opened with the host's file-reading tools in this run.
 - Cite CVE numbers from training-data memory. CVE knowledge comes only from package-manager audit output captured during Phase 3 (A06).
 - Dispatch parallel subagents. All work in main thread.
 
@@ -65,7 +64,7 @@ Phase ledger: at every phase transition, print `Phase N/8 done -> Phase N+1`.
 ### 0.1 Resolve scope to concrete file list
 
 - If user supplied literal path or glob (e.g. `/security-review src/auth`, `/security-review on Pandahrms.Performance.Api/Controllers/LoginController.cs`), use exactly that path set.
-- If user supplied natural-language scope (e.g. "the new login endpoint", "the export feature"), resolve to concrete file list using `git status`, `grep`, `find`. When more than 5 files match, or zero match, list the matched files inline in chat and confirm the file set via AskUserQuestion before proceeding.
+- If user supplied natural-language scope (e.g. "the new login endpoint", "the export feature"), resolve to concrete file list using `git status`, `grep`, `find`. When more than 5 files match, or zero match, list the matched files inline in chat and ask the user to confirm the file set before proceeding.
 - If no scope supplied, default to git working tree captured by:
   - `git status` (untracked and modified files)
   - `git diff` and `git diff --cached` (unstaged and staged changes)
@@ -76,7 +75,7 @@ If no scope supplied AND `git status` shows clean tree (no staged, unstaged, or 
 
 ### 0.3 Read every in-scope file end-to-end
 
-Read **full content** of every in-scope file using Read tool. Diff alone is not enough for security analysis -- unchanged surrounding code (guards, middleware, filters) often determines whether change is safe.
+Read **full content** of every in-scope file using the host's file-reading tools. Diff alone is not enough for security analysis -- unchanged surrounding code (guards, middleware, filters) often determines whether change is safe.
 
 If file exceeds 2000 lines, page through with explicit `offset`/`limit` calls until EOF. Maintain per-file ledger:
 
@@ -99,7 +98,7 @@ Detect every project-type signal in the in-scope file list. Run checklist rows f
 
 ### No-signal fallback
 
-If **no** project-type signal matches in scope, halt and use `AskUserQuestion` to confirm whether to (a) abort as out-of-scope, or (b) proceed using user-specified checklist set. Do not infer checklist from absence of signals, and do not silently default to .NET.
+If **no** project-type signal matches in scope, halt and ask the user whether to (a) abort as out-of-scope, or (b) proceed using a user-specified checklist set. Do not infer checklist from absence of signals, and do not silently default to .NET.
 
 **Phase 2: Threat Pass**
 
@@ -192,7 +191,7 @@ Deviation from this structure is defect. Do not omit a section because empty -- 
 
 ### No invented references
 
-Every `Where:` reference must come from file actually opened by Read tool in this run. Do not write line number unless you have read that line. If finding spans a concept rather than single line, write `path/to/file.cs (whole file)` instead of guessing.
+Every `Where:` reference must come from a file actually opened with the host's file-reading tools in this run. Do not write line number unless you have read that line. If finding spans a concept rather than single line, write `path/to/file.cs (whole file)` instead of guessing.
 
 **Phase 7: Fix (Optional)**
 
@@ -203,7 +202,7 @@ Every `Where:` reference must come from file actually opened by Read tool in thi
 
 ### Approval prompt
 
-If Critical or High findings exist, use `AskUserQuestion` to ask:
+If Critical or High findings exist, ask the user:
 
 > "The security review found [N Critical / M High] issues. Fix them now, or report and let you handle them?"
 
@@ -244,11 +243,11 @@ Summarize:
 
 **If `--no-commit` set (review-only mode):** emit the summary above and STOP. Do NOT ask the commit/test question, do NOT invoke `/commit`. Return control to the caller (the caller owns the commit gate). Used when a caller such as `/code-review` or `/execute` invokes this skill for findings only.
 
-Then use `AskUserQuestion` to ask:
+Then ask the user:
 
 > "Security review complete. Would you like to proceed to /commit, or test first?"
 
-- **Commit** -- invoke `pandahrms:commit` via Skill tool, then end security-review turn immediately upon dispatch. Do not produce additional output, findings, or commentary after dispatch.
+- **Commit** -- invoke the bundled `/commit` skill using the active host's skill mechanism, then end security-review immediately after it starts. In Codex, load and follow `../commit/SKILL.md` inline when nested skill invocation is not exposed as a tool. Do not produce additional output, findings, or commentary after dispatch.
 - **Test first** -- emit exactly the single line "Sounds good. Run /commit when you're ready." and end turn. Do not add further text.
 
 After Phase 8 ends, security-review is complete. Do not continue executing security-review behavior (no further audits, follow-up advice, or additional checks) in same turn.

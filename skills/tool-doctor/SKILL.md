@@ -1,6 +1,6 @@
 ---
 name: tool-doctor
-description: '`/tool-doctor` -- audit the work machine AND the current project for the deterministic code-quality guard tools used by the review flow (ripgrep, gitleaks, ast-grep, linters/analyzers, coverage, jscpd). Scans read-only first, prints a readiness table (guard -> tool -> machine status -> project status -> built-in fallback -> recommendation), then OFFERS, with per-item confirmation, to install missing machine tools and add missing project config. Never installs or edits anything without explicit confirmation, and never runs `sudo` silently. NOT part of the card flow -- no other skill invokes it.'
+description: '`/tool-doctor` -- audit the work machine AND the current project for deterministic code-quality guard tools used by the review flow (ripgrep, gitleaks, ast-grep, linters/analyzers, coverage, jscpd). Scans read-only first, prints a readiness table, then OFFERS, with per-item confirmation, to install missing machine tools and add missing project config. Never installs or edits anything without explicit confirmation, and never runs `sudo` silently. NOT part of the card flow -- no other skill invokes it.'
 ---
 
 # Tool Doctor
@@ -16,10 +16,10 @@ Audit the work machine + current project for the deterministic code-quality guar
 ## Safety (full gate -- never bypass)
 
 - Read-only scan FIRST. Report the table before proposing any change. Every probe stays read-only -- any `npx` probe uses `npx --no-install <bin> --version` so a probe never triggers a download.
-- Every install and every config edit is confirmed by the user before it runs. Use AskUserQuestion to let the user pick which fixes to apply; apply only the picked ones.
+- Every install and every config edit is confirmed by the user before it runs. Ask the user which fixes to apply; apply only the picked ones.
 - NEVER run a machine install without showing the exact command and getting an explicit yes. NEVER use `sudo` unless the user is shown the full command and approves it.
 - Detect the package manager before suggesting an install. Never assume one.
-- Project config edits go through the Edit tool, only on confirmation. NEVER auto-write repo files.
+- Project config edits go through the host's patch/edit tool, only on confirmation. NEVER auto-write repo files.
 - After applying, list every change made (machine + project) in the closing summary.
 
 ## Phase 1 -- Context detect
@@ -46,7 +46,7 @@ Read-only. Check the cwd project for:
 - .NET analyzers: `<PackageReference>` to any of `AsyncFixer`, `Meziantou.Analyzer`, `SonarAnalyzer.CSharp`, `Microsoft.VisualStudio.Threading.Analyzers` in `*.csproj` / `Directory.Build.props`.
 - Coverage: `@vitest/coverage-v8` (JS) or `coverlet.collector` (.NET test project).
 - Duplication: `jscpd` devDependency or `.jscpd.json`.
-- Repo-root `CLAUDE.md` mechanical conventions (file-size limit, banned imports, required headers).
+- Active host's repo-root instruction file (`AGENTS.md` for Codex, `CLAUDE.md` for Claude Code): mechanical conventions such as file-size limit, banned imports, and required headers.
 
 ## Phase 4 -- Map to guard catalog
 
@@ -69,7 +69,7 @@ Print the readiness table: `Guard | Needed tool | Machine | Project | Fallback |
 
 ## Phase 6 -- Offer fixes (per-item confirm)
 
-List the proposed fixes -- machine installs and project-config edits -- and use AskUserQuestion (multiSelect) to let the user pick which to apply. Apply only the picked ones; announce each as it runs.
+List the proposed fixes -- machine installs and project-config edits -- and ask the user to select which to apply. Use multi-select UI when the host provides it. Apply only the picked ones; announce each as it runs.
 
 ### Machine installs (show the exact command; run only on yes)
 
@@ -77,7 +77,7 @@ List the proposed fixes -- machine installs and project-config edits -- and use 
 - gitleaks: macOS `brew install gitleaks` / Linux download the release binary, or `go install github.com/gitleaks/gitleaks/v8@latest` when `go` is present.
 - ast-grep: macOS `brew install ast-grep` / any `npm install -g @ast-grep/cli`.
 
-### Project config (Edit tool, only on yes)
+### Project config (host patch/edit tool, only on yes)
 
 - JS/TS linter (biome): `pnpm add -D -E @biomejs/biome` then `pnpm biome init`. Enable rules covering dead code + debug: `noUnusedVariables`, `noConsoleLog`, `noDebugger`.
 - JS/TS lint rules (eslint): enable `no-unused-vars`, `no-unreachable`, `no-console`, `no-debugger`, `require-await`, and (type-aware) `@typescript-eslint/no-floating-promises`.

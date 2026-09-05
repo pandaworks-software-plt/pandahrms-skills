@@ -7,6 +7,8 @@ description: 'Triggers on requests to run a work card -- `/execute card-NN`, "st
 
 Run ONE card by following its ordered sequence. Native, current context. No subagent dispatch, no batches. `/execute` orchestrates the single-responsibility leaf skills (`/lint-gate`, `/code-review`, `/verify`). The card ends when `/verify` returns `VERIFY RESULT: PASS`. No per-card commit, no per-card PR -- changes accumulate in the working tree; the whole branch is committed and ONE PR raised at the end via `/commit` or `/pr` once every card is done.
 
+Invoke sub-skills with the active host's skill mechanism. In Codex, when nested skill invocation is not exposed as a tool, read the sibling `../<skill-name>/SKILL.md` and execute it inline.
+
 **Announce at start:** "I'm using Pandahrms execute to run this card."
 
 ## Invocation
