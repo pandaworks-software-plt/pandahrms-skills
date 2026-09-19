@@ -119,7 +119,7 @@ Backend projects only. Frontend-only -> skip this section.
 | Dead code | `dead-code` | Unused or unreachable code. Commented-out code is a finding. |
 | Leftover debug | `debug-leftover` | `console.log` / `debugger` / `Console.WriteLine` left in the diff. |
 | Silent TODOs | `todo` | TODO/FIXME/XXX added by the diff. |
-| Repo conventions | `repo-conventions` | Mechanical rules from the active host's repo-root instruction file (`AGENTS.md` for Codex, `CLAUDE.md` for Claude Code): size limits, banned imports, required headers. |
+| Repo conventions | `repo-conventions` | Mechanical rules from the repo-root instruction files (`AGENTS.md`, plus `CLAUDE.md` if present): size limits, banned imports, required headers. |
 | Readability | -- | Self-documenting code. No unnecessary complexity or over-engineering. Clear, meaningful naming. |
 
 **End-of-phase merge (when Codex was dispatched):** wait for Codex (or its timeout), parse, dedupe, categorize the MERGED set -- higher severity wins.
