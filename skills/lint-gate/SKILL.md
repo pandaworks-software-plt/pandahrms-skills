@@ -70,7 +70,7 @@ Cheap deterministic scans over the diff. Each row: tool -> built-in fallback. A 
 | TODO/FIXME/XXX | `rg -n 'TODO\|FIXME\|XXX'` over changed files -> `git grep -n 'TODO\|FIXME\|XXX'` | `todo` |
 | Secrets / leaked credentials | `gitleaks` (see secret-scan surface below) -> regex over the diff + untracked files | `secrets` |
 | Leftover debug | linter `no-console`/`no-debugger` (if enabled, ran clean) -> `grep -n 'console\.log\|debugger\|Console\.WriteLine'` | `debug-leftover` |
-| Repo conventions | `wc -l` per changed file vs the active host's repo-root instruction file (`AGENTS.md` for Codex, `CLAUDE.md` for Claude Code); `grep` for a banned import / required header named there | `repo-conventions` |
+| Repo conventions | `wc -l` per changed file vs the repo-root instruction files (`AGENTS.md`, plus `CLAUDE.md` if present); `grep` for a banned import / required header named there | `repo-conventions` |
 
 Rules:
 - Every `TODO`/`FIXME`/`XXX` hit in the diff is a finding (Major severity).

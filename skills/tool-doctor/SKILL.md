@@ -46,7 +46,7 @@ Read-only. Check the cwd project for:
 - .NET analyzers: `<PackageReference>` to any of `AsyncFixer`, `Meziantou.Analyzer`, `SonarAnalyzer.CSharp`, `Microsoft.VisualStudio.Threading.Analyzers` in `*.csproj` / `Directory.Build.props`.
 - Coverage: `@vitest/coverage-v8` (JS) or `coverlet.collector` (.NET test project).
 - Duplication: `jscpd` devDependency or `.jscpd.json`.
-- Active host's repo-root instruction file (`AGENTS.md` for Codex, `CLAUDE.md` for Claude Code): mechanical conventions such as file-size limit, banned imports, and required headers.
+- Repo-root instruction files (`AGENTS.md`, plus `CLAUDE.md` if present): mechanical conventions such as file-size limit, banned imports, and required headers.
 
 ## Phase 4 -- Map to guard catalog
 

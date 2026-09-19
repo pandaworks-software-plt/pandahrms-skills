@@ -11,7 +11,7 @@ Review against:
 2. Security (injection, authz, input validation, data exposure)
 3. Audit trail on state-changing endpoints (backend projects only)
 4. Code quality (reuse before creating, test coverage, error handling)
-5. Any project-specific CLAUDE.md rules you can find at the repo root.
+5. Any project-specific AGENTS.md (or CLAUDE.md) rules you can find at the repo root.
 
 Return findings as a JSON block with this shape, nothing else in the
 response except the block:
