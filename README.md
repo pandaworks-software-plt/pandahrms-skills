@@ -1,6 +1,6 @@
 # pandahrms-skills
 
-**Version:** 4.19.0
+**Version:** 4.19.1
 
 Pandahrms-specific skills plugin for Codex and Claude Code.
 

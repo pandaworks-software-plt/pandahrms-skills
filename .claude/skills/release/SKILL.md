@@ -32,8 +32,9 @@ Present one line: `current <x.y.z> -> next <x.y.z> (<level>): <one-line reason>`
 
 ## Phase 2: Bump version files
 
-- Edit `.claude-plugin/plugin.json` `version` to the next version.
+- Edit `.claude-plugin/plugin.json` AND `.codex-plugin/plugin.json` `version` to the next version; the two must match.
 - Edit the README version line (`**Version:** <x.y.z>`).
+- Run `bash scripts/skill-audit.sh`. `skill-audit: FAIL` -> STOP and surface the output; fix the skills, then re-run `/release`.
 - `grep` the tracked tree for the old version string; update any other canonical plugin-version mention. Leave unrelated version strings (dependency versions, examples) untouched.
 
 ## Phase 3: Commit gate (`/commit`)
@@ -68,7 +69,7 @@ Emit one line: `Released v<version>: pushed main, tagged, GitHub release <create
 - Never major-bump on auto-detection. Major needs an explicit user ask plus a confirm.
 - Never bypass the `/commit` gate -- it owns format + lint + `/verify`. No `--skip` unless the user passes it.
 - Never force-push, never push a branch other than `main`, never delete or move an existing tag.
-- Version source of truth is `.claude-plugin/plugin.json`; the README line mirrors it.
+- Version source of truth is `.claude-plugin/plugin.json`; `.codex-plugin/plugin.json` and the README line mirror it and never drift.
 - One release per run.
 
 ## Out of Scope
