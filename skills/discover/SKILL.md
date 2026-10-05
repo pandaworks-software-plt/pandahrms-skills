@@ -5,6 +5,20 @@ description: The free-form intake door for a new feature, enhancement, or bug in
 
 # Discover
 
+## Contents
+
+- Overview
+- Step 1: Classify intent type
+- Step 2a: Brainstorm mode (new-feature / enhancement)
+- Step 2b: Investigate mode (bug)
+- Step 3: Convergence gate (final move, both modes)
+- Step 4: Fill the output contract
+- Step 5: Resolve output location (per-work folder)
+- Step 6: Present and close
+- Hard Rules
+- Out of Scope
+- Next step
+
 ## Overview
 
 Free-form intake. Take a raw intent, explore it, converge to confirmed conclusions, and emit one output contract. Two internal modes by intent type. The artifact is a converged conclusion. No code, no git, no commit.
@@ -73,6 +87,8 @@ Rules:
 - Acceptance criteria are plain English testable statements, not Gherkin.
 - `Module / affected area` is required -- name the best-inferred module even when uncertain, and flag the uncertainty as an open question.
 - Omit a field only when the table says it is conditional (Root cause, Open questions).
+
+Self-check before Step 5: every required field filled; each acceptance criterion is one testable statement with no `Given`/`When`/`Then`; `Module / affected area` named; no dead-end or rejected-option text. Any failure -> fix, check again, then continue.
 
 ## Step 5: Resolve output location (per-work folder)
 

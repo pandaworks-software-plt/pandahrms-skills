@@ -1,0 +1,6 @@
+interface:
+  display_name: "Pandahrms Security Review"
+  short_description: "Review sensitive Pandahrms code changes"
+
+policy:
+  allow_implicit_invocation: false

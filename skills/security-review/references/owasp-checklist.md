@@ -1,5 +1,18 @@
 # OWASP + Pandahrms Check Tables
 
+## Contents
+
+- Phase 3 rows
+  - A01 - Broken Access Control
+  - A02 - Cryptographic Failures
+  - A03 - Injection
+  - A04 - Insecure Design
+  - A05 - Security Misconfiguration
+  - A06 - Vulnerable and Outdated Components
+  - A07 - Identification and Authentication Failures
+  - A08 - Software and Data Integrity Failures
+- Phase 4 rows - Pandahrms-Specific Checks
+
 Reference for `/security-review`. Holds the Phase 3 A01-A08 check tables and the Phase 4 Pandahrms-specific check table. Read this file before starting Phase 3.
 
 ## Phase 3 rows

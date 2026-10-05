@@ -5,6 +5,23 @@ description: Use when creating, applying, undoing, or troubleshooting Entity Fra
 
 # EF Core Migrations
 
+## Contents
+
+- Overview
+- Project Reference
+- Commands
+  - Add a Migration
+  - Apply Migrations (Update Database)
+  - List Migrations
+  - Undo Last Migration (Not Applied)
+  - Rollback to a Specific Migration
+  - Rollback All Migrations
+  - Generate SQL Script
+- Workflow
+  - Adding a new migration
+  - Undoing a mistake
+- Safety Rules
+
 ## Overview
 
 Run EF Core migration commands for Pandahrms backend APIs. Each API has its own Persistence project with DbContext-specific migrations.
@@ -19,6 +36,8 @@ Run EF Core migration commands for Pandahrms backend APIs. Each API has its own 
 | Pandahrms_RecruitmentApi | `Pandahrms.Recruitment.Persistence/` | `RecruitmentDbContext` | `AuditDbContext` |
 
 **Important:** All commands must be run from inside the Persistence project directory, not the solution root.
+
+Requires the EF tool: `dotnet ef --version` prints a version when installed; otherwise run `dotnet tool install --global dotnet-ef` first (upgrade: `dotnet tool update --global dotnet-ef`).
 
 ## Commands
 

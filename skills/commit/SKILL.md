@@ -1,27 +1,58 @@
 ---
 name: commit
-description: 'Triggers when the user explicitly requests a git commit of the whole branch''s working-tree changes -- phrases like "commit my changes", "git commit", "ready to commit", "/commit", or "make atomic commits". Branch-scope commit gate -- auto-fixes format + lint inline, invokes `/verify` (the project-scoped build + test runner) and requires `VERIFY RESULT: PASS`, then plans and executes atomic commits across the branch. Does NOT skip the gate for pre-existing or unrelated failures unless `/commit --skip` is given.'
+description: 'Triggers when the user explicitly requests a git commit of the whole branch''s working-tree changes -- phrases like "commit my changes", "git commit", "ready to commit", "/commit", or "make atomic commits". Branch-scope commit gate -- invokes `/security-review --no-commit` for sensitive changes, auto-fixes format + lint inline, invokes `/verify` (the project-scoped build + test runner), then plans and executes atomic commits across the branch. Does NOT skip the security gate; `/commit --skip` bypasses only format, lint, and verify.'
 ---
 
 # Commit
 
+## Contents
+
+- Overview
+- Skip Mode
+- Execution Order
+  - Phase 0: Sensitive-change security gate
+  - Phase 1: Hard Gate (Format + Lint + /verify)
+  - Phase 1A: Format Auto-Fix
+  - Phase 1B: Lint Auto-Fix
+  - Phase 1C: /verify (Build + Test)
+  - Phase 2: Gather Changes
+  - Phase 3: Plan Atomic Commits
+  - Phase 4: Execute Commits
+  - Phase 5: Terminate
+- Safety Rules (hard)
+
 ## Overview
 
-Branch-scope commit step. Verify the whole branch's working tree is clean, then plan and execute atomic commits across the branch.
+Branch-scope commit step. Run final security gate for sensitive changes, verify whole branch's working tree, then plan and execute atomic commits.
 
-**Phase 1 is a HARD GATE.** Before any commit, the working tree must have 0 format errors, 0 lint errors, and `VERIFY RESULT: PASS` from `/verify` (build + test) -- **even when the failures are pre-existing or unrelated to the current session's changes**. The only escape hatches: the explicit `/commit --skip` flag (Skip Mode) and the "Tool missing" branch in Failure Handling.
+**Phase 0 and Phase 1 are HARD GATES.** Before any commit, sensitive changes must clear `/security-review`; working tree must then have 0 format errors, 0 lint errors, and `VERIFY RESULT: PASS` from `/verify` (build + test) -- **even when failures are pre-existing or unrelated to current session changes**. `/commit --skip` bypasses Phase 1 only. The "Tool missing" branch in Failure Handling is Phase 1's other escape hatch.
 
-Invoke `/verify` with the active host's skill mechanism. In Codex, when nested skill invocation is not exposed as a tool, read `../verify/SKILL.md` and execute it inline.
+Invoke `/verify` with the active host's skill mechanism. In Codex, when nested skill invocation is not exposed as a tool, read `../verify/SKILL.md` in full (to end of file) and execute it inline.
 
 Phase 1A/1B auto-fix mechanical format/lint violations in write mode (`dotnet format`, `biome check --write`, `eslint --fix`, etc.); those fixes get pulled into the commit plan in Phase 3. Format and lint run BEFORE `/verify` so it sees the post-fix tree. For non-mechanical failures (a `/verify` FAIL, lint diagnostics that cannot be auto-fixed), STOP and tell the user what to fix -- never make judgment-call code edits, never hand-edit source to silence a diagnostic or pass a test.
 
 ## Skip Mode
 
-`/commit --skip` (literal whitespace-delimited token in the invocation) bypasses Phase 1 entirely: no formatter, linter, or `/verify` run. Before Phase 2, emit verbatim: `Skip mode: Phase 1 gate bypassed. Format, lint, and /verify (build + tests) will NOT run. Proceeding directly to commit planning.` All other phases and every safety rule still apply.
+`/commit --skip` (literal whitespace-delimited token in invocation) bypasses Phase 1 entirely: no formatter, linter, or `/verify` run. Phase 0 still runs. Before Phase 2, emit verbatim: `Skip mode: Phase 1 gate bypassed. Format, lint, and /verify (build + tests) will NOT run. Proceeding directly to commit planning.` All other phases and every safety rule still apply.
 
 ## Execution Order
 
-Phases run strictly in order 1 -> 2 -> 3 -> 4 -> 5. Within Phase 1: 1A (format auto-fix) -> 1B (lint auto-fix) -> 1C (`/verify`). Phase 2's four git commands run in parallel; that is the only parallelism.
+Phases run strictly in order 0 -> 1 -> 2 -> 3 -> 4 -> 5. Within Phase 1: 1A (format auto-fix) -> 1B (lint auto-fix) -> 1C (`/verify`). Phase 2's four git commands run in parallel; that is the only parallelism.
+
+Phase ledger: at every phase transition print `Phase N/5 done -> Phase N+1`. A phase that STOPS is never marked done.
+
+**Phase 0: Sensitive-change security gate**
+
+Classify entire uncommitted tree before any formatter or linter changes it. Mark sensitive when either:
+
+- Any contributing work card has `sensitivity: sensitive`.
+- Diff touches authentication, authorization, session, tenant boundary, money, billing, payment, database schema, migration, data rewrite, PII handling, audit logging, data retention, or risk named by design docs.
+
+Standard tree -> announce `Security review skipped: no sensitive changes.` and continue.
+
+Sensitive tree -> invoke `/security-review --no-commit` over whole uncommitted tree. Clean result or fully fixed findings -> continue. Unresolved Critical or High finding, review failure, or timeout -> STOP; never commit. Surface Medium, Low, and Info findings before continuing.
+
+Security fixes land before Phase 1, so format, lint, build, and tests verify final tree.
 
 **Phase 1: Hard Gate (Format + Lint + /verify)**
 
@@ -76,15 +107,9 @@ Errors the linter could not auto-fix -> STOP, emit violations verbatim, tell the
 BEFORE invoking `/verify`, check for a prior PASS on an unchanged tree:
 
 1. Read `work_folder` from the per-work `_overview.md` (none -> skip this check).
-2. Read `<work-folder>/.verify-result.json`.
-3. Compute the current tree hash:
-
-   ```bash
-   { git diff; git diff --cached; git status --porcelain; } | shasum -a 256 | cut -d' ' -f1
-   ```
-
-4. File exists AND `"result": "PASS"` AND `tree_hash` matches -> SKIP the run, announce `verify skipped: tree unchanged since last PASS (<timestamp>)`, continue to Phase 2.
-5. Anything else -> invoke `/verify` (no args) over the whole branch's working tree, after 1A/1B so it sees the post-fix tree.
+2. Run `bash <skill-dir>/../verify/scripts/check-result.sh <work-folder>` (`<skill-dir>` = directory containing this `SKILL.md`, `${CLAUDE_SKILL_DIR}` on Claude Code). Never re-derive the hash by hand.
+3. Exit 0 with `VALID <timestamp>` -> SKIP the run, announce `verify skipped: tree unchanged since last PASS (<timestamp>)`, continue to Phase 2.
+4. Anything else (`MISSING`, `FAIL`, `STALE`, script error) -> invoke `/verify` (no args) over the whole branch's working tree, after 1A/1B so it sees the post-fix tree.
 
 Read the returned result block:
 

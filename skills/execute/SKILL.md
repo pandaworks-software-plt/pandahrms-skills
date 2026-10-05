@@ -5,9 +5,33 @@ description: 'Triggers on requests to run a work card -- `/execute card-NN`, "st
 
 # Pandahrms Execute
 
+## Contents
+
+- Invocation
+- Resume
+- Detect architecture
+- Guided run with stop-gates
+- Low-touch mode (`--approve`)
+- Blast mode (`--blast-mode`)
+- Boundary steps (inline leaf actions)
+- Order
+- Pre-complete verify
+- End of card (no commit)
+- Check scope
+- TDD per layer
+- Verification marker
+- Spec cross-check
+- SOLID (inlined)
+- DDD (inlined)
+- Progress tracking
+- Card file manifest
+- Handoff
+- Surface concerns
+- Next step
+
 Run ONE card by following its ordered sequence. Native, current context. No subagent dispatch, no batches. `/execute` orchestrates the single-responsibility leaf skills (`/lint-gate`, `/code-review`, `/verify`). The card ends when `/verify` returns `VERIFY RESULT: PASS`. No per-card commit, no per-card PR -- changes accumulate in the working tree; the whole branch is committed and ONE PR raised at the end via `/commit` or `/pr` once every card is done.
 
-Invoke sub-skills with the active host's skill mechanism. In Codex, when nested skill invocation is not exposed as a tool, read the sibling `../<skill-name>/SKILL.md` and execute it inline.
+Invoke sub-skills with the active host's skill mechanism. In Codex, when nested skill invocation is not exposed as a tool, read the sibling `../<skill-name>/SKILL.md` in full (to end of file) and execute it inline.
 
 **Announce at start:** "I'm using Pandahrms execute to run this card."
 
@@ -52,7 +76,6 @@ HARD STOPS stay mandatory even under `--approve` -- never auto-proceed past:
 
 - a test failure (scoped or full suite),
 - a card/spec conflict or a scope conflict,
-- any `/security-review` finding,
 - any major `/code-review` finding the review skill could not auto-fix.
 
 Mode forwarding: under `--approve`, invoke the leaf review as `/code-review autonomous`. Do NOT widen its auto-apply beyond that skill's documented per-mode behavior.
@@ -65,7 +88,7 @@ Announce the auto-pick on one line at each auto-proceeded gate (e.g. `--approve:
 
 **Commit + PR prohibited.** Never run `/commit` or `/pr` in this mode. Deploy BE to local Docker and FE regen still run (they are not commit/PR). All cards' changes pile up uncommitted in the working tree for the user to review and commit later.
 
-**Decision points instead of stop-gates.** The normal hard stops -- scoped/full test failure, `/verify` FAIL, card/spec conflict, `/security-review` finding, major `/code-review` finding -- do NOT pause the run. At each:
+**Decision points instead of stop-gates.** The normal hard stops -- scoped/full test failure, `/verify` FAIL, card/spec conflict, major `/code-review` finding -- do NOT pause the run. At each:
 
 - Resolve it autonomously ONLY when it falls in this CLOSED list. Where a `DECISION` line is required, announce one line `DECISION -- <point>: <choice> (<reason>)` and append the same to the card's Progress.
   - (a) A scoped test's assertion contradicts the card's referenced spec scenario -> fix the test to match the spec. DECISION line required.
@@ -97,7 +120,7 @@ Never fake a pass, never commit broken code, never silently absorb a block. Ever
 Run these inline as leaf actions, NOT a skill chain. `/execute` drives the whole slice and composes the leaf skills.
 
 - Lint gate = invoke `/lint-gate` over the layer's `git diff` (deterministic guards: linter, Tool Gate, structural tier, L1->L2 traceability). It returns `### Findings` (`[tool:<name>]` tags) + a verbatim `OWNED: <categories>` line. `/execute` invokes it; `/code-review` does NOT auto-invoke it. `/lint-gate` ALSO writes that same report to `<work-folder>/.lint-gate-result.md`. Pass THAT PATH to `/code-review` as the lint-gate result -- never relay the report by prose.
-- Code review = invoke `/code-review orchestrated` (or `/code-review autonomous` under `--approve` / blast), passing the `<work-folder>/.lint-gate-result.md` path as the lint-gate result so code-review skips the OWNED checks. LLM judgment only (review + fixes; orchestrated and autonomous skip its commit phase). Orchestrated mode defers the security section to its caller: `/execute` is the SINGLE owner of `/security-review` -- run `/security-review --no-commit` ONCE when the card's sensitivity tag is set, so the deep pass runs exactly once per sensitive card (no double invocation, no double scan). The review skills never commit, and `/execute` does not commit per card -- the branch is committed at the end via `/commit` or `/pr`.
+- Code review = invoke `/code-review orchestrated` (or `/code-review autonomous` under `--approve` / blast), passing the `<work-folder>/.lint-gate-result.md` path as lint-gate result so code-review skips OWNED checks. LLM judgment only (review + fixes; orchestrated and autonomous skip commit phase). Preserve card sensitivity tag for final branch gate. Review skills never commit, and `/execute` does not commit per card -- branch is committed at end via `/commit` or `/pr`.
 - Deploy = deploy BE to local Docker.
 - Regen = regenerate FE API types from the deployed swagger (openapi).
 
@@ -113,8 +136,8 @@ Invoke `/verify` ONCE per card, placed LAST -- after every layer's `/code-review
 
 - During work, only feature-scoped tests ran (see TDD per layer). Neither the full suite nor a full build has run yet on the final code -- `/verify` covers both now.
 - Require `VERIFY RESULT: PASS`. On `VERIFY RESULT: FAIL`, STOP and surface the verbatim failing build/test output; the card is not done. Coverage `uncovered:` is advisory -- it does not flip PASS/FAIL.
-- `/verify` ALSO writes its result to `<work-folder>/.verify-result.json`. The card is done ONLY when that file shows `"result": "PASS"` AND its `tree_hash` matches the freshly computed hash of `{ git diff; git diff --cached; git status --porcelain; } | shasum -a 256 | cut -d' ' -f1`.
-- If ANY edit lands after this `/verify` PASS (a fix, a simplify pass), the PASS is void -> re-invoke `/verify` and require PASS again before the card is marked done. Mechanical check: recompute the `tree_hash` command above and compare it with the `tree_hash` in `.verify-result.json` -- a mismatch means the PASS is void, so re-run `/verify`.
+- `/verify` ALSO writes its result to `<work-folder>/.verify-result.json`. The card is done ONLY when `bash <skill-dir>/../verify/scripts/check-result.sh <work-folder>` exits 0 and prints `VALID <timestamp>` (`<skill-dir>` = directory containing this `SKILL.md`, `${CLAUDE_SKILL_DIR}` on Claude Code). Run the script; never re-derive the hash by hand.
+- If ANY edit lands after this `/verify` PASS (a fix, a simplify pass), the PASS is void -> re-invoke `/verify` and require PASS again before the card is marked done. Mechanical check: run `check-result.sh` again right before the card move -- `STALE` means the PASS is void, so re-run `/verify`.
 - Cross-repo card: run `/verify` in EACH touched repo, require PASS in both.
 
 ## End of card (no commit)

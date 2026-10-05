@@ -5,7 +5,16 @@ description: '`/pr-approver-review PR_NUMBER [fast|deep]` -- senior-approver rev
 
 # Pandahrms /pr-approver-review
 
+## Contents
+
+- Commands at head
+- Dispatch -- Steps 1-3 always run in a subagent
+- Step 4 -- Bot cross-check (read the bot only now)
+- Step 5 -- Output (use exactly this; keep it tight)
+
 Senior-approver review of an already-opened GitHub PR. Form your own findings and approval gate first, then read the `claude[bot]` review only to cross-check -- catch your own misses and the bot's hallucinations. Verify every finding at the PR head commit, enforce Pandahrms project rules as real severity, score the gate, return a verdict plus a senior take.
+
+**Decision standard:** Favor approval when change improves code health and has no verified release-blocking defect; perfection and a zero-finding report are not gates. Use impact and evidence to separate required fixes from follow-ups. Preserve Pandahrms security, tenant, payroll, audit, migration, and deploy gates. Apply [Google's review standard](https://google.github.io/eng-practices/review/reviewer/standard.html) with Pandahrms project rules taking precedence.
 
 **Announce at start:** "I'm using Pandahrms /pr-approver-review to do a senior-approver review of PR #<PR>."
 
@@ -13,14 +22,17 @@ Senior-approver review of an already-opened GitHub PR. Form your own findings an
 
 You are a senior approver reviewing PR **#<PR>** in Pandahrms (ASP.NET MVC 5, multi-tenant HR). You hold merge judgement, not merge authority -- a human merges. Read-only: never commit, push, merge, post to the PR, or move the local checkout (`gh pr checkout`, `git checkout`, `git switch`, `git reset`, `git stash`). `git fetch` is allowed.
 
-**Four rules across the whole review:**
+**Rules across the whole review:**
 
 1. **Independent first -- ALWAYS in a dispatched subagent.** Steps 1-3 live in `references/independent-phase.md` and run in ONE subagent using the active host's subagent tools, never inline. Orchestrator dispatches, waits, then runs Steps 4-5. Bot comment bodies are fetched only in Step 4.
 2. **Verify before report.** Read cited code at the PR HEAD COMMIT (not the local working tree -- it may be another branch) before stating any finding. Cited code not read -> drop the finding; it is never tagged. `[VERIFIED]` = read the code, the defect is on the page. `[INFERRED]` = read the code, the defect depends on a runtime path or caller not traced. Applies equally to every bot claim in Step 4. Orchestrator does not re-verify subagent findings; it verifies bot claims only.
 3. **Project rules are correctness, not style.** A missing tenant filter leaks data; a missing `.csproj` entry breaks the deploy.
 4. **The diff is not the unit of review -- the change is.** A diff proves what changed, never what *should* have changed. When a PR removes a bad line, that removal is the ONLY evidence the diff can show, and it reads as "handled" even when an identical bad line survives in the unchanged lines of the same file. Every bug a diff hides is invisible by construction -- the Step 2a sweeps are the only way to see that class of defect, so they are not optional thoroughness.
+5. **Bound review scope and cadence.** Run one integrated independent review. After fixes, verify changed behavior and affected contracts with targeted checks; repeat the full review only after material design, trust-boundary, or contract changes. Do not loop until all findings disappear. Report residual risk and hand off to the human reviewer.
 
 ## Commands at head
+
+Requires `gh` signed in: `gh auth status` must succeed. Missing -> `brew install gh` (macOS) / `winget install GitHub.cli` (Windows), then `gh auth login`; report and stop when it cannot be installed.
 
 Resolve the repo slug once: `gh repo view --json nameWithOwner -q .nameWithOwner` -> `<OWNER/REPO>`.
 
@@ -47,20 +59,21 @@ Orchestrator sequence, no exceptions (Fast and Deep alike):
 
 Classify each bot finding by checking the cited code at head yourself:
 - **CONFIRMED** -- real; matches a finding of yours (or you verify it now).
-- **MISSED** -- real, you missed it -> add it, classed and scored with Step 3 of the reference file (Read that file when needed); re-run gate/verdict if it shifts them.
+- **MISSED** -- real, you missed it -> add it, classed and scored with Step 3 of the reference file (Read that file in full when needed); re-run gate/verdict if it shifts them.
 - **HALLUCINATION** -- the cited symbol/line isn't there, or the reasoning fails.
 - **NIT** -- trivial.
 
 A bot finding fixed by a later commit stays CONFIRMED (note `resolved at <sha>`). The `Bot:` counts in Step 5 equal the table rows.
+Classify bot findings by current impact. A confirmed nit or follow-up does not become a required fix solely because a bot reported it.
 
 ## Step 5 -- Output (use exactly this; keep it tight)
 
 ```
 ## Verdict -- <APPROVE | APPROVE WITH FOLLOW-UP | REQUEST CHANGES>
-<one line why> · Mode: <Fast|Deep> · Related PRs: <each as `repo#n [lens -- YOUR verdict]` + merge order | none -- never "not reviewed">
+<one line why> · Mode: <Fast|Deep> · Related PRs: <each as `repo#n [lens -- compatible | mismatch | coverage gap]` + merge order and prerequisites | none>
 Bot: CONFIRMED N · MISSED N · HALLUCINATION N · NIT N  (or "skipped -- check not finished" / "no bot review")
 
-Gate -- decided by: <gate row FAIL | Blocking finding | untrue claim | blocked related PR | all PASS>:
+Gate -- decided by: <gate row FAIL | Blocking finding | material untrue claim | verified related-PR incompatibility | all PASS>:
 
 | Dimension | Status |
 |-----------|--------|
@@ -76,16 +89,14 @@ CONCERN/FAIL reasons (one bullet each, or "none"):
 - <dimension>: <one line> [VERIFIED]/[INFERRED]
 
 Completeness sweeps (five lines, never drop one: "none found" or "n/a -- <trigger absent>"):
-- Claim sweep: <each advertised fix, PR-level and per commit -> `N sites, M fixed, L listed open`; flag every N - M - L > 0>
+- Claim sweep: <material claims checked, counts when fully enumerated, and any coverage gap; score confirmed gaps by impact>
 - Error paths: <catch blocks read: N · leaks: ... · unguarded I/O: ...>
 - Duplicate copies: <matrix result, or "single copy">
-- Invariant locality: <guards enforced in exactly one place, or "none">
-- Guard ladder: <1 lookup: ... · 2 writer: ... · 3 reads: ... · 4 trusts: ...>
+- Invariant locality: <current guard bypass or unstable assumption, or "none found">
+- Guard ladder: <checked lookup, writer, guard fields and trusted IDs; state any coverage gap>
 
-Manual checks before merge -- runtime/visual checks only a human can run, NOT a re-review (one bullet each):
-- <check 1>
-- <check 2>
-- <check 3>
+Manual checks before merge -- 0-3 unresolved runtime/visual checks, NOT a re-review (or "none"):
+- <check>
 
 ## Summary
 <2-4 lines: what changed, why, what most deserves a human's eyes> (Fast may use one line)

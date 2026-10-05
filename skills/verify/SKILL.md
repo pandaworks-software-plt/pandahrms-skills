@@ -5,6 +5,18 @@ description: Manually invoked as `/verify` (or by an explicit mention of "verify
 
 # Verify
 
+## Contents
+
+- Scope
+- Detection
+- Stage 1: Build / Type-check
+- Stage 2: Test suite
+- Stage 3: Changed-file coverage existence gate
+- Result contract
+- Result file
+- Failure handling
+- Red Flags
+
 The single canonical project-scoped runner: full build + full test + changed-file coverage existence gate. Emits one structured result other skills consume.
 
 **Announce at start:** "I'm using Pandahrms verify to run the project build, tests, and coverage."
@@ -103,13 +115,21 @@ Below the block, when a stage `failed` or tests failed, include the captured ver
 
 ## Result file
 
-After emitting the chat result block, ALSO write the same result to `<work-folder>/.verify-result.json` when a work folder is known (read `work_folder` from the per-work `_overview.md`). When no work folder exists, skip the file write and add one line under the chat block:
+After emitting the chat result block, ALSO write the same result to `<work-folder>/.verify-result.json` when a work folder is known (read `work_folder` from the per-work `_overview.md`). Write it with the bundled script, never by hand:
+
+```bash
+bash <skill-dir>/scripts/write-result.sh --work-folder <work-folder> --result <PASS|FAIL> --build "<stage status>" --tests "<stage status>" --coverage "<stage status>"
+```
+
+`<skill-dir>` = directory containing this `SKILL.md` (`${CLAUDE_SKILL_DIR}` on Claude Code). Needs `git` plus `shasum` or `sha256sum` (both ship with git). The script computes `timestamp` and `tree_hash` itself and prints the written path. Non-zero exit -> report the script output verbatim; do not write the file another way.
+
+When no work folder exists, skip the file write and add one line under the chat block:
 
 ```
 result file: skipped (no work folder)
 ```
 
-JSON shape (exact keys):
+JSON shape the script writes (exact keys):
 
 ```json
 {
@@ -117,12 +137,12 @@ JSON shape (exact keys):
   "build": "<stage status>",
   "tests": "<stage status>",
   "coverage": "<stage status>",
-  "timestamp": "<output of: date -u +%Y-%m-%dT%H:%M:%SZ>",
-  "tree_hash": "<output of: { git diff; git diff --cached; git status --porcelain; } | shasum -a 256 | cut -d' ' -f1>"
+  "timestamp": "<UTC, YYYY-MM-DDTHH:MM:SSZ>",
+  "tree_hash": "<sha256 of git diff + git diff --cached + git status --porcelain from the repo root, excluding the work folder and the two result files>"
 }
 ```
 
-Consumer rule: "A PASS in this file is valid for a caller ONLY while `tree_hash` matches the caller's freshly computed hash of the same command. A changed tree voids the PASS."
+Consumer rule: "A PASS in this file is valid for a caller ONLY while the tree hash still matches. A changed tree voids the PASS." Consumers check with `bash <skill-dir>/scripts/check-result.sh <work-folder>`: exit 0 and `VALID <timestamp>` means the PASS stands; `MISSING`, `FAIL` or `STALE` means re-run `/verify`.
 
 ## Failure handling
 

@@ -7,7 +7,7 @@ description: 'Triggers on requests to raise the PR for finished work -- `/pr`, "
 
 Determine the branch, commit, then raise the one PR for the whole work.
 
-Invoke sub-skills with the active host's skill mechanism. In Codex, when nested skill invocation is not exposed as a tool, read the sibling `../<skill-name>/SKILL.md` and execute it inline.
+Invoke sub-skills with the active host's skill mechanism. In Codex, when nested skill invocation is not exposed as a tool, read the sibling `../<skill-name>/SKILL.md` in full (to end of file) and execute it inline.
 
 **Announce at start:** "I'm using Pandahrms /pr to commit and raise the PR for this work."
 
@@ -21,7 +21,7 @@ If the current branch is not protected, use it. Never auto-create or auto-switch
 
 ## 2. Commit
 
-Run `/commit` once the branch is settled. `/commit` gates the tree (0 test, 0 lint, 0 format, 0 build errors) and plans atomic commits. Never `/commit` onto a protected branch.
+Run `/commit` once branch is settled. `/commit` owns sensitive-change security review, gates tree (0 test, 0 lint, 0 format, 0 build errors), and plans atomic commits. Never `/commit` onto a protected branch. Do not run a second security review before opening PR.
 
 ## 3. Raise the PR
 

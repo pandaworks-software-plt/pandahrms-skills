@@ -1,6 +1,6 @@
 # pandahrms-skills
 
-**Version:** 4.18.0
+**Version:** 4.19.0
 
 Pandahrms-specific skills plugin for Codex and Claude Code.
 
@@ -39,6 +39,7 @@ The plugin is a set of manual, standalone skills. There is no orchestrator -- yo
 | Skill | Claude Code | Codex | Description |
 |-------|-------------|-------|-------------|
 | **pr-approver-review** | `/pandahrms:pr-approver-review` | `$pandahrms:pr-approver-review` | Senior-approver review of an already-opened GitHub PR by number |
+| **pr-review-experimental** | `/pandahrms:pr-review-experimental` | `$pandahrms:pr-review-experimental` | Experimental bounded PR review: NO-GO / MEL, persistent findings, 3 rounds plus one conditional final round; optional `--fix` |
 | **branching** | `/pandahrms:branching` | `$pandahrms:branching` | Safe branch creation with upstream protection and folder-based naming |
 | **ef-migrations** | `/pandahrms:ef-migrations` | `$pandahrms:ef-migrations` | EF Core migration commands for Performance and Recruitment APIs |
 | **tool-doctor** | `/pandahrms:tool-doctor` | `$pandahrms:tool-doctor` | Once-per-project setup: audit machine + project for the guard tools, offer install/config per item |
@@ -80,6 +81,24 @@ To update the plugin to the latest version:
 /plugins update pandahrms@pandahrms-skills
 ```
 
+## Prerequisites
+
+Every skill needs `git` and the host (Claude Code or Codex). Some need more; each skill names the tool and its install line next to the command that uses it, and installs or falls back instead of assuming.
+
+| Skill | Needs |
+|-------|-------|
+| `verify`, `commit`, `execute` | `shasum` or `sha256sum` (ship with git) for the `.verify-result.json` scripts under `skills/verify/scripts/` |
+| `pr`, `pr-approver-review`, `pr-review-experimental` | `gh` signed in (`gh auth status`) |
+| `pr-review-experimental` | `python3` 3.8+ (stdlib only) |
+| `ef-migrations` | `dotnet-ef` (`dotnet tool install --global dotnet-ef`) |
+| `lint-gate`, `tool-doctor` | optional: `rg`, `gitleaks`, `ast-grep`, `jscpd`; every guard falls back to a built-in |
+| `security-review` | the project's package-manager CLI (`dotnet`, `pnpm`, `npm`, `yarn`) for the dependency audit |
+| `discover-ticket`, `discover-project`, `resolve-ticket`, `close` | the `workspace-prod` MCP server |
+
+## Maintaining the plugin
+
+Before a release run `bash scripts/skill-audit.sh` from the plugin root. It checks the skill layout rules in `CLAUDE.md` (500-line `SKILL.md` cap, `## Contents` lists on files over 100 lines, references one level deep, frontmatter keys) and exits non-zero on any miss. The hand-checked items are in `docs/skill-authoring-checklist.md`.
+
 ## How it fits
 
 Each skill is manual and standalone -- you run each step. There is no orchestrator: each skill ends by suggesting the next one (`## Next step`), so the flow self-guides while you stay in control of every hop. The diagram uses short logical skill names; invoke them with the Claude Code or Codex syntax in the tables above.
@@ -90,11 +109,12 @@ discover  (or discover-ticket; discover-project to pick from a project's pending
    -> slice       work cards (each holds its L2 spec files + an ordered sequence)
    -> execute     per card: guided run with stop-gates + spec-first TDD
                   inline leaf actions: lint-gate then code-review orchestrated
-                  (+ security-review when sensitive), deploy BE, regen FE types,
-                  verify at card pre-complete. No per-card commit or PR -- changes accumulate
+                  deploy BE, regen FE types, verify at card pre-complete.
+                  No per-card commit or PR -- changes accumulate
    -> status      auto when the last card is done (conclusion) + manual status anytime
    -> close       update ticket status, write the log, tidy cards
-   -> pr          final PR for the whole work, once every card is done (runs commit first)
+   -> pr          final PR for the whole work, once every card is done
+                  (runs commit first; commit runs security-review once for sensitive changes)
 ```
 
 The always-on execution rules (TDD markers, gates, sensitivity list, output discipline) ship via the plugin's SessionStart hook (`hooks/execution-rules.md`) -- no per-member setup. The hook only injects them for Pandahrms/Pandaworks work (a `pandaworks-software-plt`/`pandaworks-sw` git origin, a `.pandahrms-rules` marker file in the tree, or `PANDAHRMS_RULES=1`); every other session gets an empty context instead.

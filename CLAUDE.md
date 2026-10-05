@@ -29,16 +29,18 @@ pandahrms-skills/
 │   ├── lint-gate/                     # Diff-scoped deterministic guard runner: linter + Tool Gate scans + analyzer/dup + L1->L2 traceability (no LLM judgment); writes <work-folder>/.lint-gate-result.md
 │   ├── verify/                        # Project-scoped runner: full build + full test + coverage; the single source /commit + /execute invoke; writes <work-folder>/.verify-result.json
 │   ├── code-review/                   # Diff-scoped LLM judgment in 3 modes (standalone | orchestrated | autonomous); consumes the .lint-gate-result.md path, fixes issues, runs /simplify (no commits)
-│   ├── security-review/               # Security review (OWASP + Pandahrms-specific), no commits
+│   ├── security-review/               # Manual security review; final commit gate uses it for sensitive changes
 │   ├── simplify/                      # 3-agent parallel reuse/quality/efficiency pass on working-tree changes (no commits)
-│   ├── commit/                        # Branch-scope commit gate: invokes /verify, plan and execute atomic commits (one commit pass at end of work)
+│   ├── commit/                        # Branch-scope gate: sensitive security review + /verify + atomic commits
 │   │  # Standalone utilities
 │   ├── pr-approver-review/            # Senior-approver review of an already-opened GitHub PR by number: own findings + gate first, then cross-check claude[bot]
+│   ├── pr-review-experimental/        # Experimental bounded PR review: NO-GO / MEL, durable ledger, 3 rounds plus one conditional final round
 │   ├── branching/                     # Safe branch creation with upstream protection
 │   ├── ef-migrations/                 # Entity Framework Core migrations
 │   └── tool-doctor/                   # External, once-per-project setup: audit machine + project for the guard tools, offer install/config (per-item confirm)
 ├── hooks/                       # Shared lifecycle hooks (session-start, etc.)
-└── docs/                        # Plans and documentation
+├── scripts/                     # Plugin maintenance: skill-audit.sh checks the layout rules below
+└── docs/                        # Plans, documentation, skill-authoring-checklist.md
 ```
 
 ## Versioning
@@ -61,6 +63,33 @@ pandahrms-skills/
   - **Upstream-flow prose** -- descriptions of which skill, step, or pipeline node invokes this one ("called by atlas Step 5", "triggered after spec-writing"). The invoker owns that knowledge; the invoked skill stays self-contained
   - **Negative-trigger prose** -- "does NOT trigger on X", "skip when Y", or any mention of skills/contexts the current skill should ignore. Silence is the rule; only state what the skill does. (This applies to the body only -- the frontmatter `description` field still needs precise trigger language for the harness)
 - **Allowed exception -- the `## Next step` line.** A flow skill MAY end with a single `## Next step` section that suggests the next skill to the user (e.g. "run `/spec` next"). This is the one permitted downstream-flow line: it is a user-facing recommendation, not a runner and not an instruction the model auto-executes. The dev still invokes the next skill by hand, and that skill re-reads the durable `_overview.md` / cards -- no state passes by prose. Keep it to one short section; do not let it grow into orchestration logic.
+
+## Skill Layout and Self-Check Rules
+
+Mechanical items are checked by `bash scripts/skill-audit.sh`; run it before every release. The long form with rationale is `docs/skill-authoring-checklist.md`.
+
+Layout:
+- Keep each `SKILL.md` body at 500 lines or fewer. Approaching it -> move detail into `skills/<skill>/references/<area>.md`, one file per area, so a run loads only the area it needs
+- Link every reference file directly from its `SKILL.md`. One level deep only: a reference never points at another reference
+- Any skill file over 100 lines (`SKILL.md` or reference) opens with a `## Contents` list of its H2 headings; a container section (Workflow, Commands) lists its phases or H3s indented underneath. Keep it in sync when headings change
+- Any instruction that loads another skill file says "in full" / "to end of file". A head-style preview skips every rule past the preview
+
+Degrees of freedom -- match instruction tightness to how fragile the step is; one skill mixes all three:
+- Judgment steps (intake, review, naming): state the goal and criteria, not the method
+- Shaped output (cards, reports, result blocks): a template with named slots
+- Fragile or irreversible steps (hashes, result files, ticket mutation order, git commands): an exact command or a bundled script under `skills/<skill>/scripts/`, with no parameter the model may vary. Scripts run; they are not read into context. Bash scripts stay bash 3.2 / git-bash portable, like the hook
+
+Checklists and self-checks:
+- When step order matters, render the steps as a checklist the skill prints and ticks in its output. A failed check returns to the named step, never forward. When order does not matter, no checklist
+- A skill that produces an artifact (spec, cards, contract, ticket fields, result file) checks it against the skill's own rules, fixes, re-checks until clean, then presents. Prefer a `grep` / `wc` check over a prose check
+- When a run fails for a reason no rule covers, the skill may end with ONE line proposing the rule. The user approves; the rule lands in the plugin by PR
+
+Dependencies:
+- State the runtime and its install line next to every script or CLI call (`python3`, `gh`, `dotnet-ef`, ...). Never assume a tool is installed: detect -> install on confirmation, or fall back to a built-in
+
+Models:
+- A skill result depends on the model under it. Before release, run the changed skill on the same task with every model the team uses and ask: Haiku -- enough guidance? Sonnet -- clear and efficient? Opus / Fable -- does it avoid over-explaining? A step a smaller model skips becomes clearer or a script; an instruction a larger model does worse with is removed
+- Record the models tested in the release commit message. Do not add a `model:` frontmatter key for this -- Claude Code treats it as a runtime model override
 
 ## SKILL.md Prose Compression Rules
 

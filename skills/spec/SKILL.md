@@ -1,11 +1,30 @@
 ---
 name: spec
-description: '`/spec` -- write or update the L1 behaviour spec in the L1 spec repo (location read from the `Spec repo:` line in the active host''s global instructions; asks the user and saves it there when the location is not stated) from intake output (objective + acceptance criteria + module). The L1 spec is the tech-agnostic product truth in Gherkin -- no UI mechanics, no API/endpoint detail. Presents a scenario-index table for user agreement, then asks whether to commit/PR to the L1 spec repo -- never auto-commits. Does NOT write L2 executable specs (those come later during execution).'
+description: '`/spec` -- write or update the L1 behaviour spec in a dedicated git worktree of the L1 spec repo (location read from the `Spec repo:` line in the active host''s global instructions; asks the user and saves it there when the location is not stated) from intake output (objective + acceptance criteria + module). The L1 spec is the tech-agnostic product truth in Gherkin -- no UI mechanics, no API/endpoint detail. Presents a scenario-index table for user agreement, then asks whether to commit/PR to the L1 spec repo -- never auto-commits. Does NOT write L2 executable specs (those come later during execution).'
 ---
 
 # /spec -- L1 Behaviour Spec
 
-Write/update the **L1 behaviour spec** in `<spec-repo>` (resolved in LOCATE) from intake output. L1 = tech-agnostic product truth (the WHAT + when done), Gherkin, no UI mechanics, no API/endpoint detail, no field-level form steps. Write L1 only -- never L2 FE/BE executable specs.
+## Contents
+
+- GATE-0 -- behaviour change?
+- LOCATE
+  - Dedicated worktree
+- WRITE -- convert acceptance criteria -> Gherkin
+  - BDD -- behaviour-focused, strict no-UI (the L1 rule)
+  - No hard-coded messages or input-coercion
+  - Structure
+  - Tags -- at BOTH feature and scenario level
+  - Mandatory scenarios
+  - File splitting
+  - Naming + roles
+  - Self-check (loop until clean)
+- GATE-1 -- present + agree
+- COMMIT? -- ask, never auto
+- RECORD
+- Next step
+
+Write/update **L1 behaviour spec** in dedicated `<spec-worktree>` of `<spec-repo>` (resolved in LOCATE) from intake output. L1 = tech-agnostic product truth (WHAT + when done), Gherkin, no UI mechanics, no API/endpoint detail, no field-level form steps. Write L1 only -- never L2 FE/BE executable specs.
 
 INPUT: the per-work `_overview.md`. Read its `work_folder` frontmatter field for the work folder location -- never re-derive it. From `_overview.md` read objective + plain-statement acceptance criteria + `module`.
 
@@ -24,9 +43,26 @@ Resolve the L1 spec repo location (call the result `<spec-repo>`) in this order 
 
 After the user answers via step 2, append a `Spec repo: <path>` line to the active host's global instructions (`~/.codex/AGENTS.md` for Codex, `~/.claude/CLAUDE.md` for Claude Code). Put it under a `## Spec` heading; create the file and heading if absent. The user's answer is authorization to write -- do not re-confirm. Never write this line to a project instruction file.
 
-Branch alignment (before reading any `.feature`): compare `git -C <spec-repo> rev-parse --abbrev-ref HEAD` with the working project's `git rev-parse --abbrev-ref HEAD`. On mismatch, ask the user: checkout matching branch / stay and proceed / abort. Never auto-checkout, auto-fetch, or auto-pull.
+### Dedicated worktree
 
-Find `specs/<module>/<feature>/*.feature`. `module` comes from intake -- never hard-code a module list. `<feature>` = kebab-case of the affected feature area (e.g. `adhoc-review`). Full path: `specs/<module>/<feature>/<entity>-<area>.feature`. Check existing FIRST: update the matching `.feature`; create a new file only when none fits.
+Resolve working project's current branch as `<work-branch>` with `git rev-parse --abbrev-ref HEAD`. STOP on detached HEAD.
+
+Never checkout `<work-branch>` in primary `<spec-repo>` worktree and never write `.feature` files there. Use one dedicated spec worktree per `<work-branch>`:
+
+- `<spec-worktree-root>` = sibling folder `<spec-repo-parent>/<spec-repo-name>-worktrees`
+- `<spec-worktree-name>` = `<work-branch>` with each `/` replaced by `--`
+- `<spec-worktree>` = `<spec-worktree-root>/<spec-worktree-name>`
+
+Read `git -C <spec-repo> worktree list --porcelain` before reading any `.feature`:
+
+1. `<work-branch>` already attached -> use reported worktree path as `<spec-worktree>`; do not create another.
+2. `<work-branch>` exists as local branch but is not attached -> require computed `<spec-worktree>` path to be absent, create `<spec-worktree-root>`, then run `git -C <spec-repo> worktree add <spec-worktree> <work-branch>`.
+3. `<work-branch>` has no local branch -> ask user to confirm creating it and name local source branch (recommend local `main`). After confirmation, require computed path absent, create root, then run `git -C <spec-repo> worktree add -b <work-branch> <spec-worktree> <local-source-branch>`. Never create from `origin/*`. Verify new branch has no upstream with `git -C <spec-worktree> branch -vv`.
+4. Computed path exists but is not registered -> STOP and ask user. Never delete, prune, or reuse it automatically.
+
+Run `git -C <spec-worktree> status --porcelain` before editing. If changes exist, inspect them. Continue only when all changes belong to current work; otherwise STOP and ask user. State `<spec-worktree>` path used.
+
+Find `specs/<module>/<feature>/*.feature` under `<spec-worktree>`. `module` comes from intake -- never hard-code a module list. `<feature>` = kebab-case of affected feature area (e.g. `adhoc-review`). Full path: `specs/<module>/<feature>/<entity>-<area>.feature`. Check existing FIRST: update matching `.feature`; create new file only when none fits.
 
 Study conventions before writing: read the most recently modified `.feature` in `specs/<module>/` (or, if none, one from another module) and match its tags, section headers, role names, scenario phrasing, Background structure verbatim. State which file you used as reference.
 
@@ -150,6 +186,17 @@ Split by functional concern / bounded context (different actors, lifecycle phase
 - Scenario names: describe expected behaviour, verbatim from action.
 - Consistent role names: "HR administrator", "Head of Department", "employee", "reviewer", "manager".
 
+### Self-check (loop until clean)
+
+Run on every `.feature` written or changed this pass, after the sub-steps above:
+
+1. UI language: `grep -nEi 'click|tap|dropdown|textbox|date picker|toggle|toast|modal|spinner|redirect|sidebar|top right|highlighted|greyed' <file>` -> rewrite each hit with the behaviour table.
+2. Hard-coded messages: `grep -nE 'Then I see "' <file>` -> rewrite as an outcome, unless a comment names the legal/compliance requirement.
+3. Tags: feature header carries module + sub-feature tags; every `Scenario:` has a tag line above it; at least one `@validation` scenario per feature; `@bugfix` / `@refactor` where mandatory.
+4. Size: `wc -l <file>` <= 200.
+
+Any failure -> fix it, run all four checks again. Only a clean set goes to GATE-1. Print `Self-check: clean after <N> pass(es)` under the Totals footer.
+
 ## GATE-1 -- present + agree
 
 Present the complete L1 spec. Output a scenario-index table per `.feature` file changed or added:
@@ -172,13 +219,13 @@ Highlight assumptions and gaps. Wait for explicit agreement. On change requests,
 
 ## COMMIT? -- ask, never auto
 
-After agreement, write the `.feature` file(s) to `specs/<module>/<feature>/` in `<spec-repo>`.
+After agreement, write `.feature` file(s) to `specs/<module>/<feature>/` in `<spec-worktree>`.
 
 Then ask the user: commit/PR the spec, or leave it written and stop?
 - **No** -> leave the `.feature` files written in the working tree, stop. Nothing staged, nothing committed.
-- **Yes** -> in `<spec-repo>`: stage ONLY the `.feature` files this skill produced (`git -C <spec-repo> add <each .feature path>`) -- never `git add .`/`-A`, never any non-`.feature` path; leave all other working-tree files untouched. Commit them in `<spec-repo>`. Then optionally open a PR if the user wants one.
+- **Yes** -> in `<spec-worktree>`: stage ONLY `.feature` files this skill produced (`git -C <spec-worktree> add <each .feature path>`) -- never `git add .`/`-A`, never any non-`.feature` path; leave all other working-tree files untouched. Commit them in `<spec-worktree>`. Then optionally open a PR if user wants one.
 
-Nothing auto-commits. Never stage or commit outside `<spec-repo>`.
+Nothing auto-commits. Never stage or commit outside `<spec-worktree>`.
 
 Commit-message format when the user opts to commit:
 - new: `feat(<module>): add spec for <feature>`

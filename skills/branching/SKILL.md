@@ -5,6 +5,16 @@ description: ALWAYS use when the user needs to create, start, or checkout a new 
 
 # Branching
 
+## Contents
+
+- Overview
+- The Danger This Skill Prevents
+- Process
+- Step-by-Step
+- Safety Checklist
+- Red Flags
+- Quick Reference
+
 ## Overview
 
 Safely creates git branches with folder-based naming and correct upstream tracking. Prevents the dangerous scenario where branching from a remote tracking branch silently inherits the parent's upstream, causing pushes to go to the wrong remote branch.

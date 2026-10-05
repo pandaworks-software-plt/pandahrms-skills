@@ -5,6 +5,19 @@ description: Manually invoked as `/lint-gate` (or by an explicit "run the lint g
 
 # Lint Gate
 
+## Contents
+
+- Hard Prohibitions
+- Scope resolution
+- Guard contract
+- Phase 1: Linter
+- Phase 2: Tool Gate
+- Phase 3: Structural analyzer / duplication tier (OPTIONAL)
+- Phase 4: L1->L2 `.feature` traceability
+- Output
+- Result file
+- Rules
+
 Standalone deterministic guard runner over the working-tree diff. No LLM judgment. Runs the linter + Tool Gate + optional structural tier + L1->L2 traceability; emits findings tagged `[tool:<name>]` and returns the OWNED-category set.
 
 **Announce at start:** "I'm using Pandahrms lint-gate to run the deterministic guards on your changes."

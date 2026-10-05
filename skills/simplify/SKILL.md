@@ -5,6 +5,22 @@ description: Triggers when the user explicitly requests a simplification pass on
 
 # Simplify
 
+## Contents
+
+- Overview
+- Flags
+- Workflow
+  - Phase 0: Gather changes
+  - Phase 1: Read changed files
+  - Phase 2: Dispatch three review subagents in parallel
+  - Phase 3: Merge findings and re-classify
+  - Phase 4: Auto-apply mechanical findings
+  - Phase 5: Behavior-changing findings
+  - Phase 6: Done
+- Hard Rules
+- Out of Scope
+- Common Mistakes
+
 ## Overview
 
 Targeted simplification pass on working-tree changes. Three parallel review subagents look for duplication, quality drift, and inefficiency. Mechanical findings apply automatically. Behavior-changing findings pause for user pick. Never commits.

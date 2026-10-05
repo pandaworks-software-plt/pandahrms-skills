@@ -5,6 +5,19 @@ description: Manually invoked as `/resolve-ticket TICKET_NUMBER` (or by an expli
 
 # Resolve Ticket
 
+## Contents
+
+- Overview
+- Input
+- Phase 1: Fetch
+- Phase 2: Draft the fields
+- Phase 3: Confirm (gate)
+- Phase 4: Mutate (ordered)
+- Field rules
+  - Self-check (loop until clean)
+  - Relevance gate
+- Hard Rules
+
 ## Overview
 
 Card-less ticket resolution. Take one ticket ref, move the workspace-prod ticket to a resolved + ready-for-release state with the right fields, in the right order. Mutating. Confirms before any write. One ticket per run.
@@ -57,11 +70,31 @@ Run in this exact order:
 4. **Developer Resolution** -> `update_ticket` with `resolutionNotes`.
 5. **Customer comment** -> `add_ticket_comment` with `commentType="comment"` and the customer note.
 
+Print this checklist when Phase 4 starts; tick each step after its call returns success. A rejected step stays unticked and STOPS the run with the checklist as printed:
+
+```
+- [ ] 1 developer + needsDev=true
+- [ ] 2 devStatus ready-for-release
+- [ ] 3 status resolved + solution
+- [ ] 4 resolutionNotes
+- [ ] 5 customer comment
+```
+
 After the writes, print a one-line summary: ticketNumber, dev status set, status resolved, resolutionNotes + comment written.
 
 ## Field rules
 
 All three fields obey these rules. Apply before writing.
+
+### Self-check (loop until clean)
+
+Before Phase 3 shows the values, check every drafted field against these patterns (write the draft to a scratch file and `grep -nE` when unsure):
+
+```
+<[A-Za-z/][^>]*>|^#|\*\*|^[-*] |next release|after update|next version|once your system is updated
+```
+
+Any match -> rewrite that field, check again. Customer-facing fields get one more pass for code, file paths, function names, branch/PR refs. Zero matches -> Phase 3. After an `edit`, run this check again before re-showing.
 
 - **Plain text only.** No HTML and no Markdown formatting -- no `<p>`/`<h1>`/`<br>`/`<ul>` tags, no `#` headings, no `**bold**`, no `-`/`*` bullet markup. Use line breaks for separation.
 - **Customer-facing fields** (`solution`, the customer comment) stay in plain business language. Never code, file paths, function names, stack traces, internal IDs, or branch/PR refs.

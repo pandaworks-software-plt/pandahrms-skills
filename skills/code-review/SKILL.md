@@ -5,26 +5,40 @@ description: Triggers on mentions of code review of working-tree changes -- `/co
 
 # Code Review
 
+## Contents
+
+- Modes
+- Lint-gate consumption
+- Phase 0: Triage
+- Phase 1: Gather changes
+- Phase 2: Review (LLM judgment)
+- Phase 3: Fix
+- Phase 4: Sensitivity classification
+- Phase 5: Spec discrepancy check
+- Phase 6: Simplify
+- Phase 7: Done
+- Sub-skill failure handling
+
 Diff-scoped LLM-judgment review over the git working-tree changes. Judges SOLID intent, naming meaning, semantic reuse, audit-pattern conformance, input-validation adequacy, PII/data-exposure, error-handling adequacy, readability, and spec meaning. Fixes issues and runs /simplify. Changes code, never commits directly; standalone mode may invoke `/commit` in Phase 7.
 
-Scope boundary: this skill runs only `git status` / `git diff` / `git diff --cached`, file reads, and the phase-defined sub-skills (`/simplify`, `/security-review`, `/spec`, `/commit`). Linter, build, tests, coverage, and deterministic guards belong to `/lint-gate` and `/verify`. It never produces commit messages, PR descriptions, changelogs, migration plans, docs, branches, or PRs -- suggest in the Phase 7 summary instead.
+Scope boundary: this skill runs only `git status` / `git diff` / `git diff --cached`, file reads, and phase-defined sub-skills (`/simplify`, `/spec`, `/commit`). Linter, build, tests, coverage, and deterministic guards belong to `/lint-gate` and `/verify`. It never produces commit messages, PR descriptions, changelogs, migration plans, docs, branches, or PRs -- suggest in Phase 7 summary instead.
 
-Invoke sub-skills with the active host's skill mechanism. In Codex, when nested skill invocation is not exposed as a tool, read the sibling `../<skill-name>/SKILL.md` and execute it inline.
+Invoke sub-skills with the active host's skill mechanism. In Codex, when nested skill invocation is not exposed as a tool, read the sibling `../<skill-name>/SKILL.md` in full (to end of file) and execute it inline.
 
 ## Modes
 
 Invocation: `/code-review [mode]`. Mode omitted -> `standalone`.
 
-- `standalone` -- a dev runs the skill directly. Fully interactive; owns its own security phase and commit question.
-- `orchestrated` -- a caller (e.g. `/execute`) drives the card and owns `/security-review` and the commit step. Fix approval stays interactive.
+- `standalone` -- a dev runs skill directly. Fully interactive; owns commit question.
+- `orchestrated` -- a caller (e.g. `/execute`) drives card. Fix approval stays interactive.
 - `autonomous` -- unattended run (blast mode). No pauses; announces each auto-pick on one line (e.g. `autonomous: applying all major fixes`). Never commits.
 
 | Phase | standalone | orchestrated | autonomous |
 |-------|------------|--------------|------------|
 | 0 Triage (trivial diff) | ask: full review or commit | skip question, full review | skip question, full review |
-| 2 Security section | full shallow checklist | one-line deferral note (caller owns the deep pass) | full shallow checklist |
+| 2 Security section | full shallow checklist | full shallow checklist | full shallow checklist |
 | 3 Fix approval (Major) | ask user | ask user | auto-apply all Major fixes |
-| 4 /security-review | detect surface, ask user, may invoke | SKIP phase -- caller owns /security-review | SKIP phase -- caller owns /security-review |
+| 4 Sensitivity | classify sensitive / standard | classify sensitive / standard | classify sensitive / standard |
 | 5 Spec check | runs; ask user on gaps | runs; ask user on gaps | runs; skip the ask, record the gap, never invoke /spec |
 | 7 Commit question | ask: /commit or test first | none -- emit summary, return to caller | none -- emit summary, return to caller |
 
@@ -146,25 +160,15 @@ Work from the merged finding set (Primary + external Codex + lint-gate `[tool:*]
 2. Report Major issues: what, why it matters, proposed fix, attribution.
 3. **standalone / orchestrated:** ask the user -- apply the Major fixes, or skip? After emitting the question STOP: no edits until the user approves a specific finding.
 4. Apply approved fixes (scope-of-edits rule still binds).
+5. Re-read each edited file in full. Confirm every applied finding is closed and no new finding appeared. A finding still open -> back to step 4 once; still open after that -> list it as unresolved in Phase 7.
 
-**autonomous:** skip the question, announce `autonomous: applying all major fixes`, apply every Major finding.
+**autonomous:** skip the question, announce `autonomous: applying all major fixes`, apply every Major finding, then run step 5.
 
-## Phase 4: Security review (/security-review)
+## Phase 4: Sensitivity classification
 
-**orchestrated / autonomous:** SKIP -- the caller owns `/security-review`. Record `Security review: deferred to caller`, go to Phase 5.
-
-**standalone:** the deeper pass (OWASP Top 10, tenant isolation, PII handling, audit-trail completeness, dependency scanning). Skip (announce "Skipping security review -- no security-relevant surface in these changes.") when the diff is UI-only, docs/spec/config-only, or has no security-relevant surface: no new/modified auth, authorization, endpoints, request handlers, persistence writes, file I/O, secrets, PII fields, cross-tenant operations, or dependency additions. Unsure -> not skippable.
+Classify diff `sensitive` when it touches authentication, authorization, session, tenant boundary, money, billing, payment, database schema, migration, data rewrite, PII handling, audit logging, data retention, or risk named by design docs. Otherwise classify `standard`. Record classification for Phase 7.
 
 **UI-only definition (shared with Phase 5):** every changed file is pure styling, or a component file whose hunks touch ONLY markup, className/style, UI-primitive imports, or copy. Any hunk touching a function body, hook, store, API call, or event handler -> NOT UI-only.
-
-Security-relevant surface present -> ask the user:
-
-> "Changes include security-sensitive surface ([summary]). Run /security-review for a deeper OWASP + Pandahrms security audit?"
-
-- **Run** -> invoke `/security-review --no-commit`; it reports, may apply approved fixes, returns here. Do not re-ask about committing.
-- **Skip** -> note in the summary.
-
-Record the outcome for Phase 7: Skipped / Clean / Fixes applied / Findings acknowledged.
 
 ## Phase 5: Spec discrepancy check
 
@@ -191,7 +195,7 @@ Summarize all changes made during review:
 - Major issues fixed (with attribution)
 - Lint-gate: `consumed (OWNED: <list>)` or `not provided`
 - Codex: ran / skipped (reason) / not installed
-- Security review outcome (deferred to caller / skipped / clean / fixes applied / findings acknowledged)
+- Sensitivity (sensitive / standard)
 - Spec status (in sync / updated / gap recorded)
 - /simplify changes
 
@@ -206,7 +210,7 @@ Summarize all changes made during review:
 
 ## Sub-skill failure handling
 
-Applies whenever code-review invokes `/simplify`, `/security-review`, `/spec`, or `/commit`:
+Applies whenever code-review invokes `/simplify`, `/spec`, or `/commit`:
 
 - A sub-skill errors or times out -> record `<skill>: failed - <reason>` in the Phase 7 summary and continue. Do NOT retry in this run.
 - A sub-skill returns control with its own pending question -> surface it verbatim; resume code-review once the user answered through the sub-skill.

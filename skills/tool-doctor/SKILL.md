@@ -5,6 +5,19 @@ description: '`/tool-doctor` -- audit the work machine AND the current project f
 
 # Tool Doctor
 
+## Contents
+
+- Invocation
+- Safety (full gate -- never bypass)
+- Phase 1 -- Context detect
+- Phase 2 -- Machine scan
+- Phase 3 -- Project scan
+- Phase 4 -- Map to guard catalog
+- Phase 5 -- Report
+- Phase 6 -- Offer fixes (per-item confirm)
+- Phase 7 -- Summary
+- Red Flags -- STOP
+
 Audit the work machine + current project for the deterministic code-quality guard tools. Report readiness, then offer to install/configure what's missing.
 
 **Announce at start:** "I'm using Pandahrms tool-doctor to audit machine + project tooling."

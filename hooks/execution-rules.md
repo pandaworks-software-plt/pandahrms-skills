@@ -32,7 +32,7 @@ Real logic is never exempt: a mapping/DTO/config carrying real behavior (e.g. a 
 - Do NOT reclassify a gate at runtime -- no Auto to Manual "to be safe", no Manual to Auto "looks safe".
 - **BE to deploy to regen to FE order**: finish BE, deploy BE locally so swagger is live, regen FE types, then FE work. Never hand-edit generated types to start FE early.
 
-## Sensitivity list (sensitive-card tagging + security-review gating)
+## Sensitivity list (sensitive-card tagging + final security-review gate)
 A change is sensitive when it touches any of:
 - authentication / authorization / session
 - multi-tenant data boundary -- tenant_id filters, row-level security, cross-tenant checks
@@ -41,7 +41,7 @@ A change is sensitive when it touches any of:
 - PII handling / audit logging / data retention
 - anything a design doc flagged as risky
 
-Tag such cards sensitive; run /security-review on them.
+Tag such cards sensitive. `/commit` runs `/security-review --no-commit` once for sensitive uncommitted changes. `/pr` reuses `/commit`; never run a duplicate review.
 
 ## Spec vs code conflict
 If a spec and the code or plan disagree, STOP and report the conflict. Never silently reconcile or pick one side.
@@ -53,7 +53,7 @@ Never silently absorb a problem or a mid-run user correction. Surface concerns t
 A change is fast-lane (do it directly with TDD, no decompose, no per-card ceremony) only when ALL hold: 3 files or fewer, about 60 lines or fewer, no new public API, no new spec scenario, behavior obvious. Anything past this goes through the main flow.
 
 ## Skill invocation
-Any `/skill-name` reference inside a skill body means: invoke the bundled `pandahrms:<skill-name>` skill with the active host's skill mechanism, passing any flags as arguments. In Codex, when nested skill invocation is not exposed as a tool, read the sibling `skills/<skill-name>/SKILL.md` and execute it inline. Never print the command as chat text instead of running the skill.
+Any `/skill-name` reference inside a skill body means: invoke the bundled `pandahrms:<skill-name>` skill with the active host's skill mechanism, passing any flags as arguments. In Codex, when nested skill invocation is not exposed as a tool, read the sibling `skills/<skill-name>/SKILL.md` in full -- to end of file, never a head preview -- and execute it inline. Same for any `references/` file a skill names: read it to EOF before acting on it. Never print the command as chat text instead of running the skill.
 
 ## Output discipline (every skill, every flow)
 - Lead with the result. First line answers "what happened" or "what was found".

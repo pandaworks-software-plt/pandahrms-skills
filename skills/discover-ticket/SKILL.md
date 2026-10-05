@@ -5,6 +5,20 @@ description: The ticket intake door of the Pandahrms flow. `/discover-ticket TIC
 
 # Discover (ticket door)
 
+## Contents
+
+- Input
+- Workflow
+  - Phase 1: Fetch
+  - Phase 2: Read
+  - Phase 3: Validate + fill gaps in acceptance criteria
+  - Phase 4: Convergence gate (final move)
+  - Phase 5: Resolve output location
+  - Phase 6: Write `_overview.md`
+- Hard Rules
+- Out of Scope
+- Next step
+
 Fetch a ticket, validate its acceptance criteria, converge, emit the shared output contract. Read-only on the ticket. Writes one `_overview.md`.
 
 ## Input
@@ -108,6 +122,8 @@ work_folder: <repo-relative path to <work-folder>>
 ```
 
 Omit `## Root cause` for non-bug types. Omit `## Open questions` when none.
+
+Self-check before writing: every required field filled; `work_folder` is repo-relative; each acceptance criterion is one testable statement with no `Given`/`When`/`Then` and traces to ticket content; `Source` carries ticketNumber, customer and sys version. Any failure -> fix, check again, then write.
 
 Print the written path and a one-line summary. End. Return control to caller or user.
 

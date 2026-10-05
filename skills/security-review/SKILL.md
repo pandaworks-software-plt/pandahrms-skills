@@ -5,6 +5,24 @@ description: Triggers when the user requests a security review of code or workin
 
 # Security Review
 
+## Contents
+
+- Overview
+- Hard Prohibitions
+- Entry Criteria
+- Workflow
+  - Phase 0: Scope
+  - Phase 1: Detect Project Type
+  - Phase 2: Threat Pass
+  - Phase 3: OWASP Checklist
+  - Phase 4: Pandahrms-Specific Checks
+  - Phase 5: Secret and Credential Scan
+  - Phase 6: Categorize and Report
+  - Phase 7: Fix (Optional)
+  - Phase 8: Handoff
+- Red Flags - STOP
+- Common Mistakes
+
 ## Overview
 
 Focused security audit of code under review. Scans working tree changes (or specified feature area) for vulnerabilities using OWASP Top 10 and Pandahrms-specific threat patterns (tenant isolation, audit trails, PII handling). Reports findings by severity and optionally fixes approved issues. Never commits on its own.
@@ -241,13 +259,13 @@ Summarize:
 - What was fixed (if any)
 - Residual risk the user is accepting (if any)
 
-**If `--no-commit` set (review-only mode):** emit the summary above and STOP. Do NOT ask the commit/test question, do NOT invoke `/commit`. Return control to the caller (the caller owns the commit gate). Used when a caller such as `/code-review` or `/execute` invokes this skill for findings only.
+**If `--no-commit` set (review-only mode):** emit summary above and STOP. Do NOT ask commit/test question, do NOT invoke `/commit`. Return control to caller.
 
 Then ask the user:
 
 > "Security review complete. Would you like to proceed to /commit, or test first?"
 
-- **Commit** -- invoke the bundled `/commit` skill using the active host's skill mechanism, then end security-review immediately after it starts. In Codex, load and follow `../commit/SKILL.md` inline when nested skill invocation is not exposed as a tool. Do not produce additional output, findings, or commentary after dispatch.
+- **Commit** -- invoke the bundled `/commit` skill using the active host's skill mechanism, then end security-review immediately after it starts. In Codex, read `../commit/SKILL.md` in full (to end of file) and follow it inline when nested skill invocation is not exposed as a tool. Do not produce additional output, findings, or commentary after dispatch.
 - **Test first** -- emit exactly the single line "Sounds good. Run /commit when you're ready." and end turn. Do not add further text.
 
 After Phase 8 ends, security-review is complete. Do not continue executing security-review behavior (no further audits, follow-up advice, or additional checks) in same turn.

@@ -5,6 +5,24 @@ description: '`/slice` -- cut agreed work into independently-completable cards. 
 
 # Pandahrms Slice
 
+## Contents
+
+- Input
+- Slicing heuristic
+- Collapse Rule
+- Architecture detection
+- Each card
+- Sequence templates
+- Card category
+- Sensitivity tagging
+- Card store
+- Card template
+- Cross-repo card
+- Self-check (loop until clean)
+- Card set output
+- Rules
+- Next step
+
 Cut agreed work into independently-completable cards. Group by capability where it helps; strict vertical slicing is not required. Each card carries its own L2 spec file(s) and an ordered work-sequence checklist. Show the card list, write the files, proceed -- no confirmation gate.
 
 **Announce at start:** "I'm using Pandahrms slice to cut this into work cards."
@@ -115,7 +133,7 @@ Tag a card `sensitive` when it touches any of:
 - PII handling / audit logging / data retention
 - anything a design doc flagged as risky
 
-Sensitive cards add /security-review to the sequence; standard cards skip it.
+Sensitive cards preserve tag for final branch security gate. Card execution sequence does not include security review.
 
 ## Card store
 
@@ -163,6 +181,18 @@ sensitivity: sensitive | standard
 
 A card spanning BE + FE is one logical unit. No commit or PR per card; the 2 linked PRs (one per repo) are raised at the END for the whole work via `/pr`, each cross-linking the other. Flag the cross-repo span on the card.
 
+## Self-check (loop until clean)
+
+Before showing the list, check every drafted card:
+
+1. Frontmatter carries all eight keys (`title`, `order`, `created`, `status`, `project`, `layers`, `category`, `sensitivity`); every template section is present.
+2. Each `L1 covered` entry names a real scenario: `grep -nF 'Scenario: <name>' <L1 .feature>` finds it. No hit -> fix the name or drop the claim.
+3. Sequence matches the detected architecture and the card's `layers` (cross-repo cards carry DEPLOY BE + FE generate API; monolith cards do not).
+4. Sensitivity list applied; `sensitive` set when any item matches.
+5. L2 paths sit under folders that exist in the real layout.
+
+Any failure -> fix the card, check again. Only a clean set is shown and written.
+
 ## Card set output
 
 After drafting the card set, show the user the ordered list -- each line: order, title, layers, category, sensitivity, one-line capability. Then write the card files to the resolved store in the same turn -- no confirmation gate. When the user requests changes after seeing the list, revise the affected card files in place and re-show the list.
@@ -173,7 +203,7 @@ After drafting the card set, show the user the ordered list -- each line: order,
 - Collapse steps into one card when they are same concern + causally chained + can't parallelise.
 - Tag every card with one category (implementation/data-migration/deployment/testing/refactor/config). Default `implementation`; use another only when that is the card's whole point.
 - Default to one capability card spanning categories; group same-category tasks together. Break out a same-category card ONLY when that block is BOTH substantial AND independently shippable -- never split on category difference alone, never make a card with no standalone value. Substantial = the block alone would carry 3+ sequence steps OR includes an EF migration. Independently shippable = it delivers verifiable value with no other card. Default: if unsure whether to split, do NOT split. Collapse Rule still overrides for same-concern causally-chained steps.
-- Always check the sensitivity list. Auth, tenant boundary, billing, schema, PII force `sensitive` + /security-review in the sequence.
+- Always check sensitivity list. Auth, tenant boundary, billing, schema, or PII force `sensitive`; preserve tag for final branch gate.
 - Cross-repo slice deploys BE then regenerates FE API types before FE work. Only monolith/MVC5/monorepo skips that bridge.
 - Slice DECIDES the L2 spec paths; the writing happens later.
 - Show the ordered card list, write the files, proceed -- no confirmation gate. Revise card files in place on user-requested changes.
